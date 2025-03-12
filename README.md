@@ -31,7 +31,21 @@ runApiServer()
 
 This will start the API server on port 8585.
 
-Swagger API UI can be accessed at: http://127.0.0.1:8585/__docs__/
+The main endpoint is: http://127.0.0.1:8585/getCodeCounts?conceptIds=<concept_id_1>,<concept_id_2>,...
+
+For example, http://127.0.0.1:8585/getCodeCounts?conceptIds=201826
+
+This will return the code counts for the concept ids 201826.
+
+Separated in 3 tables:
+
+- `concept_relationship`: relationships between conceptIds
+- `concept`: information about the conceptIds
+- `code_counts`: patient counts by conceptId stratified by gender, year, and age decile
+
+
+
+See the API documentation for more details: http://127.0.0.1:8585/__docs__/
 
 
 ### Running the API Server with a custom database
