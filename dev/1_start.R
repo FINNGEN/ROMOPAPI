@@ -22,3 +22,7 @@ usethis::use_description(
 usethis::use_readme_md()
 
 usethis::use_git()
+
+usethis::use_github(organisation = "FINNGEN", private = FALSE)
+
+renv::init()
