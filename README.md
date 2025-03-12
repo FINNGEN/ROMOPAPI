@@ -1,74 +1,72 @@
 # ROMOPAPI
 
-API to access OMOP CDM database
+API to access OMOP CDM (Observational Medical Outcomes Partnership Common Data Model) database
 
 ## Installation
 
-You can install the development version of ROMOPAPI from GitHub with:
+You can install ROMOPAPI from GitHub with:
 
 ```r
-# install.packages("devtools")
-devtools::install_github("javier-gracia-tabuenca-tuni/ROMOPAPI")
+# install.packages("remotes")
+remotes::install_github("FINNGEN/ROMOPAPI")
 ```
 
 ## Usage
 
-### Validation Functions
+### Running the API Server with the default testing database
 
-ROMOPAPI provides validation functions to ensure your data meets the expected format:
+The simplest way to start the API server is:
 
-```r
-library(ROMOPAPI)
-
-# Validate integer vectors
-ids <- c(1, 2, 3)
-validated_ids <- toAccept(ids, "ids")
-print(validated_ids)  # Will be converted to integer: 1L, 2L, 3L
-
-# This will throw an error
-tryCatch({
-  toAccept(c(1.5, 2.5), "ids")
-}, error = function(e) {
-  print(e$message)
-})
-```
-
-### REST API
-
-ROMOPAPI includes a plumber API that you can use to expose your functions as REST endpoints:
+Create a folder to store the testing databases. This saves time as the databases dont have to be downloaded every time the API server is started.
 
 ```r
 library(ROMOPAPI)
 
-# Create the API
-api <- create_api()
+# Set the folder to store the testing databases
+Sys.setenv(EUNOMIA_DATA_FOLDER = "<full_path_to_local_eunomia_data_folder>")
 
-# Run the API
-plumber::pr_run(api, port = 8000)
+# Run the API server with default settings (uses test FinnGen Eunomia database)
+runApiServer()
 ```
 
-Once the API is running, you can access the following endpoints:
+This will start the API server on port 8585.
 
-- `GET /health`: Check the health status of the API
-- `GET /process-ids?ids=1,2,3`: Process a comma-separated list of integer IDs
-- `POST /batch-process`: Process a batch of IDs (JSON body with an "ids" field)
+Swagger API UI can be accessed at: http://127.0.0.1:8585/__docs__/
 
-Example of using the API with curl:
 
-```bash
-# Check health
-curl http://localhost:8000/health
+### Running the API Server with a custom database
 
-# Process IDs via GET
-curl http://localhost:8000/process-ids?ids=1,2,3
+Create a custom database configuration.
 
-# Process IDs via POST
-curl -X POST http://localhost:8000/batch-process \
-  -H "Content-Type: application/json" \
-  -d '{"ids": [1, 2, 3]}'
+Create a yaml file with the database configuration.
+
+For example, `database_config.yml`:
+```yaml     
+cohortTableHandler:
+    database:
+      databaseId: F1
+      databaseName: FinnGen
+      databaseDescription: Eunomia database FinnGen
+    connection:
+      connectionDetailsSettings:
+          dbms: sqlite
+          server: <pathToFinnGenEunomiaSqlite>
+    cdm:
+        cdmDatabaseSchema: main
+        vocabularyDatabaseSchema: main
 ```
 
-## License
+Run the API server with the custom configuration.
 
-MIT
+```r
+library(ROMOPAPI)
 
+databaseConfig <- yaml::read_yaml("path/to/database_config.yml")
+
+# Run the API server with custom configuration
+runApiServer(
+  cohortTableHandlerConfig = databaseConfig,
+  host = "0.0.0.0",  # Allow external connections
+  port = 8080
+)
+```

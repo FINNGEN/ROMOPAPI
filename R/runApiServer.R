@@ -1,6 +1,13 @@
+#' Run the ROMOPAPI API server
+#' 
+#' @param cohortTableHandlerConfig Configuration for connecting to the OMOP CDM database. If NULL, uses test Eunomia database
+#' @param host Host address to run the API server on. Defaults to "127.0.0.1"
+#' @param port Port number to run the API server on. Defaults to 8585
+#' @param ... Additional arguments passed to plumber::pr_run()
+#' @export
 runApiServer <- function(
     cohortTableHandlerConfig = NULL,
-    host = "127.0.0.1",
+    host = "127.0.0.1", 
     port = 8585,
     ...) {
     #
