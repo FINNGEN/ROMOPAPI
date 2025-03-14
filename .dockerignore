@@ -1,0 +1,12 @@
+.git
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.DS_Store
+renv/library
+renv/local
+renv/staging
+renv/cache
+tests/testthat/_snaps
+dev/ 

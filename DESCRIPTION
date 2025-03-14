@@ -23,6 +23,8 @@ Imports:
     HadesExtras,
     rlang,
     utils
+Remotes:
+    FINNGEN/HadesExtras
 Suggests: 
     testthat (>= 3.0.0),
     bigrquery,
