@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev li
 
 # Install renv and restore packages
 RUN Rscript -e 'install.packages("remotes")'
-RUN Rscript -e 'remotes::install_github("FINNGEN/ROMOPAPI", force = TRUE)'
+RUN Rscript -e 'remotes::install_github("FINNGEN/ROMOPAPI", force = TRUE);'
 
 # Expose the port that the API will run on
 EXPOSE 8585
