@@ -1,5 +1,19 @@
 # plumber.R
 
+#* @filter cors
+function(req, res) {
+  res$setHeader("Access-Control-Allow-Origin", "*")
+  res$setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+  res$setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+  
+  if (req$REQUEST_METHOD == "OPTIONS") {
+    res$status <- 200
+    return(list())
+  } else {
+    plumber::forward()
+  }
+}
+
 #* Echo the parameter that was sent in
 #* @param msg The message to echo back.
 #* @get /echo

@@ -50,6 +50,14 @@ runApiServer <- function(
         )
     )
 
+    # Add CORS middleware
+    plumberRouter <- plumberRouter |>
+        plumber::pr_set_docs(docs = TRUE) |>
+        plumber::pr_set_api_spec(function(spec) {
+            spec$components$parameters <- list()
+            return(spec)
+        })
+
     # Run plumber router
     plumberRouter |>
         plumber::pr_run(
