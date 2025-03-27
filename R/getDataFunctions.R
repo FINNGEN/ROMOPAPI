@@ -38,7 +38,7 @@ getCodeCounts <- function(
     #
 
     # - Get concept_relationships
-    sql <- "SELECT * FROM @vocabularyDatabaseSchema.concept_relationship WHERE relationship_id IN ('Maps to', 'Subsumes') AND concept_id_1 IN (@conceptIds);"
+    sql <- "SELECT * FROM @vocabularyDatabaseSchema.concept_relationship WHERE relationship_id IN ('Maps to', 'Subsumes') AND concept_id_2 IN (@conceptIds);"
     sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","))
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     concept_relationships <- DatabaseConnector::dbGetQuery(connection, sql) |> tibble::as_tibble()

@@ -8,3 +8,5 @@
 renv/
 renv.lock
 .Rprofile
+
+eunomia_data/

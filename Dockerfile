@@ -22,14 +22,16 @@ RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev li
 
 # Install renv and restore packages
 RUN Rscript -e 'install.packages("remotes")'
-RUN Rscript -e 'remotes::install_github("FINNGEN/ROMOPAPI")'
+RUN Rscript -e 'remotes::install_github("FINNGEN/ROMOPAPI", force = TRUE)'
 
 # Expose the port that the API will run on
 EXPOSE 8585
 
 # Create a directory for Eunomia data
 RUN mkdir -p /eunomia_data
+COPY eunomia_data/FinnGenR12_v5.4.sqlite /eunomia_data/FinnGenR12_v5.4.sqlite
+COPY eunomia_data/FinnGenR12_v5.4.zip /eunomia_data/FinnGenR12_v5.4.zip
 ENV EUNOMIA_DATA_FOLDER=/eunomia_data
 
 # Run the API server
-CMD ["Rscript", "-e", "remotes::install_github('FINNGEN/ROMOPAPI')"] 
+CMD ["Rscript", "-e", "ROMOPAPI::runApiServer(host = '0.0.0.0', port = 8585)"] 
