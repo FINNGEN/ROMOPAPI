@@ -22,11 +22,13 @@ Create a folder to store the testing databases. This saves time as the databases
 ```r
 library(ROMOPAPI)
 
+
 # Set the folder to store the testing databases
 Sys.setenv(EUNOMIA_DATA_FOLDER = "<full_path_to_local_eunomia_data_folder>")
 
 # Run the API server with default settings (uses test FinnGen Eunomia database)
 runApiServer()
+
 ```
 
 This will start the API server on port 8585.

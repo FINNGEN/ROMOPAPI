@@ -10,3 +10,5 @@ renv.lock
 .Rprofile
 
 eunomia_data/
+
+errorReportSql.txt
