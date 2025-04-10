@@ -29,9 +29,10 @@ EXPOSE 8585
 
 # Create a directory for Eunomia data
 RUN mkdir -p /eunomia_data
-COPY eunomia_data/FinnGenR12_v5.4.sqlite /eunomia_data/FinnGenR12_v5.4.sqlite
-COPY eunomia_data/FinnGenR12_v5.4.zip /eunomia_data/FinnGenR12_v5.4.zip
 ENV EUNOMIA_DATA_FOLDER=/eunomia_data
+
+# Copy the database into the container
+RUN Rscript -e 'ROMOPAPI::helper_FinnGen_getDatabaseFile()'
 
 # Run the API server
 CMD ["Rscript", "-e", "ROMOPAPI::runApiServer(host = '0.0.0.0', port = 8585)"] 
