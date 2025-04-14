@@ -37,10 +37,44 @@ getCodeCounts <- function(
     #
 
     # - Get concept_relationships
+    # Get all the relationships for the conceptIds of type 'Maps to', 'Mapped from', 'Is a', 'Subsumes'
     sql <- "SELECT * FROM @vocabularyDatabaseSchema.concept_relationship WHERE relationship_id IN ('Maps to','Mapped from', 'Is a', 'Subsumes') AND concept_id_1 IN (@conceptIds);"
     sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","))
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-    concept_relationships <- DatabaseConnector::dbGetQuery(connection, sql) |> tibble::as_tibble()
+    concept_relationships <- DatabaseConnector::dbGetQuery(connection, sql) |>
+        tibble::as_tibble() |>
+        dplyr::select(
+            concept_id_1,
+            concept_id_2,
+            relationship_id
+        ) |> 
+        dplyr::filter(
+            concept_id_1 != concept_id_2
+        )
+
+    descendantConceptIds <- c(
+        concept_relationships |>
+            dplyr::pull(concept_id_2),
+        concept_relationships |>
+            dplyr::pull(concept_id_1)
+    ) |>
+        unique()
+
+    # - Get code counts
+    # Get all the code counts for the descendantConceptIds
+    sql <- "SELECT * FROM @resultsDatabaseSchema.code_counts WHERE concept_id IN (@descendantConceptIds);"
+    sql <- SqlRender::render(sql, resultsDatabaseSchema = resultsDatabaseSchema, descendantConceptIds = paste(descendantConceptIds, collapse = ","))
+    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
+    code_counts <- DatabaseConnector::dbGetQuery(connection, sql) |>
+        tibble::as_tibble() |>
+        dplyr::select(-domain)
+
+    # if the code_count is 0 for 'Mapped from' or 'Mapped to', remove from concept_relationships
+    concept_relationships <- concept_relationships |>
+        dplyr::semi_join(
+            code_counts,
+            by = c( "concept_id_2" = "concept_id")
+        )
 
     descendantConceptIds <- c(
         concept_relationships |>
@@ -51,17 +85,13 @@ getCodeCounts <- function(
         unique()
 
     # - Get concepts
+    # Get all the concepts for the descendantConceptIds
     sql <- "SELECT * FROM @vocabularyDatabaseSchema.concept WHERE concept_id IN (@descendantConceptIds);"
     sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, descendantConceptIds = paste(descendantConceptIds, collapse = ","))
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     concepts <- DatabaseConnector::dbGetQuery(connection, sql) |> tibble::as_tibble()
 
 
-    # - Get code counts
-    sql <- "SELECT * FROM @resultsDatabaseSchema.code_counts WHERE concept_id IN (@conceptIds);"
-    sql <- SqlRender::render(sql, resultsDatabaseSchema = resultsDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","))
-    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-    code_counts <- DatabaseConnector::dbGetQuery(connection, sql) |> tibble::as_tibble()
 
     return(list(
         concept_relationships = concept_relationships,

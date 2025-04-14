@@ -86,3 +86,18 @@ runApiServer(
   port = 8080
 )
 ```
+
+
+# DEVELOPMENT
+
+## Run API with AtlasDevelopment
+
+```r
+library(ROMOPAPI)
+
+databasesConfig <- HadesExtras::readAndParseYaml(system.file("testdata", "config", "atlasDev_databasesConfig.yml", package = "ROMOPAPI"))
+bigrquery::bq_auth(path = Sys.getenv("GCP_SERVICE_KEY"))
+# Run the API server with default settings (uses test FinnGen Eunomia database)
+runApiServer(cohortTableHandlerConfig = databasesConfig$BQ5k$cohortTableHandler)
+
+```
