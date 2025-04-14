@@ -1,7 +1,7 @@
-BQ5K:
+BQ5k:
   cohortTableHandler:
     database:
-      databaseId: BQ5K
+      databaseId: BQ5k
       databaseName: bigquery5k
       databaseDescription: BigQuery database
     connection:
@@ -15,6 +15,7 @@ BQ5K:
     cdm:
         cdmDatabaseSchema: atlas-development-270609.etl_sam_r12_5k_omop
         vocabularyDatabaseSchema: atlas-development-270609.etl_sam_r12_5k_omop
+        resultsDatabaseSchema: atlas-development-270609.sandbox
     cohortTable:
         cohortDatabaseSchema: atlas-development-270609.sandbox
         cohortTableName: hadesextras_test_cohort_table_<timestamp>
@@ -35,6 +36,7 @@ BQ500k:
     cdm:
         cdmDatabaseSchema: atlas-development-270609.etl_sam_dev_omop
         vocabularyDatabaseSchema: atlas-development-270609.etl_sam_dev_omop
+        resultsDatabaseSchema: atlas-development-270609.sandbox
     cohortTable:
         cohortDatabaseSchema: atlas-development-270609.sandbox
         cohortTableName: hadesextras_test_cohort_table_<timestamp>
