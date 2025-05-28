@@ -36,3 +36,20 @@ test_that("getCodeCounts works", {
     expect_equal(concept_relationships_ids)
 
 })
+
+test_that("getListOfConcepts works", {
+  CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+  withr::defer({CDMdbHandler$finalize()})
+
+  createCodeCountsTable(CDMdbHandler)
+
+  concepts <- getListOfConcepts(CDMdbHandler)
+
+  expect_true(all(c("concept_id", "concept_name", "vocabulary_id", "standard_concept") %in% colnames(concepts)))
+  expect_gt(nrow(concepts), 0)
+  # Validate column types
+  expect_type(concepts$concept_id, "double")
+  expect_type(concepts$concept_name, "character") 
+  expect_type(concepts$vocabulary_id, "character")
+  expect_type(concepts$standard_concept, "logical")
+})

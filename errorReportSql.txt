@@ -2,54 +2,13 @@ DBMS:
 sqlite
 
 Error:
-near "@scratchDatabaseSchema": syntax error
+no such table: main.code_counts
 
 SQL:
-INSERT INTO @scratchDatabaseSchema.code_counts
-SELECT 
-    CAST(cc.domain AS TEXT) AS domain,
-    CAST(cc.concept_id AS BIGINT) AS concept_id,
-    CAST(cc.calendar_year AS INTEGER) AS calendar_year,
-    CAST(cc.gender_concept_id AS BIGINT) AS gender_concept_id,
-    CAST(cc.age_decile AS INTEGER) AS age_decile,
-    CAST(cc.n_persons_with_code AS BIGINT) AS n_persons_with_code,
-    CAST(oc.count_value AS BIGINT) AS n_persons_with_observation
-FROM (
-    SELECT 
-        'Condition' AS domain,
-        t.condition_concept_id AS concept_id,
-        CAST(STRFTIME('%Y', t.condition_start_date, 'unixepoch') AS INT) AS calendar_year,
-        p.gender_concept_id AS gender_concept_id,
-        FLOOR((CAST(STRFTIME('%Y', t.condition_start_date, 'unixepoch') AS INT) - p.year_of_birth) / 10) AS age_decile,
-        COUNT(DISTINCT p.person_id) AS n_persons_with_code
-    FROM 
-        main.person p
-    JOIN 
-        main.condition_occurrence t
-    ON 
-        p.person_id = t.person_id
-    JOIN 
-        main.observation_period op 
-    ON 
-        t.person_id = op.person_id
-    AND 
-        t.condition_start_date >= op.observation_period_start_date
-    AND 
-        t.condition_start_date <= op.observation_period_end_date
-    WHERE
-        t.condition_concept_id != 0
-    GROUP BY
-        t.condition_concept_id,
-        CAST(STRFTIME('%Y', t.condition_start_date, 'unixepoch') AS INT),
-        p.gender_concept_id,
-        FLOOR((CAST(STRFTIME('%Y', t.condition_start_date, 'unixepoch') AS INT) - p.year_of_birth) / 10)
-) cc
-JOIN
-    @scratchDatabaseSchema.observation_counts oc
-ON
-    CAST(cc.calendar_year AS TEXT) = oc.calendar_year
-    AND CAST(cc.gender_concept_id AS TEXT) = oc.gender_concept_id 
-    AND CAST(cc.age_decile AS TEXT) = oc.age_decile
+    SELECT DISTINCT c.concept_id, c.concept_name, c.vocabulary_id 
+       FROM main.concept c 
+       INNER JOIN main.code_counts cc 
+       ON c.concept_id = cc.concept_id;
 
 R version:
 R version 4.4.1 (2024-06-14)

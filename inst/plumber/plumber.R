@@ -21,15 +21,6 @@ function(msg=""){
   list(msg = paste0("The message is: '", msg, "'"))
 }
 
-#* Get the CDM source information
-#* @get /getCDMSource
-function(){
-  getCDMSource(
-    CDMdbHandler = CDMdbHandler
-  )
-}
-
-
 #* Get the code counts for a given concept ID
 #* @param conceptIds A vector of concept IDs
 #* @get /getCodeCounts
@@ -47,6 +38,23 @@ function(
   getCodeCounts(
     CDMdbHandler = CDMdbHandler, 
     conceptIds = conceptIds
+  )
+}
+
+
+#* Get the CDM source information
+#* @get /getCDMSource
+function(){
+  getCDMSource(
+    CDMdbHandler = CDMdbHandler
+  )
+}
+
+#* Get the list of concepts with code counts
+#* @get /getListOfConcepts
+function() {
+  getListOfConcepts(
+    CDMdbHandler = CDMdbHandler
   )
 }
 
