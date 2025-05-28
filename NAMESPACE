@@ -3,6 +3,7 @@
 export(create_api)
 export(getCDMSource)
 export(getCodeCounts)
+export(getListOfConcepts)
 export(helper_FinnGen_getDatabaseFile)
 export(runApiServer)
 importFrom(DatabaseConnector,dbGetQuery)

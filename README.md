@@ -70,6 +70,22 @@ cohortTableHandler:
     cdm:
         cdmDatabaseSchema: main
         vocabularyDatabaseSchema: main
+        resultsDatabaseSchema: main
+```
+
+If it is the first time running the API server with the custom database, you need to run the following command to create the code counts table.
+
+```r
+databaseConfig <- yaml::read_yaml("path/to/database_config.yml")
+
+ CDMdbHandler  <- HadesExtras::createCDMdbHandlerFromList(
+  databaseConfig$cohortTableHandler, 
+  loadConnectionChecksLevel = "basicChecks"
+)
+ 
+ROMOPAPI::createCodeCountsTable(
+  CDMdbHandler = CDMdbHandler
+)
 ```
 
 Run the API server with the custom configuration.

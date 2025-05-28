@@ -130,3 +130,47 @@ getCDMSource <- function(
 
     return(cdm_source)
 }
+
+
+#' Get list of concepts with code counts
+#'
+#' @param CDMdbHandler A CDMdbHandler object that contains database connection details
+#'
+#' @return A tibble with concept_id, concept_name, vocabulary_id, and standard_concept for concepts present in code_counts
+#'
+#' @importFrom checkmate assertClass
+#' @importFrom SqlRender render translate
+#' @importFrom DatabaseConnector dbGetQuery
+#' @importFrom tibble as_tibble
+#' @export
+getListOfConcepts <- function(
+    CDMdbHandler) {
+    #
+    # VALIDATE
+    #
+    CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
+
+    connection <- CDMdbHandler$connectionHandler$getConnection()
+    vocabularyDatabaseSchema <- CDMdbHandler$vocabularyDatabaseSchema
+    resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+
+    #
+    # FUNCTION
+    #
+    # Get concept_id, concept_name, vocabulary_id, standard_concept for all concept_ids present in code_counts in one SQL call
+    sql <- "
+    SELECT DISTINCT c.concept_id, c.concept_name, c.vocabulary_id, c.standard_concept
+       FROM @vocabularyDatabaseSchema.concept c 
+       INNER JOIN @resultsDatabaseSchema.code_counts cc 
+       ON c.concept_id = cc.concept_id;"
+    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, resultsDatabaseSchema = resultsDatabaseSchema)
+    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
+    concepts <- DatabaseConnector::dbGetQuery(connection, sql) |> tibble::as_tibble() |> 
+        dplyr::mutate(standard_concept = dplyr::if_else(is.na(standard_concept), TRUE, FALSE))
+
+    return(concepts)
+}
+
+
+
+
