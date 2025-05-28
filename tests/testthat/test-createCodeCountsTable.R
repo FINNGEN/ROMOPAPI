@@ -20,4 +20,9 @@ test_that("createCodeCountsTable works", {
   code_counts |> dplyr::filter(descendant_person_counts < person_counts) |> dplyr::count() |> dplyr::pull(n) |> expect_equal(0)
   code_counts |> dplyr::filter(descendant_incidence_person_counts < incidence_person_counts) |> dplyr::count() |> dplyr::pull(n) |> expect_equal(0)
   code_counts |> dplyr::filter(descendant_event_counts < event_counts) |> dplyr::count() |> dplyr::pull(n) |> expect_equal(0)
+
+
+  if(testingDatabase == "Eunomia-FinnGen") {
+    code_counts |> dplyr::count() |> dplyr::pull(n) |> expect_equal(92046)
+  }
 })

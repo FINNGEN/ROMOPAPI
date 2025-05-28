@@ -10,7 +10,7 @@ WITH code_counts AS (
         ccm.age_decile AS age_decile,
         COUNT_BIG(*) AS event_counts,
         COUNT_BIG(DISTINCT ccm.person_id) AS person_counts,
-        SUM(CASE WHEN ccm.calendar_year = ccm.min_calendar_year THEN 1 ELSE 0 END) AS incidence_person_counts
+        COUNT(DISTINCT CASE WHEN ccm.calendar_year = ccm.min_calendar_year THEN ccm.person_id END) AS incidence_person_counts
     FROM (
         -- get all person_ids with the concept_id with in a valid observation period
         -- calculate the calendar year, gender_concept_id, age_decile
@@ -21,7 +21,7 @@ WITH code_counts AS (
             YEAR(t.@date_field) AS calendar_year,
             p.gender_concept_id AS gender_concept_id,
             FLOOR((YEAR(t.@date_field) - p.year_of_birth) / 10) AS age_decile,
-            MIN(YEAR(t.@date_field)) AS min_calendar_year
+            MIN(YEAR(t.@date_field)) OVER (PARTITION BY p.person_id, t.@concept_id_field) AS min_calendar_year
         FROM
             @cdmDatabaseSchema.person p
         JOIN 
@@ -38,9 +38,6 @@ WITH code_counts AS (
             t.@date_field <= op.observation_period_end_date
         WHERE
             t.@concept_id_field != 0
-        GROUP BY
-            t.@concept_id_field,
-            t.person_id
     ) ccm
     GROUP BY
         ccm.concept_id,
@@ -59,16 +56,16 @@ descendant_counts AS (
         cc.event_counts AS event_counts,
         cc.person_counts AS person_counts,
         cc.incidence_person_counts AS incidence_person_counts,
-        SUM(cc2.event_counts) + cc.event_counts AS descendant_event_counts,
-        SUM(cc2.person_counts) + cc.person_counts AS descendant_person_counts,
-        SUM(cc2.incidence_person_counts) + cc.incidence_person_counts AS descendant_incidence_person_counts
+        SUM(COALESCE(cc2.event_counts, 0)) + cc.event_counts AS descendant_event_counts,
+        SUM(COALESCE(cc2.person_counts, 0)) + cc.person_counts AS descendant_person_counts,
+        SUM(COALESCE(cc2.incidence_person_counts, 0)) + cc.incidence_person_counts AS descendant_incidence_person_counts
     FROM
         code_counts cc
-    JOIN
+    LEFT JOIN
         @cdmDatabaseSchema.concept_ancestor ca
     ON
         cc.concept_id = ca.ancestor_concept_id
-    JOIN
+    LEFT JOIN
         code_counts cc2
     ON
         ca.descendant_concept_id = cc2.concept_id
