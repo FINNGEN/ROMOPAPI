@@ -6,8 +6,9 @@ SELECT
     CAST(cc.calendar_year AS INTEGER) AS calendar_year,
     CAST(cc.gender_concept_id AS BIGINT) AS gender_concept_id,
     CAST(cc.age_decile AS INTEGER) AS age_decile,
-    CAST(cc.n_persons_with_code AS BIGINT) AS n_persons_with_code,
-    CAST(oc.count_value AS BIGINT) AS n_persons_with_observation
+    CAST(cc.event_counts AS BIGINT) AS event_counts,
+    CAST(cc.person_counts AS BIGINT) AS person_counts,
+    CAST(oc.total_person_counts AS BIGINT) AS total_person_counts
 FROM (
     SELECT 
         '@domain_id' AS domain,
@@ -15,7 +16,8 @@ FROM (
         YEAR(t.@date_field) AS calendar_year,
         p.gender_concept_id AS gender_concept_id,
         FLOOR((YEAR(t.@date_field) - p.year_of_birth) / 10) AS age_decile,
-        COUNT_BIG(DISTINCT p.person_id) AS n_persons_with_code
+        COUNT_BIG(DISTINCT p.person_id) AS person_counts,
+        COUNT_BIG(*) AS event_counts
     FROM 
         @cdmDatabaseSchema.person p
     JOIN 
