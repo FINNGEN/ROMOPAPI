@@ -15,7 +15,7 @@ WITH rawData AS (
     t1.obs_year as  calendar_year,
     p1.gender_concept_id as gender_concept_id,
     floor((t1.obs_year - p1.year_of_birth)/10) as age_decile,
-    COUNT_BIG(distinct p1.PERSON_ID) as count_value
+    COUNT_BIG(distinct p1.PERSON_ID) as total_person_counts
   from
     @cdmDatabaseSchema.person p1
     inner join
@@ -34,7 +34,7 @@ SELECT
   CAST(calendar_year AS VARCHAR(255)) as calendar_year,
   cast(gender_concept_id as varchar(255)) as gender_concept_id,
   cast(age_decile as varchar(255)) as age_decile,
-  count_value
+  total_person_counts
 INTO @resultsDatabaseSchema.observation_counts
 FROM rawData;
 

@@ -59,8 +59,13 @@ createCodeCountsTable <- function(
         calendar_year INTEGER,
         gender_concept_id INTEGER,
         age_decile INTEGER,
-        n_persons_with_code INTEGER,
-        n_persons_with_observation INTEGER
+        event_counts INTEGER,
+        person_counts INTEGER,
+        incidence_person_counts INTEGER,
+        descendant_event_counts INTEGER,
+        descendant_person_counts INTEGER,
+        descendant_incidence_person_counts INTEGER,
+        total_person_counts INTEGER
     )"
     sql <- SqlRender::render(sql,
         resultsDatabaseSchema = resultsDatabaseSchema
