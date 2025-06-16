@@ -1,14 +1,22 @@
 -- Modified from Achilles https://github.com/OHDSI/Achilles/blob/main/inst/sql/sql_server/analyses/116.sql
 DROP TABLE IF EXISTS @resultsDatabaseSchema.observation_counts;
 
+CREATE TABLE @resultsDatabaseSchema.observation_counts (
+  analysis_id int,
+  calendar_year varchar(255),
+  gender_concept_id varchar(255),
+  age_decile varchar(255),
+  total_person_counts int
+);
+
+INSERT INTO @resultsDatabaseSchema.observation_counts
 -- Find min and max year in observation_period
-WITH min_max_year AS (
+WITH RECURSIVE min_max_year AS (
   SELECT 
     MIN(YEAR(observation_period_start_date)) AS min_year,
     MAX(YEAR(observation_period_end_date)) AS max_year
-  FROM observation_period
+  FROM @cdmDatabaseSchema.observation_period
 ),
--- Generate a series of years between min_year and max_year
 years AS (
   SELECT min_year AS obs_year, max_year
   FROM min_max_year
@@ -43,6 +51,5 @@ SELECT
   cast(gender_concept_id as varchar(255)) as gender_concept_id,
   cast(age_decile as varchar(255)) as age_decile,
   total_person_counts
-INTO @resultsDatabaseSchema.observation_counts
 FROM rawData;
 

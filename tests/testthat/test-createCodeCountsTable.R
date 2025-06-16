@@ -7,7 +7,8 @@ test_that("createCodeCountsTable works", {
   createCodeCountsTable(CDMdbHandler)
 
   # - Check if the table was created
-  code_counts <- CDMdbHandler$connectionHandler$tbl("code_counts")
+  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+  code_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".code_counts"))
 
   code_counts |>
     dplyr::count() |>
@@ -57,8 +58,8 @@ test_that("createCodeCountsTable works", {
   }
 
   # check that all the conditions in code_counts are in the condition_occurrence table
-  condition_occurrence <- CDMdbHandler$connectionHandler$tbl("condition_occurrence")
-  observation_period <- CDMdbHandler$connectionHandler$tbl("observation_period")
+  condition_occurrence <- CDMdbHandler$connectionHandler$tbl(paste0(cdmDatabaseSchema, ".condition_occurrence"))
+  observation_period <- CDMdbHandler$connectionHandler$tbl(paste0(cdmDatabaseSchema, ".observation_period"))
   conditionsInObservationPeriod <- condition_occurrence |>
     dplyr::inner_join(observation_period, by = c("person_id" = "person_id")) |>
     dplyr::filter(observation_period_start_date <= condition_start_date) |>
@@ -106,6 +107,6 @@ test_that("createObservationCountsTable works", {
 
   DatabaseConnector::executeSql(connection, sql)
 
-  observation_counts <- CDMdbHandler$connectionHandler$tbl("observation_counts")
+  observation_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".observation_counts"))
   observation_counts |> dplyr::count() |> dplyr::pull(n) |> expect_gt(0)
 })
