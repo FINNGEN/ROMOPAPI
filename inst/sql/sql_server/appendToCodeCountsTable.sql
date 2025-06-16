@@ -1,8 +1,9 @@
--- Parameterized query to count codes from any domain table
 
+-- Insert into code_counts table
+INSERT INTO @resultsDatabaseSchema.code_counts
 
+-- calculate counts per each group of concept_id, calendar_year, gender_concept_id, age_decile
 WITH code_counts AS (
-    -- caculate counts per each group of concept_id, calendar_year, gender_concept_id, age_decile
     SELECT 
         ccm.concept_id AS concept_id,
         ccm.calendar_year AS calendar_year,
@@ -76,11 +77,13 @@ descendant_counts AS (
         cc.concept_id,
         cc.calendar_year,
         cc.gender_concept_id,
-        cc.age_decile
+        cc.age_decile,
+        cc.event_counts,
+        cc.person_counts,
+        cc.incidence_person_counts
 )
 
 -- append total person counts and save to table
-INSERT INTO @resultsDatabaseSchema.code_counts
 SELECT 
     CAST('@domain_id' AS VARCHAR(255)) AS domain,
     CAST(ccd.concept_id AS BIGINT) AS concept_id,

@@ -4,7 +4,7 @@
 
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-GiBleed")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-DBI")
-Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen")
+# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen")
 testingDatabase <- Sys.getenv("HADESEXTAS_TESTING_ENVIRONMENT")
 
 # check correct settings
@@ -45,13 +45,13 @@ if (testingDatabase |> stringr::str_starts("Eunomia")) {
   )
 
   if (testingDatabase |> stringr::str_ends("GiBleed")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig[[1]]$cohortTableHandle
+    test_cohortTableHandlerConfig <- test_databasesConfig[[1]]$cohortTableHandler
   }
   if (testingDatabase |> stringr::str_ends("MIMIC")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig[[2]]$cohortTableHandle
+    test_cohortTableHandlerConfig <- test_databasesConfig[[2]]$cohortTableHandler
   }
   if (testingDatabase |> stringr::str_ends("FinnGen")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig[[4]]$cohortTableHandle
+    test_cohortTableHandlerConfig <- test_databasesConfig[[4]]$cohortTableHandler 
   }
 
 }
@@ -70,8 +70,8 @@ if (testingDatabase %in% c("AtlasDevelopment-DBI")) {
 
   bigrquery::bq_auth(path = Sys.getenv("GCP_SERVICE_KEY"))
 
-  test_databasesConfig <- readAndParseYaml(
-    pathToYalmFile = system.file("testdata", "config", "atlasDev_DBI.yml", package = "ROMOPAPI")
+  test_databasesConfig <- HadesExtras::readAndParseYaml(
+    pathToYalmFile = system.file("testdata", "config", "atlasDev_databasesConfig.yml", package = "ROMOPAPI")
   )
 
   test_cohortTableHandlerConfig <- test_databasesConfig[[1]]$cohortTableHandler
@@ -84,3 +84,12 @@ if (testingDatabase %in% c("AtlasDevelopment-DBI")) {
 #
 message("************* Testing on: ")
 message("Database: ", testingDatabase)
+
+#  CDMdbHandler  <- HadesExtras::createCDMdbHandlerFromList(
+#   test_cohortTableHandlerConfig, 
+#   loadConnectionChecksLevel = "basicChecks"
+# )
+
+# createCodeCountsTable(
+#   CDMdbHandler = CDMdbHandler
+# )
