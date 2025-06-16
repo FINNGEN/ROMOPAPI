@@ -35,7 +35,7 @@ getCodeCounts <- function(
     #
     # FUNCTION
     #
-
+    
     # - Get concept_relationships
     # Get all the relationships for the conceptIds of type 'Maps to', 'Mapped from', 'Is a', 'Subsumes'
     sql <- "SELECT * FROM @vocabularyDatabaseSchema.concept_relationship WHERE relationship_id IN ('Maps to','Mapped from', 'Is a', 'Subsumes') AND concept_id_1 IN (@conceptIds);"

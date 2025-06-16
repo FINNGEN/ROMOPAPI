@@ -1,4 +1,5 @@
 test_that("getCodeCounts works", {
+  skip_if(testingDatabase != "Eunomia-FinnGen")
 
   CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
   withr::defer({CDMdbHandler$finalize()})
