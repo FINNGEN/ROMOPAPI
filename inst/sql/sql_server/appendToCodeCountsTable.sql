@@ -57,9 +57,9 @@ descendant_counts AS (
         cc.event_counts AS event_counts,
         cc.person_counts AS person_counts,
         cc.incidence_person_counts AS incidence_person_counts,
-        SUM(COALESCE(cc2.event_counts, 0)) + cc.event_counts AS descendant_event_counts,
-        SUM(COALESCE(cc2.person_counts, 0)) + cc.person_counts AS descendant_person_counts,
-        SUM(COALESCE(cc2.incidence_person_counts, 0)) + cc.incidence_person_counts AS descendant_incidence_person_counts
+        SUM(COALESCE(cc2.event_counts, 0)) AS descendant_event_counts,
+        SUM(COALESCE(cc2.person_counts, 0)) AS descendant_person_counts,
+        SUM(COALESCE(cc2.incidence_person_counts, 0)) AS descendant_incidence_person_counts
     FROM
         code_counts cc
     LEFT JOIN
