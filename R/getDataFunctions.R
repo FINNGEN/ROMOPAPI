@@ -32,11 +32,11 @@ getCodeCounts <- function(
     vocabularyDatabaseSchema <- CDMdbHandler$vocabularyDatabaseSchema
     resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
 
-    browser()
+  
     #
     # FUNCTION
     #
-
+# SAVE this
     # - Get concept parents and all descendants
     sql <- "
     -- Get all descendants of the conceptIds recursively
