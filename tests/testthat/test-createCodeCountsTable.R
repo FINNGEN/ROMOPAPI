@@ -1,3 +1,40 @@
+test_that("appendToCodeCountsTable works", {
+
+  CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+  withr::defer({
+    CDMdbHandler$finalize()
+  })
+
+  domain <- tibble::tribble(
+    ~domain_id, ~table_name, ~concept_id_field, ~date_field,
+    "Drug", "drug_exposure", "drug_concept_id", "drug_exposure_start_date",
+  )
+  createCodeCountsTable(CDMdbHandler, domains = domain)
+  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+  code_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".code_counts"))  
+
+  parentNoCouns <- code_counts |> dplyr::filter(concept_id == 40169766)   |> collect()
+  childCounts <- code_counts |> dplyr::filter(concept_id == 21115716)   |> collect()
+
+  sideBySide <- parentNoCouns |> dplyr::left_join(
+    childCounts,
+    by = c("domain", "concept_id", "calendar_year", "gender_concept_id", "age_decile")
+  ) 
+  
+  sideBySide |> dplyr::filter(event_counts.x != 0) |> nrow() |> expect_equal(0)
+  sideBySide |> dplyr::filter(person_counts.x != 0) |> nrow() |> expect_equal(0)
+  sideBySide |> dplyr::filter(incidence_person_counts.x != 0) |> nrow() |> expect_equal(0)
+
+  sideBySide |> dplyr::filter(event_counts.y == 0) |> nrow() |> expect_equal(0)
+  sideBySide |> dplyr::filter(person_counts.y == 0) |> nrow() |> expect_equal(0)
+  sideBySide |> dplyr::filter(incidence_person_counts.y == 0) |> nrow() |> expect_equal(0)
+
+  sideBySide |> dplyr::filter(descendant_event_counts.x != event_counts.y) |> nrow() |> expect_equal(0)
+  sideBySide |> dplyr::filter(descendant_person_counts.x != person_counts.y) |> nrow() |> expect_equal(0)
+  sideBySide |> dplyr::filter(descendant_incidence_person_counts.x != incidence_person_counts.y) |> nrow() |> expect_equal(0)
+
+})
+
 test_that("createCodeCountsTable works", {
   CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
   withr::defer({
@@ -44,7 +81,7 @@ test_that("createCodeCountsTable works", {
     dplyr::pull(n) |>
     expect_equal(0)
   code_counts |>
-    dplyr::filter(descendant_event_counts < event_counts) |>
+    dplyr::filter(descendant_event_counts < event_counts) |> collect() |> 
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_equal(0)
@@ -63,9 +100,9 @@ test_that("createCodeCountsTable works", {
   conditionsInObservationPeriod <- condition_occurrence |>
     dplyr::inner_join(observation_period, by = c("person_id" = "person_id")) |>
     dplyr::filter(observation_period_start_date <= condition_start_date) |>
-    dplyr::filter(observation_period_end_date >= condition_end_date)  
-  conditionConceptIds <- conditionsInObservationPeriod |> 
-    dplyr::filter(condition_concept_id != 0) |> 
+    dplyr::filter(observation_period_end_date >= condition_end_date)
+  conditionConceptIds <- conditionsInObservationPeriod |>
+    dplyr::filter(condition_concept_id != 0) |>
     dplyr::distinct(condition_concept_id) |>
     dplyr::pull(condition_concept_id)
   conditionSourceConceptIds <- conditionsInObservationPeriod |>
@@ -82,7 +119,6 @@ test_that("createCodeCountsTable works", {
     dplyr::pull(concept_id) |>
     sort()
   expect_equal(allConditionConceptIds, conditionCountsIds)
-
 })
 
 
@@ -108,5 +144,22 @@ test_that("createObservationCountsTable works", {
   DatabaseConnector::executeSql(connection, sql)
 
   observation_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".observation_counts"))
-  observation_counts |> dplyr::count() |> dplyr::pull(n) |> expect_gt(0)
+  observation_counts |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
 })
+
+
+
+
+CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".concept_ancestor")) |> filter(ancestor_concept_id == 45538561) |> 
+left_join(code_counts, by = c("descendant_concept_id" = "concept_id")) |>
+filter( domain == "Condition" & calendar_year == 2011 & gender_concept_id == 8532 & age_decile == 6) |>
+select(ancestor_concept_id, descendant_concept_id, event_counts) |>
+collect()
+
+
+
+
+collect()

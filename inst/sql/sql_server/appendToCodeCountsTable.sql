@@ -50,34 +50,34 @@ WITH code_counts AS (
 -- for each group of concept_id, calendar_year, gender_concept_id, age_decile
 descendant_counts AS (
     SELECT 
-        cc.concept_id AS concept_id,
-        cc.calendar_year AS calendar_year,
-        cc.gender_concept_id AS gender_concept_id,
-        cc.age_decile AS age_decile,
-        cc.event_counts AS event_counts,
-        cc.person_counts AS person_counts,
-        cc.incidence_person_counts AS incidence_person_counts,
-        SUM(COALESCE(cc2.event_counts, 0)) AS descendant_event_counts,
-        SUM(COALESCE(cc2.person_counts, 0)) AS descendant_person_counts,
-        SUM(COALESCE(cc2.incidence_person_counts, 0)) AS descendant_incidence_person_counts
+        ca.ancestor_concept_id AS concept_id,
+        cctosum.calendar_year AS calendar_year,
+        cctosum.gender_concept_id AS gender_concept_id,
+        cctosum.age_decile AS age_decile,
+        COALESCE(cc.event_counts, 0) AS event_counts,
+        COALESCE(cc.person_counts, 0) AS person_counts,
+        COALESCE(cc.incidence_person_counts, 0) AS incidence_person_counts,
+        SUM(COALESCE(cctosum.event_counts, 0)) AS descendant_event_counts,
+        SUM(COALESCE(cctosum.person_counts, 0)) AS descendant_person_counts,
+        SUM(COALESCE(cctosum.incidence_person_counts, 0)) AS descendant_incidence_person_counts
     FROM
-        code_counts cc
-    LEFT JOIN
         @cdmDatabaseSchema.concept_ancestor ca
+    INNER JOIN
+        code_counts cctosum
     ON
-        cc.concept_id = ca.ancestor_concept_id
+       ca.descendant_concept_id = cctosum.concept_id
     LEFT JOIN
-        code_counts cc2
+        code_counts cc
     ON
-        ca.descendant_concept_id = cc2.concept_id
-        AND cc2.calendar_year = cc.calendar_year
-        AND cc2.gender_concept_id = cc.gender_concept_id
-        AND cc2.age_decile = cc.age_decile
+        ca.ancestor_concept_id = cc.concept_id
+        AND cctosum.calendar_year = cc.calendar_year
+        AND cctosum.gender_concept_id = cc.gender_concept_id
+        AND cctosum.age_decile = cc.age_decile
     GROUP BY
-        cc.concept_id,
-        cc.calendar_year,
-        cc.gender_concept_id,
-        cc.age_decile,
+        ca.ancestor_concept_id,
+        cctosum.calendar_year,
+        cctosum.gender_concept_id,
+        cctosum.age_decile,
         cc.event_counts,
         cc.person_counts,
         cc.incidence_person_counts

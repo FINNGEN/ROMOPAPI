@@ -1,10 +1,8 @@
-
-
 #' Create code counts table
-#' 
+#'
 #' Creates a table containing counts of codes by domain, concept, year, gender and age decile.
 #' The table includes both event counts and person counts, as well as descendant counts.
-#' 
+#'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
 #'
 #' @return Nothing. Creates a table called 'code_counts' in the results schema with columns:
@@ -25,23 +23,47 @@
 #'
 #' @export
 createCodeCountsTable <- function(
-    CDMdbHandler 
-) {
+    CDMdbHandler,
+    domains = NULL) {
     #
     # VALIDATE
     #
     CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
     connection <- CDMdbHandler$connectionHandler$getConnection()
-    vocabularyDatabaseSchema  <- CDMdbHandler$vocabularyDatabaseSchema
-    cdmDatabaseSchema       <- CDMdbHandler$cdmDatabaseSchema
-    resultsDatabaseSchema   <- CDMdbHandler$resultsDatabaseSchema
+    vocabularyDatabaseSchema <- CDMdbHandler$vocabularyDatabaseSchema
+    cdmDatabaseSchema <- CDMdbHandler$cdmDatabaseSchema
+    resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+
+    if (is.null(domains)) {
+        domains <- tibble::tribble(
+            ~domain_id, ~table_name, ~concept_id_field, ~date_field,
+            "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date",
+            "Procedure", "procedure_occurrence", "procedure_concept_id", "procedure_date",
+            "Drug", "drug_exposure", "drug_concept_id", "drug_exposure_start_date",
+            "Measurement", "measurement", "measurement_concept_id", "measurement_date",
+            "Observation", "observation", "observation_concept_id", "observation_date",
+            "Device", "device_exposure", "device_concept_id", "device_exposure_start_date",
+            "Visit", "visit_occurrence", "visit_concept_id", "visit_start_date",
+            # non standard
+            "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date",
+            "Procedure", "procedure_occurrence", "procedure_source_concept_id", "procedure_date",
+            "Drug", "drug_exposure", "drug_source_concept_id", "drug_exposure_start_date",
+            "Measurement", "measurement", "measurement_source_concept_id", "measurement_date",
+            "Observation", "observation", "observation_source_concept_id", "observation_date",
+            "Device", "device_exposure", "device_source_concept_id", "device_exposure_start_date",
+            "Visit", "visit_occurrence", "visit_source_concept_id", "visit_start_date",
+        )
+    }
+
+    domains |> checkmate::assertDataFrame()
+    domains |> names() |> checkmate::assertSubset(c("domain_id", "table_name", "concept_id_field", "date_field"))
 
     #
     # FUNCTION
     #
 
     # - Create observation counts table
-    
+
     sqlPath <- system.file("sql", "sql_server", "createObservationCountsTable.sql", package = "ROMOPAPI")
     sql <- SqlRender::readSql(sqlPath)
     sql <- SqlRender::render(sql,
@@ -55,25 +77,6 @@ createCodeCountsTable <- function(
     # - Create code counts table for each domain
     sqlPath <- system.file("sql", "sql_server", "appendToCodeCountsTable.sql", package = "ROMOPAPI")
     baseSql <- SqlRender::readSql(sqlPath)
-
-    domains <- tibble::tribble(
-        ~domain_id, ~table_name, ~concept_id_field, ~date_field,
-        "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date",
-        "Procedure", "procedure_occurrence", "procedure_concept_id", "procedure_date",
-        "Drug", "drug_exposure", "drug_concept_id", "drug_exposure_start_date",
-        "Measurement", "measurement", "measurement_concept_id", "measurement_date",
-        "Observation", "observation", "observation_concept_id", "observation_date",
-        "Device", "device_exposure", "device_concept_id", "device_exposure_start_date",
-        "Visit", "visit_occurrence", "visit_concept_id", "visit_start_date",
-        # non standard
-        "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date",
-        "Procedure", "procedure_occurrence", "procedure_source_concept_id", "procedure_date",
-        "Drug", "drug_exposure", "drug_source_concept_id", "drug_exposure_start_date",
-        "Measurement", "measurement", "measurement_source_concept_id", "measurement_date",
-        "Observation", "observation", "observation_source_concept_id", "observation_date",
-        "Device", "device_exposure", "device_source_concept_id", "device_exposure_start_date",
-        "Visit", "visit_occurrence", "visit_source_concept_id", "visit_start_date",
-    )
 
     sql <- "DROP TABLE IF EXISTS @resultsDatabaseSchema.code_counts;
     CREATE TABLE @resultsDatabaseSchema.code_counts (
@@ -110,5 +113,4 @@ createCodeCountsTable <- function(
         sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
         DatabaseConnector::executeSql(connection, sql)
     }
-
 }
