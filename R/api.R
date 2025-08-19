@@ -1,9 +1,14 @@
 #' Create a Plumber API for ROMOPAPI
 #'
-#' This function creates a plumber API for the ROMOPAPI package.
-#' It sets up endpoints that use the validation functions.
+#' @description
+#' Creates a Plumber API router for the ROMOPAPI package with predefined endpoints
+#' for health checks and ID processing. The API includes automatic documentation
+#' and CORS support.
 #'
-#' @return A plumber router object
+#' @return A plumber router object with configured endpoints
+#'
+#' @importFrom plumber pr
+#'
 #' @export
 #'
 #' @examples
@@ -13,6 +18,19 @@
 #'   
 #'   # Run the API
 #'   plumber::pr_run(api, port = 8000)
+#'   
+#'   # Access health endpoint
+#'   # GET /health
+#'   
+#'   # Process IDs
+#'   # GET /process-ids?ids=1,2,3
+#' }
+#'
+#' @section Endpoints:
+#' \itemize{
+#'   \item `GET /health` - Health status check
+#'   \item `GET /process-ids` - Process comma-separated list of IDs
+#'   \item `POST /batch-process` - Process batch of IDs via JSON
 #' }
 create_api <- function() {
   api <- plumber::pr()

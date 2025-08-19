@@ -17,7 +17,9 @@ test_that("createAtomicCodeCountsTable works with duplicated counts", {
     ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
     "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date", "condition_source_concept_id",
   )
-  createAtomicCodeCountsTable(CDMdbHandler, domains = domain, codeAtomicCountsTable = codeAtomicCountsWithDuplicatedCountsTable)
+  suppressWarnings(
+    createAtomicCodeCountsTable(CDMdbHandler, domains = domain, codeAtomicCountsTable = codeAtomicCountsWithDuplicatedCountsTable)
+  )
   resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
   codeAtomicCountsWithDuplicatedCounts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".", codeAtomicCountsWithDuplicatedCountsTable))
 
@@ -111,4 +113,47 @@ test_that("createObservationCountsTable works", {
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_gt(0)
+})
+
+
+test_that("createCodeCountsTable works", {
+  CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+  withr::defer({
+    CDMdbHandler$finalize()
+  })
+
+  codeCountsTable <- "code_counts_test0"
+  withr::defer({
+    CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", codeCountsTable))
+  })
+
+  createCodeCountsTable(CDMdbHandler, codeCountsTable = codeCountsTable)
+
+  # - Check if the table was created
+  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+  cdmDatabaseSchema <- CDMdbHandler$cdmDatabaseSchema
+  code_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".", codeCountsTable))
+
+  code_counts |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
+  code_counts |>
+    head() |>
+    dplyr::collect() |>
+    colnames() |>
+    expect_equal(c(
+      "concept_id",
+      "calendar_year", 
+      "gender_concept_id", 
+      "age_decile",
+      "event_counts", 
+      "descendant_event_counts"
+    ))
+  code_counts |>
+    dplyr::filter(descendant_event_counts < event_counts) |> 
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
 })

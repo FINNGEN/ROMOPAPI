@@ -27,3 +27,17 @@ all |>
     ggplot2::scale_fill_discrete(name = "Concept Name")
 
 
+
+
+all |>
+    dplyr::filter(relationship_id == "Mapped from") |>
+    dplyr::group_by(relationship_id, concept_name, vocabulary_id, calendar_year) |>
+    dplyr::summarise(event_counts = sum(event_counts), .groups = "drop") |>
+    dplyr::arrange(relationship_id) |> 
+    dplyr::mutate(concept_lable = paste( concept_name, ' ', vocabulary_id)) |>
+    ggplot2::ggplot(ggplot2::aes(x = calendar_year, y = event_counts, fill = as.factor(concept_lable))) +
+    ggplot2::geom_area(position = "stack") +
+    ggplot2::theme_minimal() +
+    ggplot2::scale_fill_discrete(name = "Concept Name")
+
+

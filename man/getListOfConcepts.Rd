@@ -10,8 +10,28 @@ getListOfConcepts(CDMdbHandler)
 \item{CDMdbHandler}{A CDMdbHandler object that contains database connection details}
 }
 \value{
-A tibble with concept_id, concept_name, vocabulary_id, and standard_concept for concepts present in code_counts
+A tibble with columns:
+\itemize{
+\item \code{concept_id} - The OMOP concept ID
+\item \code{concept_name} - The human-readable concept name
+\item \code{vocabulary_id} - The vocabulary identifier (e.g., SNOMED, ICD10)
+\item \code{standard_concept} - Logical indicating if this is a standard concept
+}
 }
 \description{
-Get list of concepts with code counts
+Retrieves a list of concepts that have associated code counts in the results schema.
+This function provides concept metadata including names, vocabulary IDs, and standard concept flags
+for concepts that are actively used in the database.
+}
+\examples{
+\dontrun{
+# Get list of concepts with code counts
+concepts <- getListOfConcepts(CDMdbHandler)
+
+# View concept information
+print(concepts)
+
+# Filter for standard concepts only
+standard_concepts <- concepts[concepts$standard_concept, ]
+}
 }

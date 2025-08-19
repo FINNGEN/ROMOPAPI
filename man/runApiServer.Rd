@@ -12,7 +12,8 @@ runApiServer(
 )
 }
 \arguments{
-\item{cohortTableHandlerConfig}{Configuration for connecting to the OMOP CDM database. If NULL, uses test Eunomia database}
+\item{cohortTableHandlerConfig}{Configuration for connecting to the OMOP CDM database.
+If NULL, uses test Eunomia database}
 
 \item{host}{Host address to run the API server on. Defaults to "127.0.0.1"}
 
@@ -21,5 +22,22 @@ runApiServer(
 \item{...}{Additional arguments passed to plumber::pr_run()}
 }
 \description{
-Run the ROMOPAPI API server
+Starts a Plumber API server for the ROMOPAPI package. If no database configuration
+is provided, it automatically uses the test FinnGen Eunomia database and creates
+necessary code counts tables.
+}
+\note{
+The API server includes CORS support and automatic API documentation.
+When using the test database, code counts tables are automatically created.
+}
+\examples{
+\dontrun{
+# Run with default test database
+runApiServer()
+
+# Run with custom configuration
+config <- list(...) # your database config
+runApiServer(cohortTableHandlerConfig = config, port = 9000)
+}
+
 }

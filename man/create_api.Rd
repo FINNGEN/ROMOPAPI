@@ -7,12 +7,22 @@
 create_api()
 }
 \value{
-A plumber router object
+A plumber router object with configured endpoints
 }
 \description{
-This function creates a plumber API for the ROMOPAPI package.
-It sets up endpoints that use the validation functions.
+Creates a Plumber API router for the ROMOPAPI package with predefined endpoints
+for health checks and ID processing. The API includes automatic documentation
+and CORS support.
 }
+\section{Endpoints}{
+
+\itemize{
+\item \code{GET /health} - Health status check
+\item \code{GET /process-ids} - Process comma-separated list of IDs
+\item \code{POST /batch-process} - Process batch of IDs via JSON
+}
+}
+
 \examples{
 \dontrun{
   # Create the API
@@ -20,5 +30,12 @@ It sets up endpoints that use the validation functions.
   
   # Run the API
   plumber::pr_run(api, port = 8000)
+  
+  # Access health endpoint
+  # GET /health
+  
+  # Process IDs
+  # GET /process-ids?ids=1,2,3
 }
+
 }

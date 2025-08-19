@@ -30,6 +30,7 @@ EXPOSE 8585
 # Create a directory for Eunomia data
 RUN mkdir -p /eunomia_data
 ENV EUNOMIA_DATA_FOLDER=/eunomia_data
+COPY FinnGenR12_v5.4_counts.sqlite /eunomia_data/FinnGenR12_v5.4_counts.sqlite
 
 # Copy the database into the container
 RUN Rscript -e 'ROMOPAPI::helper_FinnGen_getDatabaseFile()'

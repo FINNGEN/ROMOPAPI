@@ -14,11 +14,22 @@ getCodeCounts(CDMdbHandler, conceptIds)
 \value{
 A list containing:
 \itemize{
-\item concept_relationships - Tibble of concept relationships (Maps to, Subsumes)
-\item concepts - Tibble of concept details for related concepts
-\item code_counts - Tibble of code counts from the code_counts table
+\item \code{concept_relationships} - Tibble of concept relationships including 'Maps to', 'Mapped from', 'Parent', and descendant relationships
+\item \code{concepts} - Tibble of concept details for related concepts
+\item \code{code_counts} - Tibble of code counts from the code_counts table
 }
 }
 \description{
-Get code counts and related concept information
+Retrieves code counts and concept relationships for specified concept IDs from an OMOP CDM database.
+This function fetches parent concepts, descendant concepts, and mapped concepts, along with
+their associated event counts.
+}
+\examples{
+\dontrun{
+# Get code counts for specific concept IDs
+result <- getCodeCounts(CDMdbHandler, conceptIds = c(317009))
+
+# View concept relationships
+print(result$concept_relationships)
+}
 }

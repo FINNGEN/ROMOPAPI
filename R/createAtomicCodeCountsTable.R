@@ -1,27 +1,43 @@
-#' Create code counts table
+#' Create atomic code counts table
 #'
-#' Creates a table containing counts of codes by domain, concept, year, gender and age decile.
-#' The table includes both event counts and person counts, as well as descendant counts.
+#' @description
+#' Creates a table containing atomic-level counts of codes by concept, year, gender and age decile.
+#' This function processes each domain separately and creates a comprehensive table with event counts
+#' for individual concepts before aggregation.
 #'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
+#' @param domains Optional data frame defining domains to process. If NULL, uses standard OMOP domains
+#' @param codeAtomicCountsTable Name of the atomic counts table to create. Defaults to "code_atomic_counts"
 #'
-#' @return Nothing. Creates a table called 'code_counts' in the results schema with columns:
+#' @return Nothing. Creates a table called 'code_atomic_counts' in the results schema with columns:
 #' \itemize{
-#'   \item domain - The domain of the code (Condition, Drug, etc.)
-#'   \item concept_id - The OMOP concept ID
-#'   \item calendar_year - The year of the events
-#'   \item gender_concept_id - The gender concept ID
-#'   \item age_decile - The age decile (0-9, 10-19, etc.)
-#'   \item event_counts - Number of events for this code
-#'   \item person_counts - Number of persons with this code
-#'   \item incidence_person_counts - Number of persons with first occurrence of this code
-#'   \item descendant_event_counts - Number of events including descendant concepts
-#'   \item descendant_person_counts - Number of persons including descendant concepts
-#'   \item descendant_incidence_person_counts - Number of persons with first occurrence including descendants
-#'   \item total_person_counts - Total number of persons in the stratum
+#'   \item `concept_id` - The OMOP concept ID
+#'   \item `maps_to_concept_id` - The mapped concept ID
+#'   \item `calendar_year` - The year of the events
+#'   \item `gender_concept_id` - The gender concept ID
+#'   \item `age_decile` - The age decile (0-9, 10-19, etc.)
+#'   \item `event_counts` - Number of events for this code
 #' }
 #'
+#' @importFrom checkmate assertClass assertDataFrame assertSubset
+#' @importFrom SqlRender readSql render translate
+#' @importFrom DatabaseConnector executeSql
+#' @importFrom tibble tribble
+#'
 #' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Create atomic code counts table for all domains
+#' createAtomicCodeCountsTable(CDMdbHandler)
+#' 
+#' # Create atomic code counts table with custom domain configuration
+#' custom_domains <- tibble::tribble(
+#'   ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
+#'   "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date", "condition_concept_id"
+#' )
+#' createAtomicCodeCountsTable(CDMdbHandler, domains = custom_domains)
+#' }
 createAtomicCodeCountsTable <- function(
     CDMdbHandler,
     domains = NULL, 
@@ -38,13 +54,22 @@ createAtomicCodeCountsTable <- function(
     if (is.null(domains)) {
         domains <- tibble::tribble(
             ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
-            "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date", "condition_source_concept_id",
-            "Procedure", "procedure_occurrence", "procedure_source_concept_id", "procedure_date", "procedure_source_concept_id",
-            "Drug", "drug_exposure", "drug_source_concept_id", "drug_exposure_start_date", "drug_source_concept_id",
-            "Measurement", "measurement", "measurement_source_concept_id", "measurement_date", "measurement_source_concept_id",
-            "Observation", "observation", "observation_source_concept_id", "observation_date", "observation_source_concept_id",
-            "Device", "device_exposure", "device_source_concept_id", "device_exposure_start_date", "device_source_concept_id",
-            "Visit", "visit_occurrence", "visit_source_concept_id", "visit_start_date", "visit_source_concept_id",
+            # standard
+            "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date", "condition_concept_id",
+            "Procedure", "procedure_occurrence", "procedure_concept_id", "procedure_date", "procedure_concept_id",
+            "Drug", "drug_exposure", "drug_concept_id", "drug_exposure_start_date", "drug_concept_id",
+            "Measurement", "measurement", "measurement_concept_id", "measurement_date", "measurement_concept_id",
+            "Observation", "observation", "observation_concept_id", "observation_date", "observation_concept_id",
+            "Device", "device_exposure", "device_concept_id", "device_exposure_start_date", "device_concept_id",
+            "Visit", "visit_occurrence", "visit_concept_id", "visit_start_date", "visit_concept_id",
+            # non standard
+            "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date", "condition_concept_id",
+            "Procedure", "procedure_occurrence", "procedure_source_concept_id", "procedure_date", "procedure_concept_id",
+            "Drug", "drug_exposure", "drug_source_concept_id", "drug_exposure_start_date", "drug_concept_id",
+            "Measurement", "measurement", "measurement_source_concept_id", "measurement_date", "measurement_concept_id",
+            "Observation", "observation", "observation_source_concept_id", "observation_date", "observation_concept_id",
+            "Device", "device_exposure", "device_source_concept_id", "device_exposure_start_date", "device_concept_id",
+            "Visit", "visit_occurrence", "visit_source_concept_id", "visit_start_date", "visit_concept_id",
         )
     }
 
@@ -54,18 +79,6 @@ createAtomicCodeCountsTable <- function(
     #
     # FUNCTION
     #
-
-    # - Create observation counts table
-
-    sqlPath <- system.file("sql", "sql_server", "createObservationCountsTable.sql", package = "ROMOPAPI")
-    sql <- SqlRender::readSql(sqlPath)
-    sql <- SqlRender::render(sql,
-        cdmDatabaseSchema = cdmDatabaseSchema,
-        resultsDatabaseSchema = resultsDatabaseSchema
-    )
-    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-
-    DatabaseConnector::executeSql(connection, sql)
 
     # - Create code counts table for each domain
     sqlPath <- system.file("sql", "sql_server", "appendToAtomicCodeCountsTable.sql", package = "ROMOPAPI")

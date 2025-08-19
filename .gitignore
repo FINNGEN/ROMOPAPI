@@ -12,3 +12,6 @@ renv.lock
 eunomia_data/
 
 errorReportSql.txt
+
+FinnGenR12_v5.4.sqlite
+FinnGenR12_v5.4_counts.sqlite

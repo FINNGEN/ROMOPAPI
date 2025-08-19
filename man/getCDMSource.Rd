@@ -10,8 +10,16 @@ getCDMSource(CDMdbHandler)
 \item{CDMdbHandler}{A CDMdbHandler object that contains database connection details}
 }
 \value{
-A tibble of the CDM source information
+A tibble containing the CDM source information with columns from the cdm_source table
 }
 \description{
-Get the CDM source information
+Retrieves the CDM source information from the vocabulary schema of an OMOP CDM database.
+This includes metadata about the database source, version, and other administrative details.
+}
+\examples{
+\dontrun{
+# Get CDM source information
+cdm_source <- getCDMSource(CDMdbHandler)
+print(cdm_source)
+}
 }

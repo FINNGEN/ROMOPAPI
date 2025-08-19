@@ -8,6 +8,9 @@
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen-counts")
 testingDatabase <- Sys.getenv("HADESEXTAS_TESTING_ENVIRONMENT")
 
+# CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+# createCodeCountsTable(CDMdbHandler, codeCountsTable = "code_counts")
+
 # check correct settings
 possibleDatabases <- c( "AtlasDevelopment-DBI", "Eunomia-GiBleed", "Eunomia-FinnGen", "Eunomia-FinnGen-counts")
 if (!(testingDatabase %in% possibleDatabases)) {

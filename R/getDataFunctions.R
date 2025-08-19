@@ -1,22 +1,36 @@
 #' Get code counts and related concept information
 #'
+#' @description
+#' Retrieves code counts and concept relationships for specified concept IDs from an OMOP CDM database.
+#' This function fetches parent concepts, descendant concepts, and mapped concepts, along with
+#' their associated event counts.
+#'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
 #' @param conceptIds Vector of concept IDs to get counts and relationships for
 #'
 #' @return A list containing:
 #' \itemize{
-#'   \item concept_relationships - Tibble of concept relationships (Maps to, Subsumes)
-#'   \item concepts - Tibble of concept details for related concepts
-#'   \item code_counts - Tibble of code counts from the code_counts table
+#'   \item `concept_relationships` - Tibble of concept relationships including 'Maps to', 'Mapped from', 'Parent', and descendant relationships
+#'   \item `concepts` - Tibble of concept details for related concepts
+#'   \item `code_counts` - Tibble of code counts from the code_counts table
 #' }
 #'
 #' @importFrom checkmate assertClass assertIntegerish
 #' @importFrom SqlRender render translate
 #' @importFrom DatabaseConnector dbGetQuery
 #' @importFrom tibble as_tibble
-#' @importFrom dplyr pull
+#' @importFrom dplyr pull bind_rows
 #'
 #' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Get code counts for specific concept IDs
+#' result <- getCodeCounts(CDMdbHandler, conceptIds = c(317009))
+#' 
+#' # View concept relationships
+#' print(result$concept_relationships)
+#' }
 getCodeCounts <- function(
     CDMdbHandler,
     conceptIds) {
@@ -104,8 +118,7 @@ getCodeCounts <- function(
     sql <- SqlRender::render(sql, resultsDatabaseSchema = resultsDatabaseSchema, parentAndDescendantsAndMappedConceptIds = paste(parentAndDescendantsAndMappedConceptIds, collapse = ","))
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     code_counts <- DatabaseConnector::dbGetQuery(connection, sql) |>
-        tibble::as_tibble() |>
-        dplyr::select(-domain)
+        tibble::as_tibble()
 
     # - Get concept details
     sql <- "SELECT * FROM @vocabularyDatabaseSchema.concept WHERE concept_id IN (@parentAndDescendantsAndMappedConceptIds);"
@@ -113,6 +126,23 @@ getCodeCounts <- function(
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     concepts <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble()
+
+    #TEMP: in eunomia missing concepts
+    missingConcepts <- code_counts |> dplyr::anti_join(concepts, by = "concept_id") |> dplyr::distinct(concept_id) |> 
+    dplyr::mutate(
+        concept_name = "Missing concept Name",
+        domain_id = "NA",
+        vocabulary_id = "NA",
+        concept_class_id = "NA",
+        standard_concept = "NA",
+        concept_code = "NA",
+        valid_start_date = as.Date("1900-01-01"),
+        valid_end_date = as.Date("1900-01-01"),
+        invalid_reason = "NA"
+    )
+    concepts <- dplyr::bind_rows(concepts, missingConcepts)
+
+    #END TEMP
 
 
     return(list(
@@ -125,11 +155,27 @@ getCodeCounts <- function(
 
 #' Get the CDM source information
 #'
+#' @description
+#' Retrieves the CDM source information from the vocabulary schema of an OMOP CDM database.
+#' This includes metadata about the database source, version, and other administrative details.
+#'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
 #'
-#' @return A tibble of the CDM source information
+#' @return A tibble containing the CDM source information with columns from the cdm_source table
+#'
+#' @importFrom checkmate assertClass
+#' @importFrom SqlRender render translate
+#' @importFrom DatabaseConnector dbGetQuery
+#' @importFrom tibble as_tibble
 #'
 #' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Get CDM source information
+#' cdm_source <- getCDMSource(CDMdbHandler)
+#' print(cdm_source)
+#' }
 getCDMSource <- function(
     CDMdbHandler) {
     #
@@ -156,15 +202,40 @@ getCDMSource <- function(
 
 #' Get list of concepts with code counts
 #'
+#' @description
+#' Retrieves a list of concepts that have associated code counts in the results schema.
+#' This function provides concept metadata including names, vocabulary IDs, and standard concept flags
+#' for concepts that are actively used in the database.
+#'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
 #'
-#' @return A tibble with concept_id, concept_name, vocabulary_id, and standard_concept for concepts present in code_counts
+#' @return A tibble with columns:
+#' \itemize{
+#'   \item `concept_id` - The OMOP concept ID
+#'   \item `concept_name` - The human-readable concept name
+#'   \item `vocabulary_id` - The vocabulary identifier (e.g., SNOMED, ICD10)
+#'   \item `standard_concept` - Logical indicating if this is a standard concept
+#' }
 #'
 #' @importFrom checkmate assertClass
 #' @importFrom SqlRender render translate
 #' @importFrom DatabaseConnector dbGetQuery
 #' @importFrom tibble as_tibble
+#' @importFrom dplyr mutate if_else
+#'
 #' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Get list of concepts with code counts
+#' concepts <- getListOfConcepts(CDMdbHandler)
+#' 
+#' # View concept information
+#' print(concepts)
+#' 
+#' # Filter for standard concepts only
+#' standard_concepts <- concepts[concepts$standard_concept, ]
+#' }
 getListOfConcepts <- function(
     CDMdbHandler) {
     #

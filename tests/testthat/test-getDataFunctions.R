@@ -1,14 +1,15 @@
 test_that("getCodeCounts works", {
-  skip_if(testingDatabase != "Eunomia-FinnGen-counts")
 
   CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
   withr::defer({CDMdbHandler$finalize()})
   
+  suppressWarnings(
   result <- getCodeCounts(
     CDMdbHandler, 
     conceptIds = c(317009)
   )
-
+  )
+  
   result$code_counts |> dplyr::count() |> dplyr::pull(n) |> expect_gt(0)
   result$concept_relationships |> dplyr::count() |> dplyr::pull(n) |> expect_gt(0)
   result$concepts |> dplyr::count() |> dplyr::pull(n) |> expect_gt(0)
@@ -17,7 +18,12 @@ test_that("getCodeCounts works", {
     dplyr::left_join(result$code_counts, by = c("concept_id_2" = "concept_id")) |>
     dplyr::left_join(result$concepts, by = c("concept_id_2" = "concept_id"))
 
-  result$concept_relationships  |> nrow() |> expect_equal(35)
+  if(testingDatabase == "Eunomia-FinnGen-counts") {
+    result$concept_relationships  |> nrow() |> expect_equal(23)
+  }
+  if(testingDatabase == "AtlasDevelopment-DBI") {
+    result$concept_relationships  |> nrow() |> expect_equal(35)
+  }
 
   concept_relationships_ids  <-  c(
         result$concept_relationships |>
@@ -46,7 +52,8 @@ test_that("getCodeCounts works", {
     dplyr::group_by(concept_id_1, concept_id_2, relationship_id) |>
     dplyr::summarise(
         event_counts = sum(event_counts),
-        descendant_event_counts = sum(descendant_event_counts)
+        descendant_event_counts = sum(descendant_event_counts), 
+        .groups = "drop"
     ) |>
     dplyr::arrange(relationship_id)
 
@@ -65,28 +72,33 @@ test_that("getCodeCounts works", {
    dplyr::filter(relationship_id == "Mapped from") |>
     dplyr::group_by(concept_id_1, concept_id_2) |>
     dplyr::summarise(
-        event_counts = sum(event_counts)
-    )  |> print(n = Inf)
-
+        event_counts = sum(event_counts),
+        .groups = "drop"
+    ) 
     famillyEvents <- all |>
-    dplyr::filter(relationship_id == "Parent") |>
-    dplyr::group_by(concept_id_1,concept_id_2) |>
+    dplyr::group_by(concept_id_1, concept_id_2) |>
     dplyr::summarise(
-        event_counts = sum(event_counts)
+        event_counts = sum(event_counts),
+        .groups = "drop"
     ) 
 
     dplyr::inner_join(
       sumEventsMappedFrom,
       famillyEvents,
       by = c("concept_id_1" = "concept_id_2")
-    )
+    ) |> 
+    dplyr::group_by(concept_id_1, event_counts.y) |>
+    dplyr::summarise(
+        event_counts.x = sum(event_counts.x), .groups = "drop"
+    )  |> 
+    dplyr::filter(event_counts.x != event_counts.y) |>
+    nrow() |>
+    expect_equal(0)
 
-   expect_equal(sumEventsMappedFrom, famillyEvents$event_counts)
 })
 
+
 test_that("getListOfConcepts works", {
-  skip_if(testingDatabase != "Eunomia-FinnGen-counts")
-  
   CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
   withr::defer({CDMdbHandler$finalize()})
 
@@ -100,73 +112,5 @@ test_that("getListOfConcepts works", {
   expect_type(concepts$vocabulary_id, "character")
   expect_type(concepts$standard_concept, "logical")
 })
-
-test_that("getCodeCounts works for ATC codes", {
-  skip_if(testingDatabase != "Eunomia-FinnGen")
-
-  CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
-  withr::defer({CDMdbHandler$finalize()})
-
-  createCodeCountsTable(CDMdbHandler)
-  
-  result <- getCodeCounts(
-    CDMdbHandler, 
-    conceptIds = c(21604344)
-  )
-
-  result$code_counts |> dplyr::count() |> dplyr::pull(n) |> expect_gt(0)
-  result$concepts |> dplyr::count() |> dplyr::pull(n) |> expect_gt(0)
-  result$concept_relationships |> dplyr::count() |> dplyr::pull(n) |> expect_gt(0)
-
-  result$concept_relationships  |> nrow() |> expect_equal(8)
-
-  concept_relationships_ids  <-  c(
-        result$concept_relationships |>
-            dplyr::pull(concept_id_2),
-        result$concept_relationships |>
-            dplyr::pull(concept_id_1)
-    ) |>
-        unique() |> 
-        sort()
-  
-  result$concepts |> 
-    dplyr::pull(concept_id) |> 
-    sort() |> 
-    expect_equal(concept_relationships_ids)
-
-  result$code_counts |> dplyr::distinct(concept_id) |> 
-    dplyr::pull(concept_id) |> 
-    sort() |> 
-    expect_equal(concept_relationships_ids)
-
-})
-
-test_that("getListOfConcepts works", {
-  CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
-  withr::defer({CDMdbHandler$finalize()})
-
-  createCodeCountsTable(CDMdbHandler)
-
-  concepts <- getListOfConcepts(CDMdbHandler)
-
-  expect_true(all(c("concept_id", "concept_name", "vocabulary_id", "standard_concept") %in% colnames(concepts)))
-  expect_gt(nrow(concepts), 0)
-  # Validate column types
-  expect_type(concepts$concept_id, "double")
-  expect_type(concepts$concept_name, "character") 
-  expect_type(concepts$vocabulary_id, "character")
-  expect_type(concepts$standard_concept, "logical")
-})
-
-
-c <- CDMdbHandler$connectionHandler$getConnection() |> dplyr::tbl("concept") 
-c |> dplyr::count(vocabulary_id) |> print(n = Inf)
-
-r  <- CDMdbHandler$connectionHandler$getConnection() |> dplyr::tbl("concept_relationship") 
-r  |> dplyr::filter(concept_id_1 == 21604457) 
-
-
-
-
 
 

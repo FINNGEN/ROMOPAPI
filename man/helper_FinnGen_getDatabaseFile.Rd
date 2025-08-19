@@ -6,10 +6,29 @@
 \usage{
 helper_FinnGen_getDatabaseFile(counts = FALSE)
 }
+\arguments{
+\item{counts}{Logical. If TRUE, creates a counts database with aggregated statistics.
+Defaults to FALSE.}
+}
 \value{
-Path to the FinnGen Eunomia SQLite database file
+Path to the FinnGen Eunomia SQLite database file (temporary copy)
 }
 \description{
 Downloads and extracts the FinnGen Eunomia database if it doesn't exist locally.
-Copies the database to a temporary directory and returns the path.
+Copies the database to a temporary directory and returns the path. Optionally
+creates a counts database with aggregated statistics.
+}
+\note{
+This function requires the \code{EUNOMIA_DATA_FOLDER} environment variable to be set
+to the path of the Eunomia data folder.
+}
+\examples{
+\dontrun{
+# Get basic database file
+db_path <- helper_FinnGen_getDatabaseFile()
+
+# Get database file with counts table
+db_path_with_counts <- helper_FinnGen_getDatabaseFile(counts = TRUE)
+}
+
 }
