@@ -41,7 +41,7 @@ runApiServer <- function(
     if (is.null(cohortTableHandlerConfig)) {
         message("No path to database config provided. Using the test FinnGen Eunomia database.")
         # if not provided, use the test FinnGen Eunomia database
-        pathToFinnGenEunomiaSqlite <- helper_FinnGen_getDatabaseFile()
+        pathToFinnGenEunomiaSqlite <- helper_FinnGen_getDatabaseFile(counts = TRUE)
 
         databasesConfig <- HadesExtras::readAndParseYaml(
             pathToYalmFile = system.file("testdata", "config", "eunomia_databasesConfig.yml", package = "ROMOPAPI"),

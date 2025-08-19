@@ -41,3 +41,7 @@ all |>
     ggplot2::scale_fill_discrete(name = "Concept Name")
 
 
+all |>
+    dplyr::group_by(relationship_id, concept_id_1, concept_id_2, concept_name, vocabulary_id) |>
+    dplyr::summarise(event_counts = sum(event_counts), .groups = "drop")  |> 
+    print(n = Inf)

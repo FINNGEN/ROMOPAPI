@@ -42,8 +42,7 @@ helper_FinnGen_getDatabaseFile <- function(counts = FALSE){
 
   # Download the database if it doesn't exist
   if (!file.exists(file.path(eunomiaDataFolder, "FinnGenR12_v5.4.zip")) |
-   !file.exists(file.path(eunomiaDataFolder, "FinnGenR12_v5.4.sqlite")) |
-   !file.exists(file.path(eunomiaDataFolder, "FinnGenR12_v5.4_counts.sqlite"))){
+   !file.exists(file.path(eunomiaDataFolder, "FinnGenR12_v5.4.sqlite"))){
 
     result <- utils::download.file(
       url = urlToFinnGenEunomiaZip,
@@ -57,6 +56,7 @@ helper_FinnGen_getDatabaseFile <- function(counts = FALSE){
       cdmVersion = '5.4',
       verbose = TRUE
     )
+
     
   }
 

@@ -32,8 +32,5 @@ RUN mkdir -p /eunomia_data
 ENV EUNOMIA_DATA_FOLDER=/eunomia_data
 COPY FinnGenR12_v5.4_counts.sqlite /eunomia_data/FinnGenR12_v5.4_counts.sqlite
 
-# Copy the database into the container
-RUN Rscript -e 'ROMOPAPI::helper_FinnGen_getDatabaseFile()'
-
 # Run the API server
 CMD ["Rscript", "-e", "ROMOPAPI::runApiServer(host = '0.0.0.0', port = 8585)"] 
