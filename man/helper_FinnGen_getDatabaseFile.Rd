@@ -4,7 +4,7 @@
 \alias{helper_FinnGen_getDatabaseFile}
 \title{Get FinnGen Eunomia database file}
 \usage{
-helper_FinnGen_getDatabaseFile()
+helper_FinnGen_getDatabaseFile(counts = FALSE)
 }
 \value{
 Path to the FinnGen Eunomia SQLite database file

@@ -22,10 +22,10 @@
 #' }
 #'
 #' @export
-createCodeCountsTable <- function(
+createAtomicCodeCountsTable <- function(
     CDMdbHandler,
     domains = NULL, 
-    codeCountsTable = "code_counts") {
+    codeAtomicCountsTable = "code_atomic_counts") {
     #
     # VALIDATE
     #
@@ -38,14 +38,6 @@ createCodeCountsTable <- function(
     if (is.null(domains)) {
         domains <- tibble::tribble(
             ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
-            "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date", "condition_concept_id",
-            "Procedure", "procedure_occurrence", "procedure_concept_id", "procedure_date", "procedure_concept_id",
-            "Drug", "drug_exposure", "drug_concept_id", "drug_exposure_start_date", "drug_concept_id",
-            "Measurement", "measurement", "measurement_concept_id", "measurement_date", "measurement_concept_id",
-            "Observation", "observation", "observation_concept_id", "observation_date", "observation_concept_id",
-            "Device", "device_exposure", "device_concept_id", "device_exposure_start_date", "device_concept_id",
-            "Visit", "visit_occurrence", "visit_concept_id", "visit_start_date", "visit_concept_id",
-            # non standard
             "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date", "condition_source_concept_id",
             "Procedure", "procedure_occurrence", "procedure_source_concept_id", "procedure_date", "procedure_source_concept_id",
             "Drug", "drug_exposure", "drug_source_concept_id", "drug_exposure_start_date", "drug_source_concept_id",
@@ -76,28 +68,21 @@ createCodeCountsTable <- function(
     DatabaseConnector::executeSql(connection, sql)
 
     # - Create code counts table for each domain
-    sqlPath <- system.file("sql", "sql_server", "appendToCodeCountsTable.sql", package = "ROMOPAPI")
+    sqlPath <- system.file("sql", "sql_server", "appendToAtomicCodeCountsTable.sql", package = "ROMOPAPI")
     baseSql <- SqlRender::readSql(sqlPath)
 
-    sql <- "DROP TABLE IF EXISTS @resultsDatabaseSchema.@codeCountsTable;
-    CREATE TABLE @resultsDatabaseSchema.@codeCountsTable (
-        domain VARCHAR(255),
+    sql <- "DROP TABLE IF EXISTS @resultsDatabaseSchema.@codeAtomicCountsTable;
+    CREATE TABLE @resultsDatabaseSchema.@codeAtomicCountsTable (
         concept_id INTEGER,
         maps_to_concept_id INTEGER,
         calendar_year INTEGER,
         gender_concept_id INTEGER,
         age_decile INTEGER,
-        event_counts INTEGER,
-        person_counts INTEGER,
-        incidence_person_counts INTEGER,
-        descendant_event_counts INTEGER,
-        descendant_person_counts INTEGER,
-        descendant_incidence_person_counts INTEGER,
-        total_person_counts INTEGER
+        event_counts INTEGER
     )"
     sql <- SqlRender::render(sql,
         resultsDatabaseSchema = resultsDatabaseSchema,
-        codeCountsTable = codeCountsTable
+        codeAtomicCountsTable = codeAtomicCountsTable
     )
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     DatabaseConnector::executeSql(connection, sql)
@@ -106,8 +91,7 @@ createCodeCountsTable <- function(
         domain <- domains[i, ]
         message(sprintf("Processing domain: %s", domain$table_name))
         sql <- SqlRender::render(baseSql,
-            codeCountsTable = codeCountsTable,
-            domain_id = domain$domain_id,
+            codeAtomicCountsTable = codeAtomicCountsTable,
             cdmDatabaseSchema = cdmDatabaseSchema,
             resultsDatabaseSchema = resultsDatabaseSchema,
             table_name = domain$table_name,
