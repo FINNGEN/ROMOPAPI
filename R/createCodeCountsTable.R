@@ -110,6 +110,7 @@ createCodeCountsTable <- function(
             concept_id_field = domain$concept_id_field,
             date_field = domain$date_field
         )
+
         sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
         DatabaseConnector::executeSql(connection, sql)
     }

@@ -7,7 +7,7 @@ test_that("appendToCodeCountsTable works", {
 
   domain <- tibble::tribble(
     ~domain_id, ~table_name, ~concept_id_field, ~date_field,
-    "Drug", "drug_exposure", "drug_concept_id", "drug_exposure_start_date",
+    "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date",
   )
   createCodeCountsTable(CDMdbHandler, domains = domain)
   resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
@@ -149,17 +149,3 @@ test_that("createObservationCountsTable works", {
     dplyr::pull(n) |>
     expect_gt(0)
 })
-
-
-
-
-CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".concept_ancestor")) |> filter(ancestor_concept_id == 45538561) |> 
-left_join(code_counts, by = c("descendant_concept_id" = "concept_id")) |>
-filter( domain == "Condition" & calendar_year == 2011 & gender_concept_id == 8532 & age_decile == 6) |>
-select(ancestor_concept_id, descendant_concept_id, event_counts) |>
-collect()
-
-
-
-
-collect()

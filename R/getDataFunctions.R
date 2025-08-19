@@ -24,9 +24,6 @@ getCodeCounts <- function(
     # VALIDATE
     #
     CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
-    # TEMP: only one conceptId at the moment
-    conceptIds |> checkmate::assertIntegerish(min.len = 1, max.len = 1)
-
 
     connection <- CDMdbHandler$connectionHandler$getConnection()
     vocabularyDatabaseSchema <- CDMdbHandler$vocabularyDatabaseSchema
@@ -36,129 +33,92 @@ getCodeCounts <- function(
     #
     # FUNCTION
     #
-# SAVE this
-    # - Get concept parents and all descendants
+    
+    # - Get concept parents and all descendants, only if they have code counts
     sql <- "
-    -- Get all descendants of the conceptIds recursively
-    WITH RECURSIVE concept_tree AS (
-        SELECT 
-            ancestor_concept_id,
-            descendant_concept_id,
-            1 as level
-        FROM @vocabularyDatabaseSchema.concept_ancestor
-        WHERE ancestor_concept_id IN (@conceptIds)
-        AND min_levels_of_separation = 1
-
-        UNION ALL
-
-        SELECT 
-            ca.ancestor_concept_id,
-            ca.descendant_concept_id,
-            ct.level + 1
-        FROM @vocabularyDatabaseSchema.concept_ancestor ca
-        INNER JOIN concept_tree ct ON ca.ancestor_concept_id = ct.descendant_concept_id
-        WHERE ca.min_levels_of_separation = 1
-    )
-    SELECT DISTINCT
-        ancestor_concept_id,
-        descendant_concept_id,
-        level
-    FROM concept_tree ct
-    
-    UNION ALL
-    
     -- Get parents of the conceptIds
     SELECT DISTINCT
-        ancestor_concept_id,
-        descendant_concept_id,
-        -1 as level
-    FROM @vocabularyDatabaseSchema.concept_ancestor
+        ca.descendant_concept_id AS concept_id_1,
+        ca.ancestor_concept_id AS concept_id_2,
+        'Parent' AS relationship_id
+    FROM @vocabularyDatabaseSchema.concept_ancestor ca
     WHERE descendant_concept_id IN (@conceptIds)
     AND min_levels_of_separation = 1
 
     UNION ALL
 
-    -- Gets itself
     SELECT DISTINCT
-        concept_id,
-        concept_id,
-        0 as level
-    FROM @vocabularyDatabaseSchema.concept
-    WHERE concept_id IN (@conceptIds)
-
-    ORDER BY level;
+        ca.ancestor_concept_id as concept_id_1,
+        ca.descendant_concept_id as concept_id_2,
+        CASE 
+            WHEN min_levels_of_separation = 0 THEN 'Root'
+            ELSE CAST(min_levels_of_separation AS VARCHAR) || '-' || CAST(max_levels_of_separation AS VARCHAR)
+        END AS relationship_id
+    FROM @vocabularyDatabaseSchema.concept_ancestor ca
+    -- Get only the descendants that have code counts
+    INNER JOIN @resultsDatabaseSchema.code_counts cc
+    ON ca.descendant_concept_id = cc.concept_id
+    --
+    WHERE ancestor_concept_id IN (@conceptIds)
+    ORDER BY relationship_id;
     "
 
     sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","), resultsDatabaseSchema = resultsDatabaseSchema)
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-    recursiveDescendants <- DatabaseConnector::dbGetQuery(connection, sql) |>
+    parentAndDescendants <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble()
 
-    familyConceptIds <- recursiveDescendants |>
-        dplyr::pull(descendant_concept_id) |>
+    parentAndDescendantsConceptIds <- parentAndDescendants |>
+        dplyr::pull(concept_id_2) |>
         unique()
 
-    # - Get concept_relationships
+    # - Get mapped concepts to the parent and descendants, only if they have code counts
     # Get all 'Maps to', 'Mapped from', for the family concepts
-    sql <- "SELECT 
+    sql <- "SELECT DISTINCT
         concept_id_1,
         concept_id_2,
         relationship_id
-    FROM @vocabularyDatabaseSchema.concept_relationship
+    FROM @vocabularyDatabaseSchema.concept_relationship cr
+    -- Get only the descendants that have code counts
+    INNER JOIN @resultsDatabaseSchema.code_counts cc
+    ON cr.concept_id_2 = cc.concept_id
+    --
     WHERE relationship_id IN ('Maps to','Mapped from') 
     AND concept_id_1 != concept_id_2
-    AND concept_id_1 IN (@familyConceptIds);"
-    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, familyConceptIds = paste(familyConceptIds, collapse = ","))
+    AND concept_id_1 IN (@parentAndDescendantsConceptIds);"
+    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, resultsDatabaseSchema = resultsDatabaseSchema,
+     parentAndDescendantsConceptIds = paste(parentAndDescendantsConceptIds, collapse = ","))
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     concept_relationships <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble()
 
+    concept_relationships = dplyr::bind_rows(parentAndDescendants, concept_relationships)
 
-    descendantConceptIds <- c(
-        concept_relationships |>
-            dplyr::pull(concept_id_2),
-        concept_relationships |>
-            dplyr::pull(concept_id_1)
-    ) |>
+    parentAndDescendantsAndMappedConceptIds <- concept_relationships |>
+        dplyr::pull(concept_id_2) |>
         unique()
-
+ 
     # - Get code counts
     # Get all the code counts for the descendantConceptIds
-    sql <- "SELECT * FROM @resultsDatabaseSchema.code_counts WHERE concept_id IN (@descendantConceptIds);"
-    sql <- SqlRender::render(sql, resultsDatabaseSchema = resultsDatabaseSchema, descendantConceptIds = paste(familyConceptIds, collapse = ","))
+    sql <- "SELECT * FROM @resultsDatabaseSchema.code_counts WHERE concept_id IN (@parentAndDescendantsAndMappedConceptIds);"
+    sql <- SqlRender::render(sql, resultsDatabaseSchema = resultsDatabaseSchema, parentAndDescendantsAndMappedConceptIds = paste(parentAndDescendantsAndMappedConceptIds, collapse = ","))
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     code_counts <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble() |>
         dplyr::select(-domain)
 
-    # if the code_count is 0 for 'Mapped from' or 'Mapped to', remove from concept_relationships
-    concept_relationships <- concept_relationships |>
-        dplyr::semi_join(
-            code_counts,
-            by = c("concept_id_2" = "concept_id")
-        )
-
-    descendantConceptIds <- c(
-        concept_relationships |>
-            dplyr::pull(concept_id_2),
-        concept_relationships |>
-            dplyr::pull(concept_id_1)
-    ) |>
-        unique()
-
-    # - Get concepts
-    # Get all the concepts for the descendantConceptIds
-    sql <- "SELECT * FROM @vocabularyDatabaseSchema.concept WHERE concept_id IN (@descendantConceptIds);"
-    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, descendantConceptIds = paste(descendantConceptIds, collapse = ","))
+    # - Get concept details
+    sql <- "SELECT * FROM @vocabularyDatabaseSchema.concept WHERE concept_id IN (@parentAndDescendantsAndMappedConceptIds);"
+    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, parentAndDescendantsAndMappedConceptIds = paste(parentAndDescendantsAndMappedConceptIds, collapse = ","))
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-    concepts <- DatabaseConnector::dbGetQuery(connection, sql) |> tibble::as_tibble()
-
+    concepts <- DatabaseConnector::dbGetQuery(connection, sql) |>
+        tibble::as_tibble()
 
 
     return(list(
         concept_relationships = concept_relationships,
-        concepts = concepts,
-        code_counts = code_counts
+        code_counts = code_counts,
+        concepts = concepts
     ))
 }
 
@@ -232,62 +192,4 @@ getListOfConcepts <- function(
         dplyr::mutate(standard_concept = dplyr::if_else(is.na(standard_concept), TRUE, FALSE))
 
     return(concepts)
-}
-
-
-#' Get concept hierarchy for building a tree structure
-#'
-#' @param CDMdbHandler A CDMdbHandler object that contains database connection details
-#' @param conceptId The root concept ID to build the hierarchy from
-#'
-#' @return A tibble with parent-child relationships showing the concept hierarchy
-#'
-#' @importFrom checkmate assertClass assertIntegerish
-#' @importFrom SqlRender render translate
-#' @importFrom DatabaseConnector dbGetQuery
-#' @importFrom tibble as_tibble
-#' @importFrom readr read_file
-#'
-#' @export
-getConceptHierarchy <- function(
-    CDMdbHandler,
-    conceptId) {
-    #
-    # VALIDATE
-    #
-    CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
-    conceptId |> checkmate::assertIntegerish(len = 1)
-
-    connection <- CDMdbHandler$connectionHandler$getConnection()
-    vocabularyDatabaseSchema <- CDMdbHandler$vocabularyDatabaseSchema
-
-    #
-    # FUNCTION
-    #
-
-    # Read the SQL file
-    sql_file_path <- system.file("sql", "sql_server", "getConceptHierarchy.sql", package = "ROMOPAPI")
-    sql <- readr::read_file(sql_file_path)
-
-    # Render the SQL with parameters
-    sql <- SqlRender::render(sql,
-        vocabularyDatabaseSchema = vocabularyDatabaseSchema,
-        conceptId = conceptId
-    )
-
-    # Translate to the target database dialect
-    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-
-    # Execute the query
-    hierarchy <- DatabaseConnector::dbGetQuery(connection, sql) |>
-        tibble::as_tibble()
-
-    return(hierarchy)
-}
-
-
-# Alternative function that returns hex color
-single_concept_to_hex <- function(concept_id) {
-  hash <- digest::digest(as.character(concept_id), algo = "md5")
-  paste0("#", substr(hash, 1, 6))
 }

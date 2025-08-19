@@ -4,11 +4,12 @@
 
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-GiBleed")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-DBI")
-#Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen")
+# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen")
+# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen-counts")
 testingDatabase <- Sys.getenv("HADESEXTAS_TESTING_ENVIRONMENT")
 
 # check correct settings
-possibleDatabases <- c( "AtlasDevelopment-DBI", "Eunomia-GiBleed", "Eunomia-FinnGen")
+possibleDatabases <- c( "AtlasDevelopment-DBI", "Eunomia-GiBleed", "Eunomia-FinnGen", "Eunomia-FinnGen-counts")
 if (!(testingDatabase %in% possibleDatabases)) {
   message("Please set a valid testing environment in envar HADESEXTAS_TESTING_ENVIRONMENT, from: ", paste(possibleDatabases, collapse = ", "))
   stop()
@@ -36,6 +37,9 @@ if (testingDatabase |> stringr::str_starts("Eunomia")) {
   if (testingDatabase |> stringr::str_ends("FinnGen")) {
     pathToFinnGenEunomiaSqlite <- helper_FinnGen_getDatabaseFile()
   }
+  if (testingDatabase |> stringr::str_ends("FinnGen-counts")) {
+    pathToFinnGenEunomiaSqlite <- helper_FinnGen_getDatabaseFile(counts = TRUE)
+  }
 
   test_databasesConfig <- HadesExtras::readAndParseYaml(
     pathToYalmFile = system.file("testdata", "config", "eunomia_databasesConfig.yml", package = "ROMOPAPI"),
@@ -50,8 +54,8 @@ if (testingDatabase |> stringr::str_starts("Eunomia")) {
   if (testingDatabase |> stringr::str_ends("MIMIC")) {
     test_cohortTableHandlerConfig <- test_databasesConfig[[2]]$cohortTableHandler
   }
-  if (testingDatabase |> stringr::str_ends("FinnGen")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig[[4]]$cohortTableHandler 
+  if (testingDatabase |> stringr::str_ends("FinnGen") | testingDatabase |> stringr::str_ends("FinnGen-counts")) {
+    test_cohortTableHandlerConfig <- test_databasesConfig[[4]]$cohortTableHandler
   }
 
 }

@@ -46,6 +46,29 @@ WITH code_counts AS (
         ccm.gender_concept_id,
         ccm.age_decile
 ), 
+-- TEMP: fix all must have an ancestor to itself
+temp_concept_ancestor AS (
+  SELECT DISTINCT * FROM (
+        SELECT * FROM @cdmDatabaseSchema.concept_ancestor
+        UNION ALL
+        SELECT DISTINCT
+            ancestor_concept_id AS ancestor_concept_id,
+            ancestor_concept_id AS descendant_concept_id,
+            0 AS min_levels_of_separation,
+            0 AS max_levels_of_separation
+        FROM
+            @cdmDatabaseSchema.concept_ancestor
+        UNION ALL
+        SELECT DISTINCT
+            descendant_concept_id AS ancestor_concept_id,
+            descendant_concept_id AS descendant_concept_id,
+            0 AS min_levels_of_separation,
+            0 AS max_levels_of_separation
+        FROM
+            @cdmDatabaseSchema.concept_ancestor
+    )
+),
+-- END TEMP
 -- append descendat counts, for event counts, person counts, incidence person counts
 -- for each group of concept_id, calendar_year, gender_concept_id, age_decile
 descendant_counts AS (
@@ -61,7 +84,7 @@ descendant_counts AS (
         SUM(COALESCE(cctosum.person_counts, 0)) AS descendant_person_counts,
         SUM(COALESCE(cctosum.incidence_person_counts, 0)) AS descendant_incidence_person_counts
     FROM
-        @cdmDatabaseSchema.concept_ancestor ca
+        temp_concept_ancestor ca -- TEMP: fix all must have an ancestor to itself
     INNER JOIN
         code_counts cctosum
     ON
