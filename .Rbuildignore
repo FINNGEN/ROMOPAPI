@@ -1,3 +1,11 @@
 ^renv$
 ^renv\.lock$
 ^\.github$
+^Dockerfile$
+^\.dockerignore$
+^dev/
+^eunomia_data/
+^FinnGenR12_v5\.4_counts\.sqlite$
+^errorReportSql\.txt$
+^\.git/
+^\.Rcheck/

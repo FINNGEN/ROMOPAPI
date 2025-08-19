@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev li
 && rm -rf /var/lib/apt/lists/*
 
 # Install renv and restore packages
+ARG ROMOPAPI_VERSION=0.0.1
 RUN Rscript -e 'install.packages("remotes")'
 RUN Rscript -e 'remotes::install_github("FINNGEN/ROMOPAPI", force = TRUE)'
 
