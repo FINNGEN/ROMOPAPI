@@ -24,7 +24,8 @@
 #' @export
 createCodeCountsTable <- function(
     CDMdbHandler,
-    domains = NULL) {
+    domains = NULL, 
+    codeCountsTable = "code_counts") {
     #
     # VALIDATE
     #
@@ -36,27 +37,27 @@ createCodeCountsTable <- function(
 
     if (is.null(domains)) {
         domains <- tibble::tribble(
-            ~domain_id, ~table_name, ~concept_id_field, ~date_field,
-            "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date",
-            "Procedure", "procedure_occurrence", "procedure_concept_id", "procedure_date",
-            "Drug", "drug_exposure", "drug_concept_id", "drug_exposure_start_date",
-            "Measurement", "measurement", "measurement_concept_id", "measurement_date",
-            "Observation", "observation", "observation_concept_id", "observation_date",
-            "Device", "device_exposure", "device_concept_id", "device_exposure_start_date",
-            "Visit", "visit_occurrence", "visit_concept_id", "visit_start_date",
+            ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
+            "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date", "condition_concept_id",
+            "Procedure", "procedure_occurrence", "procedure_concept_id", "procedure_date", "procedure_concept_id",
+            "Drug", "drug_exposure", "drug_concept_id", "drug_exposure_start_date", "drug_concept_id",
+            "Measurement", "measurement", "measurement_concept_id", "measurement_date", "measurement_concept_id",
+            "Observation", "observation", "observation_concept_id", "observation_date", "observation_concept_id",
+            "Device", "device_exposure", "device_concept_id", "device_exposure_start_date", "device_concept_id",
+            "Visit", "visit_occurrence", "visit_concept_id", "visit_start_date", "visit_concept_id",
             # non standard
-            "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date",
-            "Procedure", "procedure_occurrence", "procedure_source_concept_id", "procedure_date",
-            "Drug", "drug_exposure", "drug_source_concept_id", "drug_exposure_start_date",
-            "Measurement", "measurement", "measurement_source_concept_id", "measurement_date",
-            "Observation", "observation", "observation_source_concept_id", "observation_date",
-            "Device", "device_exposure", "device_source_concept_id", "device_exposure_start_date",
-            "Visit", "visit_occurrence", "visit_source_concept_id", "visit_start_date",
+            "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date", "condition_source_concept_id",
+            "Procedure", "procedure_occurrence", "procedure_source_concept_id", "procedure_date", "procedure_source_concept_id",
+            "Drug", "drug_exposure", "drug_source_concept_id", "drug_exposure_start_date", "drug_source_concept_id",
+            "Measurement", "measurement", "measurement_source_concept_id", "measurement_date", "measurement_source_concept_id",
+            "Observation", "observation", "observation_source_concept_id", "observation_date", "observation_source_concept_id",
+            "Device", "device_exposure", "device_source_concept_id", "device_exposure_start_date", "device_source_concept_id",
+            "Visit", "visit_occurrence", "visit_source_concept_id", "visit_start_date", "visit_source_concept_id",
         )
     }
 
     domains |> checkmate::assertDataFrame()
-    domains |> names() |> checkmate::assertSubset(c("domain_id", "table_name", "concept_id_field", "date_field"))
+    domains |> names() |> checkmate::assertSubset(c("domain_id", "table_name", "concept_id_field", "date_field", "maps_to_concept_id_field"))
 
     #
     # FUNCTION
@@ -78,10 +79,11 @@ createCodeCountsTable <- function(
     sqlPath <- system.file("sql", "sql_server", "appendToCodeCountsTable.sql", package = "ROMOPAPI")
     baseSql <- SqlRender::readSql(sqlPath)
 
-    sql <- "DROP TABLE IF EXISTS @resultsDatabaseSchema.code_counts;
-    CREATE TABLE @resultsDatabaseSchema.code_counts (
+    sql <- "DROP TABLE IF EXISTS @resultsDatabaseSchema.@codeCountsTable;
+    CREATE TABLE @resultsDatabaseSchema.@codeCountsTable (
         domain VARCHAR(255),
         concept_id INTEGER,
+        maps_to_concept_id INTEGER,
         calendar_year INTEGER,
         gender_concept_id INTEGER,
         age_decile INTEGER,
@@ -94,7 +96,8 @@ createCodeCountsTable <- function(
         total_person_counts INTEGER
     )"
     sql <- SqlRender::render(sql,
-        resultsDatabaseSchema = resultsDatabaseSchema
+        resultsDatabaseSchema = resultsDatabaseSchema,
+        codeCountsTable = codeCountsTable
     )
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     DatabaseConnector::executeSql(connection, sql)
@@ -103,12 +106,14 @@ createCodeCountsTable <- function(
         domain <- domains[i, ]
         message(sprintf("Processing domain: %s", domain$table_name))
         sql <- SqlRender::render(baseSql,
+            codeCountsTable = codeCountsTable,
             domain_id = domain$domain_id,
             cdmDatabaseSchema = cdmDatabaseSchema,
             resultsDatabaseSchema = resultsDatabaseSchema,
             table_name = domain$table_name,
             concept_id_field = domain$concept_id_field,
-            date_field = domain$date_field
+            date_field = domain$date_field,
+            maps_to_concept_id_field = domain$maps_to_concept_id_field
         )
 
         sql <- SqlRender::translate(sql, targetDialect = connection@dbms)

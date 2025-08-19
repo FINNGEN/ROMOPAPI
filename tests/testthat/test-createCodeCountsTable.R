@@ -6,12 +6,14 @@ test_that("appendToCodeCountsTable works", {
   })
 
   domain <- tibble::tribble(
-    ~domain_id, ~table_name, ~concept_id_field, ~date_field,
-    "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date",
+    ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
+    "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date", "condition_concept_id",
   )
-  createCodeCountsTable(CDMdbHandler, domains = domain)
+  createCodeCountsTable(CDMdbHandler, domains = domain, codeCountsTable = "code_counts_test0")
   resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
-  code_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".code_counts"))  
+  code_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".code_counts_test0"))  
+
+  code_counts |>  dplyr::count() 
 
   parentNoCouns <- code_counts |> dplyr::filter(concept_id == 40169766)   |> collect()
   childCounts <- code_counts |> dplyr::filter(concept_id == 21115716)   |> collect()
@@ -149,3 +151,16 @@ test_that("createObservationCountsTable works", {
     dplyr::pull(n) |>
     expect_gt(0)
 })
+
+
+
+
+
+code_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".code_counts_test2"))
+
+code_counts |>
+dplyr::distinct(domain, concept_id, maps_to_concept_id, calendar_year, gender_concept_id, age_decile, 
+                event_counts, person_counts, incidence_person_counts,
+                descendant_event_counts, descendant_person_counts, 
+                descendant_incidence_person_counts, total_person_counts) |>
+dplyr::count()

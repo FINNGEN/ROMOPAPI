@@ -1,11 +1,12 @@
 
 -- Insert into code_counts table
-INSERT INTO @resultsDatabaseSchema.code_counts
+INSERT INTO @resultsDatabaseSchema.@codeCountsTable
 
 -- calculate counts per each group of concept_id, calendar_year, gender_concept_id, age_decile
 WITH code_counts AS (
     SELECT 
         ccm.concept_id AS concept_id,
+        ccm.maps_to_concept_id AS maps_to_concept_id,
         ccm.calendar_year AS calendar_year,
         ccm.gender_concept_id AS gender_concept_id,
         ccm.age_decile AS age_decile,
@@ -19,10 +20,11 @@ WITH code_counts AS (
         SELECT 
             p.person_id AS person_id,
             t.@concept_id_field AS concept_id,
+            t.@maps_to_concept_id_field AS maps_to_concept_id,
             YEAR(t.@date_field) AS calendar_year,
             p.gender_concept_id AS gender_concept_id,
             FLOOR((YEAR(t.@date_field) - p.year_of_birth) / 10) AS age_decile,
-            MIN(YEAR(t.@date_field)) OVER (PARTITION BY p.person_id, t.@concept_id_field) AS min_calendar_year
+            MIN(YEAR(t.@date_field)) OVER (PARTITION BY p.person_id, t.@concept_id_field, t.@maps_to_concept_id_field) AS min_calendar_year
         FROM
             @cdmDatabaseSchema.person p
         JOIN 
@@ -42,6 +44,7 @@ WITH code_counts AS (
     ) ccm
     GROUP BY
         ccm.concept_id,
+        ccm.maps_to_concept_id,
         ccm.calendar_year,
         ccm.gender_concept_id,
         ccm.age_decile
@@ -74,6 +77,7 @@ temp_concept_ancestor AS (
 descendant_counts AS (
     SELECT 
         ca.ancestor_concept_id AS concept_id,
+        cctosum.maps_to_concept_id AS maps_to_concept_id,
         cctosum.calendar_year AS calendar_year,
         cctosum.gender_concept_id AS gender_concept_id,
         cctosum.age_decile AS age_decile,
@@ -98,6 +102,7 @@ descendant_counts AS (
         AND cctosum.age_decile = cc.age_decile
     GROUP BY
         ca.ancestor_concept_id,
+        cctosum.maps_to_concept_id,
         cctosum.calendar_year,
         cctosum.gender_concept_id,
         cctosum.age_decile,
@@ -110,6 +115,7 @@ descendant_counts AS (
 SELECT 
     CAST('@domain_id' AS VARCHAR(255)) AS domain,
     CAST(ccd.concept_id AS BIGINT) AS concept_id,
+    CAST(ccd.maps_to_concept_id AS BIGINT) AS maps_to_concept_id,
     CAST(ccd.calendar_year AS INTEGER) AS calendar_year,
     CAST(ccd.gender_concept_id AS BIGINT) AS gender_concept_id,
     CAST(ccd.age_decile AS INTEGER) AS age_decile,
