@@ -117,3 +117,33 @@ bigrquery::bq_auth(path = Sys.getenv("GCP_SERVICE_KEY"))
 runApiServer(cohortTableHandlerConfig = databasesConfig$BQ5k$cohortTableHandler)
 
 ```
+
+
+# API return values
+
+## getCodeCounts
+
+
+Based on the example output, getCodeCounts returns a list with 3 components:
+
+1. concept_relationships - A tibble containing:
+   - concept_id_1: 🔑 Source concept ID
+   - concept_id_2: 🔑 Target concept ID 
+   - relationship_id:  Type of relationship (e.g. "Parent", "Root", "Mapped from", etc.)
+    - "Parent" means that concept_id_1 is a parent of concept_id_2
+    - "Root" concept_id is same as concept_id_2 and is the root of the concept hierarchy
+    - "Mapped from" means that concept_id_1 is mapped from concept_id_2
+    - "Mapped to" means that concept_id_1 is mapped to concept_id_2
+    - "n-m" means that concept_id_1 is a descendant of concept_id_2, where n is the min number of levels of the hierarchy and m is the max number of levels of the hierarchy
+
+2. code_counts - A tibble containing:
+   - concept_id: 🔑Concept identifier
+   - calendar_year: Year of the counts
+   - gender_concept_id: Gender concept ID
+   - age_decile: Age group by decade
+   - event_counts: Number of events for this specific concept
+   - descendant_event_counts: Number of events including descendant concepts
+
+3. concepts - A tibble containing concept :
+ as seen in [concept table](https://ohdsi.github.io/CommonDataModel/cdm54.html#concept)
+ where concept_id is the key column.
