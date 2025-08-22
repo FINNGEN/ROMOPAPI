@@ -21,9 +21,15 @@ RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev li
 && rm -rf /var/lib/apt/lists/*
 
 # Install renv and restore packages
-ARG ROMOPAPI_VERSION=0.0.1
-RUN Rscript -e 'install.packages("remotes")'
-RUN Rscript -e 'remotes::install_github("FINNGEN/ROMOPAPI", force = TRUE)'
+ARG ROMOPAPI_VERSION=0.0.3
+
+# Install renv and restore packages
+RUN --mount=type=secret,id=build_github_pat \
+    cp /usr/local/lib/R/etc/Renviron /tmp/Renviron \
+    && echo "GITHUB_PAT=$(cat /run/secrets/build_github_pat)" >> /usr/local/lib/R/etc/Renviron \
+    && Rscript -e 'install.packages("remotes")' \
+    && Rscript -e 'remotes::install_github("FINNGEN/ROMOPAPI")' \
+    && cp /tmp/Renviron /usr/local/lib/R/etc/Renviron;
 
 # Expose the port that the API will run on
 EXPOSE 8585
@@ -32,6 +38,12 @@ EXPOSE 8585
 RUN mkdir -p /eunomia_data
 ENV EUNOMIA_DATA_FOLDER=/eunomia_data
 COPY FinnGenR12_v5.4_counts.sqlite /eunomia_data/FinnGenR12_v5.4_counts.sqlite
+# Create empty files to avoid Eunomia from downloading the database
+RUN echo 'n' > /eunomia_data/FinnGenR12_v5.4.zip
+RUN echo 'n' > /eunomia_data/FinnGenR12_v5.4.sqlite
+
+# Copy the database into the container
+RUN Rscript -e 'ROMOPAPI::helper_FinnGen_getDatabaseFile(counts = TRUE)'
 
 # Run the API server
 CMD ["Rscript", "-e", "ROMOPAPI::runApiServer(host = '0.0.0.0', port = 8585)"] 

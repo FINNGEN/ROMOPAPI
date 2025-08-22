@@ -1,9 +1,8 @@
 CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
-withr::defer({
-    CDMdbHandler$finalize()
-})
 
-conceptIds <- c(317009)
+conceptIds <- c(317009)  # asthma snomde
+conceptIds <- 21601860 # ATC level 5 
+conceptIds <- 45596282 # asthma ICD10
 
 result <- getCodeCounts(
     CDMdbHandler,
@@ -44,4 +43,11 @@ all |>
 all |>
     dplyr::group_by(relationship_id, concept_id_1, concept_id_2, concept_name, vocabulary_id) |>
     dplyr::summarise(event_counts = sum(event_counts), .groups = "drop")  |> 
+    print(n = Inf)
+
+
+all |>
+    #dplyr::filter(relationship_id != "Parent" & relationship_id != "Mapped from") |>
+    dplyr::group_by(relationship_id, concept_name, concept_id_2) |>
+    dplyr::summarise(event_counts = sum(event_counts), .groups = "drop") |> 
     print(n = Inf)

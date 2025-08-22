@@ -2,10 +2,10 @@
 # SELECT DATABASE and CO2 CONFIGURATION
 #
 
-# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-GiBleed")
+#  Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-GiBleed")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-DBI")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen")
-Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen-counts")
+#Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen-counts")
 testingDatabase <- Sys.getenv("HADESEXTAS_TESTING_ENVIRONMENT")
 
 # CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")

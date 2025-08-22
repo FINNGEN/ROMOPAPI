@@ -80,7 +80,21 @@ getCodeCounts <- function(
     sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","), resultsDatabaseSchema = resultsDatabaseSchema)
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     parentAndDescendants <- DatabaseConnector::dbGetQuery(connection, sql) |>
-        tibble::as_tibble()
+        tibble::as_tibble() |> 
+        # Remove root connection or ATC to RxNorm ingredient
+        dplyr::filter(!(relationship_id == "Root" & concept_id_1 != concept_id_2))
+
+    # TEMP: add the Root, atm moment is missing for the non-standard concepts in then concept_ancestor table
+    parentAndDescendants <- parentAndDescendants |>
+        dplyr::filter(relationship_id != "Root") |>
+        dplyr::bind_rows(
+            tibble::tibble(
+                concept_id_1 = conceptIds,
+                concept_id_2 = conceptIds,
+                relationship_id = "Root"
+            )
+        )
+    # END TEMP
 
     parentAndDescendantsConceptIds <- parentAndDescendants |>
         dplyr::pull(concept_id_2) |>
