@@ -3,6 +3,7 @@ CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerC
 conceptIds <- c(317009)  # asthma snomde
 conceptIds <- 21601860 # ATC level 5 
 conceptIds <- 45596282 # asthma ICD10
+conceptIds <- 21600744 + 2100000000 # ATC level 5 
 
 result <- getCodeCounts(
     CDMdbHandler,

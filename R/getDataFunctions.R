@@ -43,6 +43,11 @@ getCodeCounts <- function(
     vocabularyDatabaseSchema <- CDMdbHandler$vocabularyDatabaseSchema
     resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
 
+    # TEMP : deduplicate the ATC codes 
+    if(any(conceptIds > 2100000000)) {
+        conceptIds <- conceptIds - 2100000000
+    }
+    # END TEMP
   
     #
     # FUNCTION
@@ -158,6 +163,72 @@ getCodeCounts <- function(
 
     #END TEMP
 
+    # TEMP : prune
+
+    # - Take only the Root, Parent, 1-1 relationships
+    concept_relationships <- concept_relationships  |> 
+        dplyr::filter( relationship_id %in% c('Root', "Parent", "1-1"))
+
+    # - Recaculate code_counts
+    rootParentConceptIds <- concept_relationships |> 
+        dplyr::filter(relationship_id %in% c("Root", "Parent")) |> 
+        dplyr::pull(concept_id_2) |> 
+        unique()
+
+    childrenConceptIds <- concept_relationships |> 
+        dplyr::filter(relationship_id == "1-1") |> 
+        dplyr::pull(concept_id_2) |> 
+        unique()
+
+    sql <- "
+    SELECT DISTINCT
+        ca.ancestor_concept_id as concept_id_1,
+        ca.descendant_concept_id as concept_id_2,
+    FROM @vocabularyDatabaseSchema.concept_ancestor ca
+    -- Get only the descendants that have code counts
+    INNER JOIN @resultsDatabaseSchema.code_counts cc
+    ON ca.descendant_concept_id = cc.concept_id
+    --
+    WHERE ancestor_concept_id IN (@childrenConceptIds)
+    "
+
+    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, childrenConceptIds = paste(childrenConceptIds, collapse = ","), resultsDatabaseSchema = resultsDatabaseSchema)
+    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
+    childrenDescendants <- DatabaseConnector::dbGetQuery(connection, sql) |>
+        tibble::as_tibble() 
+
+    code_counts <- childrenDescendants |> 
+    dplyr::left_join(
+        code_counts,
+        by = c("concept_id_2" = "concept_id")
+    ) |> 
+    dplyr::group_by(concept_id_1, calendar_year, gender_concept_id, age_decile) |>
+    dplyr::summarise(event_counts = sum(event_counts), .groups = "drop") |>
+    dplyr::rename(concept_id = concept_id_1)  |> 
+    dplyr::bind_rows(
+        code_counts |> dplyr::filter(concept_id %in% rootParentConceptIds)
+    )
+
+    # - Filter out concepts
+    concepts  <- concepts |> 
+        dplyr::filter(concept_id %in% concept_relationships$concept_id_2)
+
+    # - recode all concept id
+    concept_relationships <- concept_relationships |> 
+        dplyr::mutate(
+            concept_id_2 = concept_id_2 + 2100000000,
+            concept_id_1 = concept_id_1 + 2100000000
+        )
+
+    code_counts <- code_counts |> 
+        dplyr::mutate(
+            concept_id = concept_id + 2100000000
+        )
+
+    concepts <- concepts |> 
+        dplyr::mutate(concept_id = concept_id + 2100000000)
+
+    # END TEMP
 
     return(list(
         concept_relationships = concept_relationships,
@@ -275,6 +346,18 @@ getListOfConcepts <- function(
     concepts <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble() |>
         dplyr::mutate(standard_concept = dplyr::if_else(is.na(standard_concept), TRUE, FALSE))
+
+    # TEMP : duplicate the ATC codes 
+    concepts <- concepts |>
+        dplyr::bind_rows(
+            concepts |>
+                dplyr::filter(vocabulary_id == "ATC") |>
+                dplyr::mutate(
+                    concept_id = concept_id + 2100000000,
+                    concept_name = paste0("X ", concept_name),
+                    concept_code = paste0("x", concept_code)
+                )
+        )
 
     return(concepts)
 }
