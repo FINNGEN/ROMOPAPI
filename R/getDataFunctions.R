@@ -169,9 +169,15 @@ getCodeCounts <- function(
     # END TEMP
     # TEMP : prune
     if (hack) {
-        # - Take only the Root, Parent, 1-1 relationships
+        # - Take only the Root, Parent, 1-1 relationships if they are ATC
         concept_relationships <- concept_relationships |>
-            dplyr::filter(relationship_id %in% c("Root", "Parent", "1-1"))
+            dplyr::filter(relationship_id %in% c("Root", "Parent", "1-1")) |> 
+            dplyr::left_join(
+                concepts |> dplyr::select(concept_id, vocabulary_id),
+                by = c("concept_id_2" = "concept_id")
+            ) |>
+            dplyr::filter(vocabulary_id == "ATC")
+
 
         # - Recaculate code_counts
         rootParentConceptIds <- concept_relationships |>
@@ -207,7 +213,10 @@ getCodeCounts <- function(
                 by = c("concept_id_2" = "concept_id")
             ) |>
             dplyr::group_by(concept_id_1, calendar_year, gender_concept_id, age_decile) |>
-            dplyr::summarise(event_counts = sum(event_counts), .groups = "drop") |>
+            dplyr::summarise(
+                event_counts = sum(event_counts), 
+                descendant_event_counts = sum(descendant_event_counts),
+                .groups = "drop") |>
             dplyr::rename(concept_id = concept_id_1) |>
             dplyr::bind_rows(
                 code_counts |> dplyr::filter(concept_id %in% rootParentConceptIds)
