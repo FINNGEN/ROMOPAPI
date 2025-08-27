@@ -27,7 +27,7 @@
 #' \dontrun{
 #' # Get code counts for specific concept IDs
 #' result <- getCodeCounts(CDMdbHandler, conceptIds = c(317009))
-#' 
+#'
 #' # View concept relationships
 #' print(result$concept_relationships)
 #' }
@@ -43,16 +43,18 @@ getCodeCounts <- function(
     vocabularyDatabaseSchema <- CDMdbHandler$vocabularyDatabaseSchema
     resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
 
-    # TEMP : deduplicate the ATC codes 
-    if(any(conceptIds > 2100000000)) {
+    # TEMP : deduplicate the ATC codes
+    hack <- FALSE
+    if (any(conceptIds > 2100000000)) {
         conceptIds <- conceptIds - 2100000000
+        hack <- TRUE
     }
     # END TEMP
-  
+
     #
     # FUNCTION
     #
-    
+
     # - Get concept parents and all descendants, only if they have code counts
     sql <- "
     -- Get parents of the conceptIds
@@ -69,7 +71,7 @@ getCodeCounts <- function(
     SELECT DISTINCT
         ca.ancestor_concept_id as concept_id_1,
         ca.descendant_concept_id as concept_id_2,
-        CASE 
+        CASE
             WHEN min_levels_of_separation = 0 THEN 'Root'
             ELSE CAST(min_levels_of_separation AS VARCHAR) || '-' || CAST(max_levels_of_separation AS VARCHAR)
         END AS relationship_id
@@ -85,7 +87,7 @@ getCodeCounts <- function(
     sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","), resultsDatabaseSchema = resultsDatabaseSchema)
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     parentAndDescendants <- DatabaseConnector::dbGetQuery(connection, sql) |>
-        tibble::as_tibble() |> 
+        tibble::as_tibble() |>
         # Remove root connection or ATC to RxNorm ingredient
         dplyr::filter(!(relationship_id == "Root" & concept_id_1 != concept_id_2))
 
@@ -116,21 +118,23 @@ getCodeCounts <- function(
     INNER JOIN @resultsDatabaseSchema.code_counts cc
     ON cr.concept_id_2 = cc.concept_id
     --
-    WHERE relationship_id IN ('Maps to','Mapped from') 
+    WHERE relationship_id IN ('Maps to','Mapped from')
     AND concept_id_1 != concept_id_2
     AND concept_id_1 IN (@parentAndDescendantsConceptIds);"
-    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, resultsDatabaseSchema = resultsDatabaseSchema,
-     parentAndDescendantsConceptIds = paste(parentAndDescendantsConceptIds, collapse = ","))
+    sql <- SqlRender::render(sql,
+        vocabularyDatabaseSchema = vocabularyDatabaseSchema, resultsDatabaseSchema = resultsDatabaseSchema,
+        parentAndDescendantsConceptIds = paste(parentAndDescendantsConceptIds, collapse = ",")
+    )
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     concept_relationships <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble()
 
-    concept_relationships = dplyr::bind_rows(parentAndDescendants, concept_relationships)
+    concept_relationships <- dplyr::bind_rows(parentAndDescendants, concept_relationships)
 
     parentAndDescendantsAndMappedConceptIds <- concept_relationships |>
         dplyr::pull(concept_id_2) |>
         unique()
- 
+
     # - Get code counts
     # Get all the code counts for the descendantConceptIds
     sql <- "SELECT * FROM @resultsDatabaseSchema.code_counts WHERE concept_id IN (@parentAndDescendantsAndMappedConceptIds);"
@@ -146,88 +150,91 @@ getCodeCounts <- function(
     concepts <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble()
 
-    #TEMP: in eunomia missing concepts
-    missingConcepts <- code_counts |> dplyr::anti_join(concepts, by = "concept_id") |> dplyr::distinct(concept_id) |> 
-    dplyr::mutate(
-        concept_name = "Missing concept Name",
-        domain_id = "NA",
-        vocabulary_id = "NA",
-        concept_class_id = "NA",
-        standard_concept = "NA",
-        concept_code = "NA",
-        valid_start_date = as.Date("1900-01-01"),
-        valid_end_date = as.Date("1900-01-01"),
-        invalid_reason = "NA"
-    )
+    # TEMP: in eunomia missing concepts
+    missingConcepts <- code_counts |>
+        dplyr::anti_join(concepts, by = "concept_id") |>
+        dplyr::distinct(concept_id) |>
+        dplyr::mutate(
+            concept_name = "Missing concept Name",
+            domain_id = "NA",
+            vocabulary_id = "NA",
+            concept_class_id = "NA",
+            standard_concept = "NA",
+            concept_code = "NA",
+            valid_start_date = as.Date("1900-01-01"),
+            valid_end_date = as.Date("1900-01-01"),
+            invalid_reason = "NA"
+        )
     concepts <- dplyr::bind_rows(concepts, missingConcepts)
-
-    #END TEMP
-
+    # END TEMP
     # TEMP : prune
+    if (hack) {
+        # - Take only the Root, Parent, 1-1 relationships
+        concept_relationships <- concept_relationships |>
+            dplyr::filter(relationship_id %in% c("Root", "Parent", "1-1"))
 
-    # - Take only the Root, Parent, 1-1 relationships
-    concept_relationships <- concept_relationships  |> 
-        dplyr::filter( relationship_id %in% c('Root', "Parent", "1-1"))
+        # - Recaculate code_counts
+        rootParentConceptIds <- concept_relationships |>
+            dplyr::filter(relationship_id %in% c("Root", "Parent")) |>
+            dplyr::pull(concept_id_2) |>
+            unique()
 
-    # - Recaculate code_counts
-    rootParentConceptIds <- concept_relationships |> 
-        dplyr::filter(relationship_id %in% c("Root", "Parent")) |> 
-        dplyr::pull(concept_id_2) |> 
-        unique()
+        childrenConceptIds <- concept_relationships |>
+            dplyr::filter(relationship_id == "1-1") |>
+            dplyr::pull(concept_id_2) |>
+            unique()
 
-    childrenConceptIds <- concept_relationships |> 
-        dplyr::filter(relationship_id == "1-1") |> 
-        dplyr::pull(concept_id_2) |> 
-        unique()
+        sql <- "
+            SELECT DISTINCT
+                ca.ancestor_concept_id as concept_id_1,
+                ca.descendant_concept_id as concept_id_2,
+            FROM @vocabularyDatabaseSchema.concept_ancestor ca
+            -- Get only the descendants that have code counts
+            INNER JOIN @resultsDatabaseSchema.code_counts cc
+            ON ca.descendant_concept_id = cc.concept_id
+            --
+            WHERE ancestor_concept_id IN (@childrenConceptIds)
+            "
 
-    sql <- "
-    SELECT DISTINCT
-        ca.ancestor_concept_id as concept_id_1,
-        ca.descendant_concept_id as concept_id_2,
-    FROM @vocabularyDatabaseSchema.concept_ancestor ca
-    -- Get only the descendants that have code counts
-    INNER JOIN @resultsDatabaseSchema.code_counts cc
-    ON ca.descendant_concept_id = cc.concept_id
-    --
-    WHERE ancestor_concept_id IN (@childrenConceptIds)
-    "
+        sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, childrenConceptIds = paste(childrenConceptIds, collapse = ","), resultsDatabaseSchema = resultsDatabaseSchema)
+        sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
+        childrenDescendants <- DatabaseConnector::dbGetQuery(connection, sql) |>
+            tibble::as_tibble()
+  
+        code_counts <- childrenDescendants |>
+            dplyr::inner_join(
+                code_counts,
+                by = c("concept_id_2" = "concept_id")
+            ) |>
+            dplyr::group_by(concept_id_1, calendar_year, gender_concept_id, age_decile) |>
+            dplyr::summarise(event_counts = sum(event_counts), .groups = "drop") |>
+            dplyr::rename(concept_id = concept_id_1) |>
+            dplyr::bind_rows(
+                code_counts |> dplyr::filter(concept_id %in% rootParentConceptIds)
+            )
 
-    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, childrenConceptIds = paste(childrenConceptIds, collapse = ","), resultsDatabaseSchema = resultsDatabaseSchema)
-    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-    childrenDescendants <- DatabaseConnector::dbGetQuery(connection, sql) |>
-        tibble::as_tibble() 
+        # - Filter out concepts
+        concepts <- concepts |>
+            dplyr::filter(concept_id %in% unique(code_counts$concept_id))
 
-    code_counts <- childrenDescendants |> 
-    dplyr::left_join(
-        code_counts,
-        by = c("concept_id_2" = "concept_id")
-    ) |> 
-    dplyr::group_by(concept_id_1, calendar_year, gender_concept_id, age_decile) |>
-    dplyr::summarise(event_counts = sum(event_counts), .groups = "drop") |>
-    dplyr::rename(concept_id = concept_id_1)  |> 
-    dplyr::bind_rows(
-        code_counts |> dplyr::filter(concept_id %in% rootParentConceptIds)
-    )
+        concept_relationships <- concept_relationships |>
+            dplyr::filter(concept_id_2 %in% unique(code_counts$concept_id))
 
-    # - Filter out concepts
-    concepts  <- concepts |> 
-        dplyr::filter(concept_id %in% concept_relationships$concept_id_2)
+        # - recode all concept id
+        concept_relationships <- concept_relationships |>
+            dplyr::mutate(
+                concept_id_2 = concept_id_2 + 2100000000,
+                concept_id_1 = concept_id_1 + 2100000000
+            )
 
-    # - recode all concept id
-    concept_relationships <- concept_relationships |> 
-        dplyr::mutate(
-            concept_id_2 = concept_id_2 + 2100000000,
-            concept_id_1 = concept_id_1 + 2100000000
-        )
+        code_counts <- code_counts |>
+            dplyr::mutate(
+                concept_id = concept_id + 2100000000
+            )
 
-    code_counts <- code_counts |> 
-        dplyr::mutate(
-            concept_id = concept_id + 2100000000
-        )
-
-    concepts <- concepts |> 
-        dplyr::mutate(concept_id = concept_id + 2100000000)
-
+        concepts <- concepts |>
+            dplyr::mutate(concept_id = concept_id + 2100000000)
+    }
     # END TEMP
 
     return(list(
@@ -314,10 +321,10 @@ getCDMSource <- function(
 #' \dontrun{
 #' # Get list of concepts with code counts
 #' concepts <- getListOfConcepts(CDMdbHandler)
-#' 
+#'
 #' # View concept information
 #' print(concepts)
-#' 
+#'
 #' # Filter for standard concepts only
 #' standard_concepts <- concepts[concepts$standard_concept, ]
 #' }
@@ -346,8 +353,8 @@ getListOfConcepts <- function(
     concepts <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble() |>
         dplyr::mutate(standard_concept = dplyr::if_else(is.na(standard_concept), TRUE, FALSE))
-    
-    # TEMP : duplicate the ATC codes 
+
+    # TEMP : duplicate the ATC codes
     concepts <- concepts |>
         dplyr::bind_rows(
             concepts |>
