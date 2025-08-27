@@ -346,7 +346,7 @@ getListOfConcepts <- function(
     concepts <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble() |>
         dplyr::mutate(standard_concept = dplyr::if_else(is.na(standard_concept), TRUE, FALSE))
-
+    
     # TEMP : duplicate the ATC codes 
     concepts <- concepts |>
         dplyr::bind_rows(
@@ -354,8 +354,7 @@ getListOfConcepts <- function(
                 dplyr::filter(vocabulary_id == "ATC") |>
                 dplyr::mutate(
                     concept_id = concept_id + 2100000000,
-                    concept_name = paste0("X ", concept_name),
-                    concept_code = paste0("x", concept_code)
+                    concept_name = paste0("X ", concept_name)
                 )
         )
 
