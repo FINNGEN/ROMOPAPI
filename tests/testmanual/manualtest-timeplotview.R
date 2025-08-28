@@ -1,4 +1,10 @@
+
+options(bigQueryConnectorInsertDelay = 1)
+options(bigQueryConnectorDdlDelay = 1)
+
+tictoc::tic()
 CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+tictoc::toc()
 
 conceptIds <- c(317009)  # asthma snomde
 conceptIds <- 21601860 # ATC level 5 
@@ -6,11 +12,13 @@ conceptIds <- 45596282 # asthma ICD10
 conceptIds <- 21600744 + 2100000000 # ATC level 5 
 conceptIds <- 21600788 + 2100000000 # ATC level 5 
 
+conceptIds <- 21603409 
+
+
 result <- getCodeCounts(
     CDMdbHandler,
     conceptIds = conceptIds
 )
-
 
 all <- result$concept_relationships |>
     dplyr::left_join(result$code_counts, by = c("concept_id_2" = "concept_id")) |>
