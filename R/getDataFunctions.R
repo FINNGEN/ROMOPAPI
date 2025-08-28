@@ -57,51 +57,101 @@ getCodeCounts <- function(
 
     # - Get concept parents and all descendants, only if they have code counts
     sql <- "
-    -- Get parents of the conceptIds
-    SELECT DISTINCT
-        ca.descendant_concept_id AS concept_id_1,
-        ca.ancestor_concept_id AS concept_id_2,
-        'Parent' AS relationship_id
-    FROM @vocabularyDatabaseSchema.concept_ancestor ca
-    WHERE descendant_concept_id IN (@conceptIds)
-    AND min_levels_of_separation = 1
+    WITH RECURSIVE concept_tree AS (
+        SELECT 
+            ancestor_concept_id,
+            descendant_concept_id,
+            1 as level
+        FROM @vocabularyDatabaseSchema.concept_ancestor
+        WHERE ancestor_concept_id IN (@conceptIds)
+        AND min_levels_of_separation = 1
 
+        UNION ALL
+
+        SELECT 
+            ca.ancestor_concept_id,
+            ca.descendant_concept_id,
+            ct.level + 1
+        FROM @vocabularyDatabaseSchema.concept_ancestor ca
+        INNER JOIN concept_tree ct ON ca.ancestor_concept_id = ct.descendant_concept_id
+        WHERE ca.min_levels_of_separation = 1
+    )
+    SELECT DISTINCT
+        ct.ancestor_concept_id as parent_concept_id,
+        ct.descendant_concept_id as child_concept_id,
+        ct.level, 
+        dwc.event_counts
+    FROM concept_tree ct
+    -- Get only the descendants of the conceptId
+    INNER JOIN (
+     SELECT DISTINCT
+            ca.ancestor_concept_id as ancestor_concept_id,
+            ca.descendant_concept_id as descendant_concept_id,
+            cc.event_counts
+        FROM @vocabularyDatabaseSchema.concept_ancestor ca
+        -- Get only the descendants that have code counts
+        INNER JOIN (
+            SELECT DISTINCT
+                concept_id,
+                sum(event_counts) as event_counts
+            FROM @resultsDatabaseSchema.code_counts
+            GROUP BY concept_id
+        ) cc
+        ON ca.descendant_concept_id = cc.concept_id
+        --
+        WHERE ca.ancestor_concept_id IN (@conceptIds)
+    ) dwc
+    ON ct.descendant_concept_id = dwc.descendant_concept_id
     UNION ALL
-
     SELECT DISTINCT
-        ca.ancestor_concept_id as concept_id_1,
-        ca.descendant_concept_id as concept_id_2,
-        CASE
-            WHEN min_levels_of_separation = 0 THEN 'Root'
-            ELSE CAST(min_levels_of_separation AS VARCHAR) || '-' || CAST(max_levels_of_separation AS VARCHAR)
-        END AS relationship_id
+        descendant_concept_id as parent_concept_id,
+        ancestor_concept_id as child_concept_id,
+        -1 as level,
+        1 as event_counts
     FROM @vocabularyDatabaseSchema.concept_ancestor ca
-    -- Get only the descendants that have code counts
-    INNER JOIN @resultsDatabaseSchema.code_counts cc
-    ON ca.descendant_concept_id = cc.concept_id
-    --
-    WHERE ancestor_concept_id IN (@conceptIds)
-    ORDER BY relationship_id;
+    WHERE descendant_concept_id IN (@conceptIds) AND min_levels_of_separation = 1
     "
 
     sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","), resultsDatabaseSchema = resultsDatabaseSchema)
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-    parentAndDescendants <- DatabaseConnector::dbGetQuery(connection, sql) |>
-        tibble::as_tibble() |>
-        # Remove root connection or ATC to RxNorm ingredient
-        dplyr::filter(!(relationship_id == "Root" & concept_id_1 != concept_id_2))
 
-    # TEMP: add the Root, atm moment is missing for the non-standard concepts in then concept_ancestor table
-    parentAndDescendants <- parentAndDescendants |>
-        dplyr::filter(relationship_id != "Root") |>
-        dplyr::bind_rows(
-            tibble::tibble(
-                concept_id_1 = conceptIds,
-                concept_id_2 = conceptIds,
-                relationship_id = "Root"
-            )
-        )
-    # END TEMP
+    # Gets tree of descendants and the code counts for each descendant
+    data <- DatabaseConnector::dbGetQuery(connection, sql) |>
+        tibble::as_tibble() 
+
+    descendantsTreeWithCounts <- data |>
+        dplyr::filter(level > 0)
+    parents <- data |>
+        dplyr::filter(level == -1)
+
+    # prune the tree, cut brach with empty leaves
+    descendantsTreeWithCountsPruned <- descendantsTreeWithCounts |>
+        dplyr::mutate(hasChildren = dplyr::if_else(child_concept_id %in% descendantsTreeWithCounts$parent_concept_id, TRUE, FALSE))  |> 
+        dplyr::filter(event_counts!=0 | hasChildren)
+
+    # Collaps into descendat table
+    descendants <- descendantsTreeWithCountsPruned |> 
+    dplyr::group_by(child_concept_id) |> 
+    dplyr::summarise(level = paste0(as.character(min(level)), "-", as.character(max(level))), .groups = "drop") |> 
+    dplyr::transmute(
+        concept_id_1 = {{conceptIds}},
+        concept_id_2 = child_concept_id,
+        relationship_id = level
+    ) |> dplyr::arrange(relationship_id)
+
+    parentAndDescendants <- dplyr::bind_rows(
+        parents |>
+        dplyr::transmute(
+            concept_id_1 = parent_concept_id,
+            concept_id_2 = child_concept_id,
+            relationship_id = "Parent"
+        ), 
+        tibble::tibble(
+            concept_id_1 = conceptIds,
+            concept_id_2 = conceptIds,
+            relationship_id = "Root"
+        ), 
+        descendants)
 
     parentAndDescendantsConceptIds <- parentAndDescendants |>
         dplyr::pull(concept_id_2) |>
