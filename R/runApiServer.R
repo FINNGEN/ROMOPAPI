@@ -54,10 +54,6 @@ runApiServer <- function(
 
         # Create CDMdbHandler
         CDMdbHandler  <- HadesExtras::createCDMdbHandlerFromList(cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
-
-        # Create code counts table
-        message("Creating code counts table")
-        createCodeCountsTable(CDMdbHandler)
  
     } else {
         # Create CDMdbHandler

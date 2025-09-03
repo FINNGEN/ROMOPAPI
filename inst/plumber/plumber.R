@@ -5,7 +5,7 @@ function(req, res) {
   res$setHeader("Access-Control-Allow-Origin", "*")
   res$setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
   res$setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
-  
+
   if (req$REQUEST_METHOD == "OPTIONS") {
     res$status <- 200
     return(list())
@@ -17,7 +17,7 @@ function(req, res) {
 #* Echo the parameter that was sent in
 #* @param msg The message to echo back.
 #* @get /echo
-function(msg=""){
+function(msg = "") {
   list(msg = paste0("The message is: '", msg, "'"))
 }
 
@@ -25,18 +25,16 @@ function(msg=""){
 #* @param conceptIds A vector of concept IDs
 #* @get /getCodeCounts
 function(
-  res, conceptIds
-){
-
+    res, conceptIds) {
   if (!grepl("^\\d+(,\\d+)*$", conceptIds)) {
     res$status <- 400 # Bad request
-    return(list(error=jsonlite::unbox("conceptIds must be a comma-separated list of integers")))
+    return(list(error = jsonlite::unbox("conceptIds must be a comma-separated list of integers")))
   }
 
   conceptIds <- as.integer(strsplit(conceptIds, ",")[[1]])
-  
-  getCodeCounts(
-    CDMdbHandler = CDMdbHandler, 
+
+  getCodeCounts_memoise(
+    CDMdbHandler = CDMdbHandler,
     conceptIds = conceptIds
   )
 }
@@ -44,7 +42,7 @@ function(
 
 #* Get the CDM source information
 #* @get /getCDMSource
-function(){
+function() {
   getCDMSource(
     CDMdbHandler = CDMdbHandler
   )
@@ -53,9 +51,5 @@ function(){
 #* Get the list of concepts with code counts
 #* @get /getListOfConcepts
 function() {
-  getListOfConcepts(
-    CDMdbHandler = CDMdbHandler
-  )
+ getListOfConcepts_memoise(CDMdbHandler = CDMdbHandler)
 }
-
-
