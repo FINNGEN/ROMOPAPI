@@ -34,6 +34,7 @@
 getCodeCounts <- function(
     CDMdbHandler,
     conceptIds) {
+    message("getCodeCounts: ", conceptIds)
     #
     # VALIDATE
     #
@@ -355,6 +356,7 @@ getCodeCounts_memoise <- memoise::memoise(
 #' }
 getCDMSource <- function(
     CDMdbHandler) {
+    message("getCDMSource")
     #
     # VALIDATE
     #
