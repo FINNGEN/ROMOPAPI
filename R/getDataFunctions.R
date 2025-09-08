@@ -34,6 +34,7 @@
 getCodeCounts <- function(
     CDMdbHandler,
     conceptIds) {
+    message("getCodeCounts: ", conceptIds)
     #
     # VALIDATE
     #
@@ -58,7 +59,7 @@ getCodeCounts <- function(
     # - Get concept parents and all descendants, only if they have code counts
     sql <- "
     WITH RECURSIVE concept_tree AS (
-        SELECT 
+        SELECT
             ancestor_concept_id,
             descendant_concept_id,
             1 as level
@@ -68,7 +69,7 @@ getCodeCounts <- function(
 
         UNION ALL
 
-        SELECT 
+        SELECT
             ca.ancestor_concept_id,
             ca.descendant_concept_id,
             ct.level + 1
@@ -79,7 +80,7 @@ getCodeCounts <- function(
     SELECT DISTINCT
         ct.ancestor_concept_id as parent_concept_id,
         ct.descendant_concept_id as child_concept_id,
-        ct.level, 
+        ct.level,
         dwc.event_counts
     FROM concept_tree ct
     -- Get only the descendants of the conceptId
@@ -117,7 +118,7 @@ getCodeCounts <- function(
 
     # Gets tree of descendants and the code counts for each descendant
     data <- DatabaseConnector::dbGetQuery(connection, sql) |>
-        tibble::as_tibble() 
+        tibble::as_tibble()
 
     descendantsTreeWithCounts <- data |>
         dplyr::filter(level > 0)
@@ -126,32 +127,34 @@ getCodeCounts <- function(
 
     # prune the tree, cut brach with empty leaves
     descendantsTreeWithCountsPruned <- descendantsTreeWithCounts |>
-        dplyr::mutate(hasChildren = dplyr::if_else(child_concept_id %in% descendantsTreeWithCounts$parent_concept_id, TRUE, FALSE))  |> 
-        dplyr::filter(event_counts!=0 | hasChildren)
+        dplyr::mutate(hasChildren = dplyr::if_else(child_concept_id %in% descendantsTreeWithCounts$parent_concept_id, TRUE, FALSE)) |>
+        dplyr::filter(event_counts != 0 | hasChildren)
 
     # Collaps into descendat table
-    descendants <- descendantsTreeWithCountsPruned |> 
-    dplyr::group_by(child_concept_id) |> 
-    dplyr::summarise(level = paste0(as.character(min(level)), "-", as.character(max(level))), .groups = "drop") |> 
-    dplyr::transmute(
-        concept_id_1 = {{conceptIds}},
-        concept_id_2 = child_concept_id,
-        relationship_id = level
-    ) |> dplyr::arrange(relationship_id)
+    descendants <- descendantsTreeWithCountsPruned |>
+        dplyr::group_by(child_concept_id) |>
+        dplyr::summarise(level = paste0(as.character(min(level)), "-", as.character(max(level))), .groups = "drop") |>
+        dplyr::transmute(
+            concept_id_1 = {{ conceptIds }},
+            concept_id_2 = child_concept_id,
+            relationship_id = level
+        ) |>
+        dplyr::arrange(relationship_id)
 
     parentAndDescendants <- dplyr::bind_rows(
         parents |>
-        dplyr::transmute(
-            concept_id_1 = parent_concept_id,
-            concept_id_2 = child_concept_id,
-            relationship_id = "Parent"
-        ), 
+            dplyr::transmute(
+                concept_id_1 = parent_concept_id,
+                concept_id_2 = child_concept_id,
+                relationship_id = "Parent"
+            ),
         tibble::tibble(
             concept_id_1 = conceptIds,
             concept_id_2 = conceptIds,
             relationship_id = "Root"
-        ), 
-        descendants)
+        ),
+        descendants
+    )
 
     parentAndDescendantsConceptIds <- parentAndDescendants |>
         dplyr::pull(concept_id_2) |>
@@ -221,7 +224,7 @@ getCodeCounts <- function(
     if (hack) {
         # - Take only the Root, Parent, 1-1 relationships if they are ATC
         concept_relationships <- concept_relationships |>
-            dplyr::filter(relationship_id %in% c("Root", "Parent", "1-1")) |> 
+            dplyr::filter(relationship_id %in% c("Root", "Parent", "1-1")) |>
             dplyr::left_join(
                 concepts |> dplyr::select(concept_id, vocabulary_id),
                 by = c("concept_id_2" = "concept_id")
@@ -256,7 +259,7 @@ getCodeCounts <- function(
         sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
         childrenDescendants <- DatabaseConnector::dbGetQuery(connection, sql) |>
             tibble::as_tibble()
-  
+
         code_counts <- childrenDescendants |>
             dplyr::inner_join(
                 code_counts,
@@ -264,9 +267,10 @@ getCodeCounts <- function(
             ) |>
             dplyr::group_by(concept_id_1, calendar_year, gender_concept_id, age_decile) |>
             dplyr::summarise(
-                event_counts = sum(event_counts), 
+                event_counts = sum(event_counts),
                 descendant_event_counts = sum(descendant_event_counts),
-                .groups = "drop") |>
+                .groups = "drop"
+            ) |>
             dplyr::rename(concept_id = concept_id_1) |>
             dplyr::bind_rows(
                 code_counts |> dplyr::filter(concept_id %in% rootParentConceptIds)
@@ -303,6 +307,29 @@ getCodeCounts <- function(
     ))
 }
 
+#' Memoised version of getCodeCounts
+#'
+#' @description
+#' A memoised version of the getCodeCounts function that caches results to improve performance
+#' for repeated calls with the same parameters. The CDMdbHandler argument is omitted from
+#' the cache key to allow sharing across different database connections.
+#'
+#' @param CDMdbHandler A CDMdbHandler object that contains database connection details
+#' @param conceptIds Vector of concept IDs to get counts and relationships for
+#'
+#' @return A list containing:
+#' \itemize{
+#'   \item `concept_relationships` - Tibble of concept relationships including 'Maps to', 'Mapped from', 'Parent', and descendant relationships
+#'   \item `concepts` - Tibble of concept details for related concepts
+#'   \item `code_counts` - Tibble of code counts from the code_counts table
+#' }
+#'
+#' @export
+getCodeCounts_memoise <- memoise::memoise(
+    getCodeCounts, 
+    omit_args = "CDMdbHandler"
+)
+
 
 #' Get the CDM source information
 #'
@@ -329,6 +356,7 @@ getCodeCounts <- function(
 #' }
 getCDMSource <- function(
     CDMdbHandler) {
+    message("getCDMSource")
     #
     # VALIDATE
     #
@@ -426,3 +454,27 @@ getListOfConcepts <- function(
 
     return(concepts)
 }
+
+
+#' Memoised version of getListOfConcepts
+#'
+#' @description
+#' A memoised version of the getListOfConcepts function that caches results to improve performance
+#' for repeated calls with the same parameters. The CDMdbHandler argument is omitted from
+#' the cache key to allow sharing across different database connections.
+#'
+#' @param CDMdbHandler A CDMdbHandler object that contains database connection details
+#'
+#' @return A tibble with columns:
+#' \itemize{
+#'   \item `concept_id` - The OMOP concept ID
+#'   \item `concept_name` - The human-readable concept name
+#'   \item `vocabulary_id` - The vocabulary identifier (e.g., SNOMED, ICD10)
+#'   \item `standard_concept` - Logical indicating if this is a standard concept
+#' }
+#'
+#' @export
+getListOfConcepts_memoise <- memoise::memoise(
+    getListOfConcepts, 
+    omit_args = "CDMdbHandler"
+)

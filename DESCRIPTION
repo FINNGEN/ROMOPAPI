@@ -24,7 +24,8 @@ Imports:
     Eunomia,
     HadesExtras,
     rlang,
-    utils
+    utils,
+    memoise
 Remotes:
     FINNGEN/HadesExtras
 Suggests: 
