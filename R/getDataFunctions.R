@@ -431,7 +431,7 @@ getListOfConcepts <- function(
     #
     # Get concept_id, concept_name, vocabulary_id, standard_concept for all concept_ids present in code_counts in one SQL call
     sql <- "
-    SELECT DISTINCT c.concept_id, c.concept_name, c.vocabulary_id, c.standard_concept
+    SELECT DISTINCT c.concept_id, c.concept_name, c.concept_code, c.domain_id, c.vocabulary_id, c.standard_concept
        FROM @vocabularyDatabaseSchema.concept c
        INNER JOIN @resultsDatabaseSchema.code_counts cc
        ON c.concept_id = cc.concept_id;"
@@ -440,17 +440,6 @@ getListOfConcepts <- function(
     concepts <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble() |>
         dplyr::mutate(standard_concept = dplyr::if_else(is.na(standard_concept), TRUE, FALSE))
-
-    # TEMP : duplicate the ATC codes
-    concepts <- concepts |>
-        dplyr::bind_rows(
-            concepts |>
-                dplyr::filter(vocabulary_id == "ATC") |>
-                dplyr::mutate(
-                    concept_id = concept_id + 2100000000,
-                    concept_name = paste0("X ", concept_name)
-                )
-        )
 
     return(concepts)
 }
@@ -469,6 +458,8 @@ getListOfConcepts <- function(
 #' \itemize{
 #'   \item `concept_id` - The OMOP concept ID
 #'   \item `concept_name` - The human-readable concept name
+#'   \item `concept_code` - The concept code
+#'   \item `domain_id` - The domain identifier (e.g., Condition, Procedure, Drug, etc.)
 #'   \item `vocabulary_id` - The vocabulary identifier (e.g., SNOMED, ICD10)
 #'   \item `standard_concept` - Logical indicating if this is a standard concept
 #' }
