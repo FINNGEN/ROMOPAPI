@@ -1,0 +1,21 @@
+---
+title: "Dynamic Report"
+output: html_document
+params:
+  conceptId: NULL
+---
+
+```{r setup, include=FALSE}
+# Set dynamic title based on conceptId parameter
+if (!is.null(params$conceptId)) {
+  title <- paste("Dynamic Report - Concept ID:", params$conceptId)
+} else {
+  title <- "Dynamic Report"
+}
+```
+
+# `r title`
+  
+```{r}
+summary(cars)
+``` 

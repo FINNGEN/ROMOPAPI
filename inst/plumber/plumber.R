@@ -53,3 +53,20 @@ function() {
 function() {
  getListOfConcepts_memoise(CDMdbHandler = CDMdbHandler)
 }
+
+
+
+#* @get /report
+#* @param conceptId The concept ID to include in the report
+#* @serializer html
+function(conceptId = NULL) {
+  # Render Rmd to a temporary HTML file
+  tmp_html <- tempfile(fileext = ".html")
+  rmarkdown::render(system.file("reports", "testReport.Rmd", package = "ROMOPAPI"), 
+                    output_file = tmp_html, 
+                    quiet = TRUE,
+                    params = list(conceptId = conceptId))
+  
+  # Return the HTML contents
+  paste(readLines(tmp_html), collapse = "\n")
+}
