@@ -182,7 +182,14 @@ createMermaidGraphFromResults <- function(
   edges_code <- concepts |>
     dplyr::filter(concept_id %in% concept_ids) |>
     dplyr::left_join(aggregated_counts, by = "concept_id") |>
-    dplyr::mutate(line = paste0(concept_id, "[\"", .cleanConceptNameForMermaid(concept_name), "\"<br>", concept_code, "<br>", vocabulary_id, "<br>", event_counts, "<br>", descendant_event_counts, "]")) |>
+    dplyr::mutate(line = paste0(concept_id, "[\"", 
+    .cleanConceptNameForMermaid(concept_name), "\"<br>",
+     concept_code, "<br>", 
+     vocabulary_id, "<br>", 
+     event_counts, "<br>", 
+     descendant_event_counts, "<br>",
+     concept_class_id,
+     "]")) |>
     dplyr::pull(line) |>
     unique() |>
     paste(collapse = "\n")
@@ -338,7 +345,8 @@ createPlotFromResults <- function(results, showsMappings = FALSE) {
       ggplot2::scale_fill_manual(values = setNames(all$rgb, all$concept_lable)) +
       ggplot2::theme(legend.position = "top")
 
-  plotly::ggplotly(plot)
+  plotly::ggplotly(plot) |>
+    plotly::layout(legend = list(orientation = "h", y = 1.1))
 
 
 }

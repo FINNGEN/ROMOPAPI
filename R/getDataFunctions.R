@@ -75,9 +75,25 @@ getCodeCounts <- function(
         ct.descendant_concept_id as child_concept_id,
         ct.level
     FROM concept_tree ct
-    -- Get only the descendants of the conceptId
-    INNER JOIN @resultsDatabaseSchema.code_counts cc 
-    ON ct.descendant_concept_id = cc.concept_id
+     -- Get only the descendants of the conceptId
+    INNER JOIN (
+     SELECT DISTINCT
+            ca.ancestor_concept_id as ancestor_concept_id,
+            ca.descendant_concept_id as descendant_concept_id
+        FROM @vocabularyDatabaseSchema.concept_ancestor ca
+        -- Get only the descendants that have code counts
+        INNER JOIN (
+            SELECT DISTINCT
+                concept_id,
+                sum(event_counts) as event_counts
+            FROM @resultsDatabaseSchema.code_counts
+            GROUP BY concept_id
+        ) cc
+        ON ca.descendant_concept_id = cc.concept_id
+        --
+        WHERE ca.ancestor_concept_id IN (@conceptId)
+    ) dwc
+    ON ct.descendant_concept_id = dwc.descendant_concept_id
 
     UNION ALL
 
