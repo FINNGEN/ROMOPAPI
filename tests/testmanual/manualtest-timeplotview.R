@@ -6,30 +6,30 @@ tictoc::tic()
 CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
 tictoc::toc()
 
-conceptIds <- c(317009)  # asthma snomde
-conceptIds <- 21601860 # ATC level 5 
-conceptIds <- 45596282 # asthma ICD10
-conceptIds <- 21600744 + 2100000000 # ATC level 5 
-conceptIds <- 21600788 + 2100000000 # ATC level 5 
+conceptId <- c(317009)  # asthma snomde
+conceptId <- 21601860 # ATC level 5 
+conceptId <- 45596282 # asthma ICD10
+conceptId <- 21600744 + 2100000000 # ATC level 5 
+conceptId <- 21600788 + 2100000000 # ATC level 5 
 
-conceptIds <- 21603409 
+conceptId <- 21603409 
 
 
-result <- getCodeCounts(
+results <- getCodeCounts(
     CDMdbHandler,
-    conceptIds = conceptIds
+    conceptId = conceptId
 )
 
 all <- result$concept_relationships |>
-    dplyr::left_join(result$code_counts, by = c("concept_id_2" = "concept_id")) |>
-    dplyr::left_join(result$concepts, by = c("concept_id_2" = "concept_id"))
+    dplyr::left_join(result$code_counts, by = c("child_concept_id" = "concept_id")) |>
+    dplyr::left_join(result$concepts, by = c("child_concept_id" = "concept_id"))
 
 all |>
-    dplyr::filter(relationship_id != "Parent" & relationship_id != "Mapped from") |>
-    dplyr::group_by(relationship_id, concept_name, concept_id_2, calendar_year) |>
+    dplyr::filter(level != "-1" & level != "Mapped from") |>
+    dplyr::group_by(level, concept_name, child_concept_id, calendar_year) |>
     dplyr::summarise(event_counts = sum(event_counts), .groups = "drop") |>
-    dplyr::arrange(relationship_id) |> 
-    dplyr::mutate(concept_lable = paste(relationship_id, ' ', concept_name)) |>
+    dplyr::arrange(level) |> 
+    dplyr::mutate(concept_lable = paste(level, ' ', concept_name)) |>
     ggplot2::ggplot(ggplot2::aes(x = calendar_year, y = event_counts, fill = as.factor(concept_lable))) +
     ggplot2::geom_area(position = "stack") +
     ggplot2::theme_minimal() +
@@ -39,10 +39,10 @@ all |>
 
 
 all |>
-    dplyr::filter(relationship_id == "Mapped from") |>
-    dplyr::group_by(relationship_id, concept_name, vocabulary_id, calendar_year) |>
+    dplyr::filter(level == "Mapped from") |>
+    dplyr::group_by(level, concept_name, vocabulary_id, calendar_year) |>
     dplyr::summarise(event_counts = sum(event_counts), .groups = "drop") |>
-    dplyr::arrange(relationship_id) |> 
+    dplyr::arrange(level) |> 
     dplyr::mutate(concept_lable = paste( concept_name, ' ', vocabulary_id)) |>
     ggplot2::ggplot(ggplot2::aes(x = calendar_year, y = event_counts, fill = as.factor(concept_lable))) +
     ggplot2::geom_area(position = "stack") +
@@ -51,13 +51,23 @@ all |>
 
 
 all |>
-    dplyr::group_by(relationship_id, concept_id_1, concept_id_2, concept_name, vocabulary_id) |>
-    dplyr::summarise(event_counts = sum(event_counts), .groups = "drop")  |> 
+    dplyr::group_by(level, child_concept_id, parent_concept_id, concept_name, vocabulary_id) |>
+    dplyr::summarise(event_counts = sum(event_counts), descendant_event_counts = sum(descendant_event_counts), .groups = "drop")  |> 
     print(n = Inf)
 
 
 all |>
-    #dplyr::filter(relationship_id != "Parent" & relationship_id != "Mapped from") |>
-    dplyr::group_by(relationship_id, concept_name, concept_id_2) |>
+    #dplyr::filter(level != "Parent" & level != "Mapped from") |>
+    dplyr::group_by(level, concept_name, child_concept_id) |>
     dplyr::summarise(event_counts = sum(event_counts), .groups = "drop") |> 
     print(n = Inf)
+
+
+
+
+createMermaidGraphFromResults(results) |> cat()
+
+
+createCodeCountsTableFromResults(results)
+
+createPlotFromResults(results)
