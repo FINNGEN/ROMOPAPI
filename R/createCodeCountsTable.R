@@ -75,16 +75,16 @@ createCodeCountsTable <- function(
 
 
     # - Create code counts table
-    sqlPath <- system.file("sql", "sql_server", "createCodeCountsTable.sql", package = "ROMOPAPI")
-    sql <- SqlRender::readSql(sqlPath)
-    sql <- SqlRender::render(sql,
-        cdmDatabaseSchema = cdmDatabaseSchema,
-        resultsDatabaseSchema = resultsDatabaseSchema,
-        codeCountsTable = codeCountsTable,
-        codeAtomicCountsTable = codeAtomicCountsTable
-    )
-    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-    DatabaseConnector::executeSql(connection, sql)
+    # sqlPath <- system.file("sql", "sql_server", "createCodeCountsTable.sql", package = "ROMOPAPI")
+    # sql <- SqlRender::readSql(sqlPath)
+    # sql <- SqlRender::render(sql,
+    #     cdmDatabaseSchema = cdmDatabaseSchema,
+    #     resultsDatabaseSchema = resultsDatabaseSchema,
+    #     codeCountsTable = codeCountsTable,
+    #     codeAtomicCountsTable = codeAtomicCountsTable
+    # )
+    # sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
+    # DatabaseConnector::executeSql(connection, sql)
 
     # - delete atomic code counts table
     #CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", codeAtomicCountsTable))

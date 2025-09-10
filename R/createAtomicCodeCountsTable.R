@@ -54,14 +54,6 @@ createAtomicCodeCountsTable <- function(
     if (is.null(domains)) {
         domains <- tibble::tribble(
             ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
-            # standard
-            "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date", "condition_concept_id",
-            "Procedure", "procedure_occurrence", "procedure_concept_id", "procedure_date", "procedure_concept_id",
-            "Drug", "drug_exposure", "drug_concept_id", "drug_exposure_start_date", "drug_concept_id",
-            "Measurement", "measurement", "measurement_concept_id", "measurement_date", "measurement_concept_id",
-            "Observation", "observation", "observation_concept_id", "observation_date", "observation_concept_id",
-            "Device", "device_exposure", "device_concept_id", "device_exposure_start_date", "device_concept_id",
-            "Visit", "visit_occurrence", "visit_concept_id", "visit_start_date", "visit_concept_id",
             # non standard
             "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date", "condition_concept_id",
             "Procedure", "procedure_occurrence", "procedure_source_concept_id", "procedure_date", "procedure_concept_id",

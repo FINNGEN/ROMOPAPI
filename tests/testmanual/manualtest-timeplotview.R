@@ -12,6 +12,7 @@ conceptId <- 45596282 # asthma ICD10
 
 conceptId <- 21601855 
 conceptId <- 21601823
+conceptId <- 21601487
 
 
 results <- getCodeCounts(
@@ -29,7 +30,7 @@ results$concept_relationships |>
 
 
 
-createMermaidGraphFromResults(results, showsMappings = FALSE) |> cat()
+createMermaidGraphFromResults(results) |> cat()
 
 createCodeCountsTableFromResults(results)
 

@@ -51,61 +51,57 @@ getCodeCounts <- function(
 
     # - Get concept parents and all descendants, only if they have code counts
     sql <- "
-    WITH RECURSIVE concept_tree AS (
-        SELECT
-            ancestor_concept_id,
-            descendant_concept_id,
-            1 as level
-        FROM @vocabularyDatabaseSchema.concept_ancestor
-        WHERE ancestor_concept_id IN (@conceptId)
-        AND min_levels_of_separation = 1
-
-        UNION ALL
-
-        SELECT
-            ca.ancestor_concept_id,
-            ca.descendant_concept_id,
-            ct.level + 1
+    -- All descendants from the concept id
+    WITH concept_descendants AS (
+        SELECT DISTINCT
+            ca.ancestor_concept_id AS concept_id,
+            ca.descendant_concept_id AS descendant_concept_id
         FROM @vocabularyDatabaseSchema.concept_ancestor ca
-        INNER JOIN concept_tree ct ON ca.ancestor_concept_id = ct.descendant_concept_id
-        WHERE ca.min_levels_of_separation = 1
-    )
-    SELECT DISTINCT
-        ct.ancestor_concept_id as parent_concept_id,
-        ct.descendant_concept_id as child_concept_id,
-        ct.level
-    FROM concept_tree ct
-     -- Get only the descendants of the conceptId
-    INNER JOIN (
-     SELECT DISTINCT
-            ca.ancestor_concept_id as ancestor_concept_id,
-            ca.descendant_concept_id as descendant_concept_id
-        FROM @vocabularyDatabaseSchema.concept_ancestor ca
-        -- Get only the descendants that have code counts
+        WHERE ca.ancestor_concept_id IN (@conceptId) AND (ca.min_levels_of_separation != 0 OR ca.ancestor_concept_id = ca.descendant_concept_id)
+    ), 
+    -- Only  descendants from the concept id that have counts
+    concept_descendants_with_counts AS (
+        SELECT 
+            cd.descendant_concept_id AS concept_id_with_counts
+        FROM
+            concept_descendants AS cd
         INNER JOIN (
             SELECT DISTINCT
-                concept_id,
-                sum(event_counts) as event_counts
-            FROM @resultsDatabaseSchema.code_counts
-            GROUP BY concept_id
-        ) cc
-        ON ca.descendant_concept_id = cc.concept_id
-        --
-        WHERE ca.ancestor_concept_id IN (@conceptId)
-    ) dwc
-    ON ct.descendant_concept_id = dwc.descendant_concept_id
-
-    UNION ALL
-
-    SELECT DISTINCT
-        descendant_concept_id as parent_concept_id,
-        ancestor_concept_id as child_concept_id,
-        -1 as level
-    FROM @vocabularyDatabaseSchema.concept_ancestor ca
-    -- Get only the descendants that have code counts
-    INNER JOIN @resultsDatabaseSchema.code_counts cc 
-    ON ca.descendant_concept_id = cc.concept_id
-    WHERE descendant_concept_id IN (@conceptId) AND min_levels_of_separation = 1
+                    concept_id AS concept_id
+            FROM @resultsDatabaseSchema.code_counts_atomic
+            UNION ALL
+            SELECT DISTINCT
+                    maps_to_concept_id AS concept_id
+            FROM @resultsDatabaseSchema.code_counts_atomic
+        ) AS cca
+        ON cd.descendant_concept_id = cca.concept_id
+    ),
+    -- Descendants from the concept id that have code or children with code
+    concept_descendants_with_counts_or_descendance_counts AS (
+        SELECT 
+            -- cd.concept_id AS concept_id
+            cd.descendant_concept_id AS descendant_concept_id
+        FROM concept_descendants AS cd
+        INNER JOIN @vocabularyDatabaseSchema.concept_ancestor ca
+        ON cd.descendant_concept_id = ca.ancestor_concept_id
+        INNER JOIN concept_descendants_with_counts AS cdc
+        ON ca.descendant_concept_id = cdc.concept_id_with_counts
+        WHERE ca.min_levels_of_separation != 0 OR ca.ancestor_concept_id = ca.descendant_concept_id
+    ),
+    temp_tree AS (
+    -- From all the descendant nodes with record counts or descendant record counts, take the parents
+     SELECT DISTINCT
+            ca.ancestor_concept_id as parent_concept_id,
+            cddrc.descendant_concept_id as child_concept_id
+        FROM concept_descendants_with_counts_or_descendance_counts AS cddrc
+    -- Append the parents to each descendant
+    LEFT JOIN @vocabularyDatabaseSchema.concept_ancestor ca
+    ON cddrc.descendant_concept_id = ca.descendant_concept_id
+    WHERE ca.min_levels_of_separation = 1 
+    )
+    -- take only parents who are someones children, or are the parents  of the concept id
+    SELECT * FROM temp_tree tt
+    WHERE parent_concept_id IN (SELECT DISTINCT child_concept_id FROM temp_tree ) OR child_concept_id IN (@conceptId)
     "
 
     sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, conceptId = conceptId, resultsDatabaseSchema = resultsDatabaseSchema)
@@ -113,9 +109,11 @@ getCodeCounts <- function(
 
     # Gets tree of descendants and the code counts for each descendant
     data <- DatabaseConnector::dbGetQuery(connection, sql) |>
-        dplyr::mutate(level = as.character(level)) |>
+        dplyr::mutate(level = "1") |>
         tibble::as_tibble()
 
+        browser()
+ 
     familyTree <-  dplyr::bind_rows(
         data  |> dplyr::filter(level != "0"), 
         tibble::tibble(
