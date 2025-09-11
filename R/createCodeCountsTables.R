@@ -16,10 +16,10 @@
 #'   \item `calendar_year` - The year of the events
 #'   \item `gender_concept_id` - The gender concept ID
 #'   \item `age_decile` - The age decile (0-9, 10-19, etc.)
-#'   \item `event_counts` - Number of events for this code
+#'   \item `record_counts` - Number of events for this code
 #'   \item `person_counts` - Number of persons with this code
 #'   \item `incidence_person_counts` - Number of persons with first occurrence of this code
-#'   \item `descendant_event_counts` - Number of events including descendant concepts
+#'   \item `descendant_record_counts` - Number of events including descendant concepts
 #'   \item `descendant_person_counts` - Number of persons including descendant concepts
 #'   \item `descendant_incidence_person_counts` - Number of persons with first occurrence including descendants
 #'   \item `total_person_counts` - Total number of persons in the stratum
@@ -39,7 +39,7 @@
 #' # Create code counts table for specific domains only
 #' createCodeCountsTable(CDMdbHandler, domains = c("Condition", "Drug"))
 #' }
-createCodeCountsTable <- function(
+createCodeCountsTables <- function(
     CDMdbHandler,
     domains = NULL, 
     codeCountsTable = "code_counts") {
@@ -56,35 +56,22 @@ createCodeCountsTable <- function(
     # FUNCTION
     #
 
-    # - Create atomic code counts table
-    codeAtomicCountsTable <- paste0(codeCountsTable, "_atomic")
-    createAtomicCodeCountsTable(CDMdbHandler, codeAtomicCountsTable = codeAtomicCountsTable)
-
-
-    # - Create observation counts table
-
-    # sqlPath <- system.file("sql", "sql_server", "createObservationCountsTable.sql", package = "ROMOPAPI")
-    # sql <- SqlRender::readSql(sqlPath)
-    # sql <- SqlRender::render(sql,
-    #     cdmDatabaseSchema = cdmDatabaseSchema,
-    #     resultsDatabaseSchema = resultsDatabaseSchema
-    # )
-    # sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-
-    # DatabaseConnector::executeSql(connection, sql)
+    # - Create stratified code counts table
+    stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
+    createStratifiedCodeCountsTable(CDMdbHandler, domains = domains, stratifiedCodeCountsTable = stratifiedCodeCountsTable)
 
 
     # - Create code counts table
-    # sqlPath <- system.file("sql", "sql_server", "createCodeCountsTable.sql", package = "ROMOPAPI")
-    # sql <- SqlRender::readSql(sqlPath)
-    # sql <- SqlRender::render(sql,
-    #     cdmDatabaseSchema = cdmDatabaseSchema,
-    #     resultsDatabaseSchema = resultsDatabaseSchema,
-    #     codeCountsTable = codeCountsTable,
-    #     codeAtomicCountsTable = codeAtomicCountsTable
-    # )
-    # sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-    # DatabaseConnector::executeSql(connection, sql)
+    sqlPath <- system.file("sql", "sql_server", "createCodeCountsTable.sql", package = "ROMOPAPI")
+    sql <- SqlRender::readSql(sqlPath)
+    sql <- SqlRender::render(sql,
+        cdmDatabaseSchema = cdmDatabaseSchema,
+        resultsDatabaseSchema = resultsDatabaseSchema,
+        codeCountsTable = codeCountsTable,
+        stratifiedCodeCountsTable = stratifiedCodeCountsTable
+    )
+    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
+    DatabaseConnector::executeSql(connection, sql)
 
     # - delete atomic code counts table
     #CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", codeAtomicCountsTable))

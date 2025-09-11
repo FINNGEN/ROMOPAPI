@@ -141,8 +141,8 @@ Based on the example output, getCodeCounts returns a list with 3 components:
    - calendar_year: Year of the counts
    - gender_concept_id: Gender concept ID
    - age_decile: Age group by decade
-   - event_counts: Number of events for this specific concept
-   - descendant_event_counts: Number of events including descendant concepts
+   - record_counts: Number of events for this specific concept
+   - descendant_record_counts: Number of events including descendant concepts
 
 3. concepts - A tibble containing concept :
  as seen in [concept table](https://ohdsi.github.io/CommonDataModel/cdm54.html#concept)

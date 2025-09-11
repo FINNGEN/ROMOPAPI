@@ -62,39 +62,39 @@ test_that("getCodeCounts works", {
     sort() |>
     expect_equal(concept_relationships_ids)
 
-  # check that descendant_event_counts is the same as event_counts for all concept_id_2
+  # check that descendant_record_counts is the same as record_counts for all concept_id_2
   countsDescendants <- all |>
     dplyr::filter(relationship_id != "Parent" & relationship_id != "Mapped from") |>
     dplyr::group_by(concept_id_1, concept_id_2, relationship_id) |>
     dplyr::summarise(
-      event_counts = sum(event_counts),
-      descendant_event_counts = sum(descendant_event_counts),
+      record_counts = sum(record_counts),
+      descendant_record_counts = sum(descendant_record_counts),
       .groups = "drop"
     ) |>
     dplyr::arrange(relationship_id)
 
   sumDescendants <- countsDescendants |>
-    dplyr::pull(event_counts) |>
+    dplyr::pull(record_counts) |>
     sum()
 
   rootDescendants <- countsDescendants |>
     dplyr::filter(relationship_id == "Root") |>
-    dplyr::pull(descendant_event_counts)
+    dplyr::pull(descendant_record_counts)
 
   expect_equal(rootDescendants, sumDescendants)
 
-  # check that all the mapped from event_counts are the same as the descendant_event_counts
+  # check that all the mapped from record_counts are the same as the descendant_record_counts
   sumEventsMappedFrom <- all |>
     dplyr::filter(relationship_id == "Mapped from") |>
     dplyr::group_by(concept_id_1, concept_id_2) |>
     dplyr::summarise(
-      event_counts = sum(event_counts),
+      record_counts = sum(record_counts),
       .groups = "drop"
     )
   famillyEvents <- all |>
     dplyr::group_by(concept_id_1, concept_id_2) |>
     dplyr::summarise(
-      event_counts = sum(event_counts),
+      record_counts = sum(record_counts),
       .groups = "drop"
     )
 
@@ -103,11 +103,11 @@ test_that("getCodeCounts works", {
     famillyEvents,
     by = c("concept_id_1" = "concept_id_2")
   ) |>
-    dplyr::group_by(concept_id_1, event_counts.y) |>
+    dplyr::group_by(concept_id_1, record_counts.y) |>
     dplyr::summarise(
-      event_counts.x = sum(event_counts.x), .groups = "drop"
+      record_counts.x = sum(record_counts.x), .groups = "drop"
     ) |>
-    dplyr::filter(event_counts.x != event_counts.y) |>
+    dplyr::filter(record_counts.x != record_counts.y) |>
     nrow() |>
     expect_equal(0)
 })
@@ -150,4 +150,64 @@ test_that("getCodeCounts works for TEMP ATC codes", {
     dplyr::pull(n) |>
     expect_equal(10)
 
+})
+
+
+
+
+test_that(".familyTreeToAncestorTable works", {
+
+  familyTree <- tibble::tribble(
+    ~parent_concept_id, ~child_concept_id,
+    45769438,           37116845,
+    257581,             45769438,
+    4145497,            45773005,
+    42538744,           45769441,
+    257581,             42538744,
+    4191479,            42538744,
+    312950,             45769441,
+    317009,             4110051,
+    317009,             257581,
+    317009,             4191479,
+    4191479,            312950,
+    317009,             4145497,
+    257581,             45773005,
+    320136,             317009
+  )
+
+  ancestorTable <- .familyTreeToAncestorTable(familyTree, 317009)
+
+  result <- tibble::tribble(
+    ~descendant_concept_id, ~levels, ~paths,
+    317009L,               "0-0",   1L,
+    257581L,               "1-1",   1L,
+    4110051L,              "1-1",   1L,
+    4145497L,              "1-1",   1L,
+    4191479L,              "1-1",   1L,
+    312950L,               "2-2",   1L,
+    42538744L,             "2-2",   2L,
+    45769438L,             "2-2",   1L,
+    45773005L,             "2-2",   2L,
+    37116845L,             "3-3",   1L,
+    45769441L,             "3-3",   2L
+  )
+
+  expect_equal(ancestorTable, result)
+
+  ancestorTable <- .familyTreeToAncestorTable(familyTree, 312950)
+  result <- tibble::tribble(
+    ~descendant_concept_id, ~levels, ~paths,
+    312950L,               "0-0",   1L,
+    45769441L,             "1-1",   1L
+  )
+  expect_equal(ancestorTable, result)
+
+
+  ancestorTable <- .familyTreeToAncestorTable(familyTree, 45769441)
+  result <- tibble::tribble(
+    ~descendant_concept_id, ~levels, ~paths,
+    45769441L,             "0-0",   1L
+  )
+
+  expect_equal(ancestorTable, result)
 })

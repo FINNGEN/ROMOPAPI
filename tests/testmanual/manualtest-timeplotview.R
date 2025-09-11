@@ -25,7 +25,7 @@ results$concept_relationships |>
     dplyr::left_join(results$concepts, by = c("child_concept_id" = "concept_id"))|>
     #dplyr::filter(level != "Parent" & level != "Mapped from") |>
     dplyr::group_by(level, concept_name, concept_code, child_concept_id) |>
-    dplyr::summarise(event_counts = sum(event_counts), descendant_event_counts = sum(descendant_event_counts), .groups = "drop") |> 
+    dplyr::summarise(record_counts = sum(record_counts), descendant_record_counts = sum(descendant_record_counts), .groups = "drop") |> 
     View()
 
 

@@ -117,7 +117,7 @@ createMermaidGraphFromResults <- function(
   concepts <- results$concepts
   aggregated_counts <- results$code_counts |>
     dplyr::group_by(concept_id) |>
-    dplyr::summarise(event_counts = sum(event_counts), descendant_event_counts = sum(descendant_event_counts), .groups = "drop")
+    dplyr::summarise(record_counts = sum(record_counts), descendant_record_counts = sum(descendant_record_counts), .groups = "drop")
 
   if (nrow(concept_relationships) == 0) {
     return("graph TD\n    A[No relationships found]")
@@ -186,8 +186,8 @@ createMermaidGraphFromResults <- function(
     .cleanConceptNameForMermaid(concept_name), "\"<br>",
      concept_code, "<br>", 
      vocabulary_id, "<br>", 
-     event_counts, "<br>", 
-     descendant_event_counts, "<br>",
+     record_counts, "<br>", 
+     descendant_record_counts, "<br>",
      concept_class_id,
      "]")) |>
     dplyr::pull(line) |>
@@ -237,7 +237,7 @@ createCodeCountsTableFromResults <- function(results) {
   concepts <- results$concepts
   aggregated_counts <- results$code_counts |>
     dplyr::group_by(concept_id) |>
-    dplyr::summarise(event_counts = sum(event_counts), descendant_event_counts = sum(descendant_event_counts), .groups = "drop")
+    dplyr::summarise(record_counts = sum(record_counts), descendant_record_counts = sum(descendant_record_counts), .groups = "drop")
 
 
   treeTable <- concept_relationships |>
@@ -278,8 +278,8 @@ createCodeCountsTableFromResults <- function(results) {
       concept_name,
       concept_code,
       vocabulary_id,
-      event_counts,
-      descendant_event_counts,
+      record_counts,
+      descendant_record_counts,
       data
     )
 
@@ -289,8 +289,8 @@ createCodeCountsTableFromResults <- function(results) {
     concept_name = reactable::colDef(name = "Concept Name"),
     concept_code = reactable::colDef(name = "Concept Code"),
     vocabulary_id = reactable::colDef(name = "Vocabulary ID"),
-    event_counts = reactable::colDef(name = "Event Counts"),
-    descendant_event_counts = reactable::colDef(name = "Descendant Event Counts"),
+    record_counts = reactable::colDef(name = "Event Counts"),
+    descendant_record_counts = reactable::colDef(name = "Descendant Event Counts"),
     data = reactable::colDef(name = "Data", show = FALSE)
   )
 
@@ -301,7 +301,7 @@ createCodeCountsTableFromResults <- function(results) {
       return(NULL)
     }
     data <- data |>
-      dplyr::select(concept_id, concept_name, concept_code, vocabulary_id, event_counts, descendant_event_counts)
+      dplyr::select(concept_id, concept_name, concept_code, vocabulary_id, record_counts, descendant_record_counts)
     reactable::reactable(data, fullWidth = FALSE)
   }
 
@@ -331,7 +331,7 @@ createPlotFromResults <- function(results, showsMappings = FALSE) {
       dplyr::left_join(results$code_counts, by = c("concept_id" = "concept_id")) |>
       dplyr::left_join(results$concepts, by = c("concept_id" = "concept_id"))|>
       dplyr::group_by(level, concept_name, concept_id, calendar_year) |>
-      dplyr::summarise(event_counts = sum(event_counts), .groups = "drop") |>
+      dplyr::summarise(record_counts = sum(record_counts), .groups = "drop") |>
       dplyr::arrange(level) |> 
       dplyr::mutate(
         concept_lable = paste(level, ' ', concept_name),
@@ -339,7 +339,7 @@ createPlotFromResults <- function(results, showsMappings = FALSE) {
       ) 
 
   plot <- all |>
-      ggplot2::ggplot(ggplot2::aes(x = calendar_year, y = event_counts, fill = concept_lable)) +
+      ggplot2::ggplot(ggplot2::aes(x = calendar_year, y = record_counts, fill = concept_lable)) +
       ggplot2::geom_area(position = "stack") +
       ggplot2::theme_minimal() +
       ggplot2::scale_fill_manual(values = setNames(all$rgb, all$concept_lable)) +
