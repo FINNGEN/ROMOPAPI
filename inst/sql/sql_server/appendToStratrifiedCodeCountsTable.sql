@@ -1,5 +1,5 @@
--- Insert into code_atomic_counts table
-INSERT INTO @resultsDatabaseSchema.@codeAtomicCountsTable
+-- Insert into code_stratified_counts table
+INSERT INTO @resultsDatabaseSchema.@stratifiedCodeCountsTable
 
 -- calculate counts per each group of concept_id, calendar_year, gender_concept_id, age_decil
 SELECT 
@@ -8,7 +8,7 @@ SELECT
         CAST(ccm.calendar_year AS BIGINT) AS calendar_year,
         CAST(ccm.gender_concept_id AS BIGINT) AS gender_concept_id,
         CAST(ccm.age_decile AS BIGINT) AS age_decile,
-        COUNT_BIG(*) AS event_counts
+        COUNT_BIG(*) AS record_counts
 FROM (
         -- get all person_ids with the concept_id with in a valid observation period
         -- calculate the calendar year, gender_concept_id, age_decile

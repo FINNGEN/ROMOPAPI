@@ -37,7 +37,7 @@ test_that("createAtomicCodeCountsTable works with duplicated counts", {
     dplyr::count() |>
     dplyr::pull(n)
   n2 <- codeAtomicCounts |>
-    dplyr::distinct(concept_id, calendar_year, gender_concept_id, age_decile, event_counts) |>
+    dplyr::distinct(concept_id, calendar_year, gender_concept_id, age_decile, record_counts) |>
     dplyr::count() |>
     dplyr::pull(n)
 
@@ -47,17 +47,17 @@ test_that("createAtomicCodeCountsTable works with duplicated counts", {
   dplyr::inner_join(
     codeAtomicCountsWithDuplicatedCounts |>
       dplyr::group_by(concept_id) |>
-      dplyr::summarise(event_counts = sum(event_counts), .groups = "drop") |>
-      dplyr::distinct(concept_id, event_counts) |> 
-      dplyr::rename(event_counts_duplicated = event_counts),
+      dplyr::summarise(record_counts = sum(record_counts), .groups = "drop") |>
+      dplyr::distinct(concept_id, record_counts) |> 
+      dplyr::rename(record_counts_duplicated = record_counts),
     codeAtomicCounts |>
       dplyr::group_by(concept_id) |>
-      dplyr::summarise(event_counts = sum(event_counts), .groups = "drop") |>
-      dplyr::distinct(concept_id, event_counts) |> 
-      dplyr::rename(event_counts_no_duplicated = event_counts),
+      dplyr::summarise(record_counts = sum(record_counts), .groups = "drop") |>
+      dplyr::distinct(concept_id, record_counts) |> 
+      dplyr::rename(record_counts_no_duplicated = record_counts),
     by = c("concept_id")
   ) |>
-    dplyr::filter(event_counts_duplicated != event_counts_no_duplicated)  |> 
+    dplyr::filter(record_counts_duplicated != record_counts_no_duplicated)  |> 
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_equal(0)
@@ -147,11 +147,11 @@ test_that("createCodeCountsTable works", {
       "calendar_year", 
       "gender_concept_id", 
       "age_decile",
-      "event_counts", 
-      "descendant_event_counts"
+      "record_counts", 
+      "descendant_record_counts"
     ))
   code_counts |>
-    dplyr::filter(descendant_event_counts < event_counts) |> 
+    dplyr::filter(descendant_record_counts < record_counts) |> 
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_equal(0)

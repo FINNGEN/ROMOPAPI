@@ -1,4 +1,3 @@
-
 #' Get FinnGen Eunomia database file
 #'
 #' @description
@@ -20,7 +19,7 @@
 #' \dontrun{
 #' # Get basic database file
 #' db_path <- helper_FinnGen_getDatabaseFile()
-#' 
+#'
 #' # Get database file with counts table
 #' db_path_with_counts <- helper_FinnGen_getDatabaseFile(counts = TRUE)
 #' }
@@ -28,8 +27,8 @@
 #' @note
 #' This function requires the `EUNOMIA_DATA_FOLDER` environment variable to be set
 #' to the path of the Eunomia data folder.
-helper_FinnGen_getDatabaseFile <- function(counts = FALSE){
-   if( Sys.getenv("EUNOMIA_DATA_FOLDER") == "" ){
+helper_FinnGen_getDatabaseFile <- function(counts = FALSE) {
+  if (Sys.getenv("EUNOMIA_DATA_FOLDER") == "") {
     message("EUNOMIA_DATA_FOLDER not set. Please set this environment variable to the path of the Eunomia data folder.")
     stop()
   }
@@ -42,8 +41,7 @@ helper_FinnGen_getDatabaseFile <- function(counts = FALSE){
 
   # Download the database if it doesn't exist
   if (!file.exists(file.path(eunomiaDataFolder, "FinnGenR12_v5.4.zip")) |
-   !file.exists(file.path(eunomiaDataFolder, "FinnGenR12_v5.4.sqlite"))){
-
+    !file.exists(file.path(eunomiaDataFolder, "FinnGenR12_v5.4.sqlite"))) {
     result <- utils::download.file(
       url = urlToFinnGenEunomiaZip,
       destfile = file.path(eunomiaDataFolder, "FinnGenR12_v5.4.zip"),
@@ -53,16 +51,13 @@ helper_FinnGen_getDatabaseFile <- function(counts = FALSE){
     Eunomia::extractLoadData(
       from = file.path(eunomiaDataFolder, "FinnGenR12_v5.4.zip"),
       to = pathToDatabase,
-      cdmVersion = '5.4',
+      cdmVersion = "5.4",
       verbose = TRUE
     )
-
-    
   }
 
   # make a copy if counts database doesn't exist
   if (!file.exists(pathToDatabaseCounts) & counts) {
-
     file.copy(
       from = file.path(eunomiaDataFolder, "FinnGenR12_v5.4.sqlite"),
       to = pathToDatabaseCounts,
@@ -93,7 +88,6 @@ helper_FinnGen_getDatabaseFile <- function(counts = FALSE){
     CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(connectionList, loadConnectionChecksLevel = "basicChecks")
     createCodeCountsTable(CDMdbHandler)
     CDMdbHandler$finalize()
-    
   }
 
   if (counts) {
