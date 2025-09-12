@@ -226,7 +226,7 @@ getCodeCounts <- function(
             record_counts = dplyr::if_else(is.na(record_counts), 0, record_counts)
         ) |>
         dplyr::rename(node_record_counts = record_counts, node_descendant_record_counts = descendant_record_counts)
-    browser()
+
     # - Get concept details
     conceptsWithCodeCounts <- getConceptsWithCodeCounts_memoise(CDMdbHandler, codeCountsTable = codeCountsTable)
     concepts <- familyTreeWithMappings |>

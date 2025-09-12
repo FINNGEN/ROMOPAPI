@@ -1,6 +1,6 @@
 createMermaidGraphFromResults <- function(
     results,
-    showsMappings = TRUE) {
+    showsMappings = FALSE) {
   concept_relationships <- results$concept_relationships
   concepts <- results$concepts
 
@@ -201,7 +201,7 @@ createCodeCountsTableFromResults <- function(results) {
 
 
 
-createPlotFromResults <- function(results, showsMappings = FALSE) {
+createPlotFromResults <- function(results, showsMappings = FALSE, ...) {
   parentConceptIds <- results$concept_relationships |>
     dplyr::filter(!levels %in% c("Mapped from", "Maps to")) |>
     dplyr::pull(parent_concept_id) |>
@@ -288,7 +288,7 @@ createPlotFromResults <- function(results, showsMappings = FALSE) {
     ggplot2::scale_fill_manual(values = setNames(all$rgb, all$concept_lable)) +
     ggplot2::theme(legend.position = "top")
 
-  plotly::ggplotly(plot) |>
+  plotly::ggplotly(plot, ...) |>
     plotly::layout(legend = list(orientation = "h", y = 1.1))
 }
 
@@ -315,4 +315,53 @@ createPlotFromResults <- function(results, showsMappings = FALSE) {
   hex <- paste0("#", r_hex, g_hex, b_hex)
 
   return(hex)
+}
+
+
+
+#' Prune levels from results
+#'
+#' @param results A list of results from getCodeCounts
+#' @param pruneLevels The levels to prune
+#'
+#' @return A list of results with the levels pruned
+#' @export
+#' 
+pruneLevelsFromResults <- function(results, pruneLevels, pruneClass = NULL) {
+
+  concept_relationships <- results$concept_relationships
+  stratified_code_counts <- results$stratified_code_counts
+  concepts <- results$concepts
+
+  concept_relationships <- concept_relationships |>
+    dplyr::mutate(min_level = dplyr::if_else(
+        stringr::str_detect(levels, "(\\d+)-(\\d+)"), 
+        stringr::str_sub(levels, 1, 1) |> as.integer(), 
+        0L)) |>
+    dplyr::filter(min_level < pruneLevels) |> 
+    dplyr::select(-min_level)
+
+  if (!is.null(pruneClass)) {
+    conceptIds <- concepts |>
+      dplyr::filter(concept_class_id %in% pruneClass) |>
+      dplyr::pull(concept_id)
+    concept_relationships <- concept_relationships |>
+      dplyr::filter(!parent_concept_id %in% {{conceptIds}}) |> 
+      dplyr::filter(!child_concept_id %in% {{conceptIds}})
+  }
+
+
+  # remove mapps to with no parent
+  concept_relationships <- concept_relationships |>
+    dplyr::filter(! (levels %in% c("Mapped from", "Maps to") & !parent_concept_id %in% concept_relationships$child_concept_id))
+
+  stratified_code_counts <- stratified_code_counts |>
+    dplyr::filter(concept_id %in% concept_relationships$child_concept_id)
+
+  concepts <- concepts |>
+    dplyr::filter(concept_id %in% concept_relationships$child_concept_id)
+
+  return(list(concept_relationships = concept_relationships, stratified_code_counts = stratified_code_counts, concepts = concepts))
+
+
 }

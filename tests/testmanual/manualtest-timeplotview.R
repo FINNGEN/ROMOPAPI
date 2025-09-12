@@ -27,5 +27,20 @@ createCodeCountsTableFromResults(results)
 
 createPlotFromResults(results)
 
+
+
+createMermaidGraphFromResults(results, showsMappings = TRUE) |> clipr::write_clip()
+createCodeCountsTableFromResults(results)
 createPlotFromResults(results, showsMappings = TRUE)
 
+
+
+# remove levels
+pruneLevels <- 2
+results <- pruneLevelsFromResults(results, pruneLevels, pruneClass = "Ingredient")
+
+
+
+# create report
+report.html <- createReport(conceptId, CDMdbHandler, showsMappings = TRUE, pruneLevels = 2)
+browseURL(report.html)
