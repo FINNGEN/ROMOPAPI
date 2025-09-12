@@ -8,8 +8,26 @@ CREATE TABLE @resultsDatabaseSchema.@codeCountsTable (
 
 INSERT INTO @resultsDatabaseSchema.@codeCountsTable 
 
+
+WITH
+-- TEMP: fix all must have an ancestor to itself
+temp_concept_ancestor AS (
+  SELECT DISTINCT * FROM (
+        SELECT * FROM @cdmDatabaseSchema.concept_ancestor
+        UNION ALL
+        SELECT DISTINCT
+            concept_id AS ancestor_concept_id,
+            concept_id AS descendant_concept_id,
+            0 AS min_levels_of_separation,
+            0 AS max_levels_of_separation
+        FROM
+            @cdmDatabaseSchema.concept
+    )
+),
+-- END TEMP
+
 -- all low level record counts
-WITH atomic_code_counts AS (
+ atomic_code_counts AS (
     SELECT DISTINCT
          concept_id AS concept_id, 
          SUM(record_counts) AS record_counts
@@ -39,7 +57,7 @@ descendant_counts AS (
         COALESCE(cc.record_counts, 0) AS record_counts,
         SUM(COALESCE(cctosum.record_counts, 0)) AS descendant_record_counts
     FROM
-        @cdmDatabaseSchema.concept_ancestor ca 
+        temp_concept_ancestor ca 
     INNER JOIN
         atomic_code_counts cctosum
     ON

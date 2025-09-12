@@ -20,19 +20,12 @@ results <- getCodeCounts(
     conceptId = conceptId
 )
 
-results$concept_relationships |>
-    dplyr::left_join(results$code_counts, by = c("child_concept_id" = "concept_id")) |>
-    dplyr::left_join(results$concepts, by = c("child_concept_id" = "concept_id"))|>
-    #dplyr::filter(level != "Parent" & level != "Mapped from") |>
-    dplyr::group_by(level, concept_name, concept_code, child_concept_id) |>
-    dplyr::summarise(record_counts = sum(record_counts), descendant_record_counts = sum(descendant_record_counts), .groups = "drop") |> 
-    View()
 
-
-
-createMermaidGraphFromResults(results) |> cat()
+createMermaidGraphFromResults(results) |> clipr::write_clip()
 
 createCodeCountsTableFromResults(results)
 
 createPlotFromResults(results)
+
+createPlotFromResults(results, showsMappings = TRUE)
 

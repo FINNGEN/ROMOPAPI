@@ -1,28 +1,3 @@
-
-#' Memoised version of getCodeCounts
-#'
-#' @description
-#' A memoised version of the getCodeCounts function that caches results to improve performance
-#' for repeated calls with the same parameters. The CDMdbHandler argument is omitted from
-#' the cache key to allow sharing across different database connections.
-#'
-#' @param CDMdbHandler A CDMdbHandler object that contains database connection details
-#' @param conceptId The concept ID to get counts and relationships for
-#'
-#' @return A list containing:
-#' \itemize{
-#'   \item `concept_relationships` - Tibble of concept relationships including 'Maps to', 'Mapped from', 'Parent', and descendant relationships
-#'   \item `concepts` - Tibble of concept details for related concepts
-#'   \item `code_counts` - Tibble of code counts from the code_counts table
-#' }
-#'
-#' @export
-getCodeCounts_memoise <- memoise::memoise(
-    getCodeCounts,
-    omit_args = "CDMdbHandler"
-)
-
-
 #' Get code counts and related concept information
 #'
 #' @description
@@ -66,7 +41,7 @@ getCodeCounts <- function(
     #
     CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
     conceptId |> checkmate::assertIntegerish(lower = 1)
-    codeCountsTable  |> checkmate::assertString()
+    codeCountsTable |> checkmate::assertString()
 
     stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
 
@@ -198,7 +173,7 @@ getCodeCounts <- function(
             dplyr::mutate(levels = "Maps to")
     )
 
-    familyTreeWithRelationships <- dplyr::bind_rows(
+    familyTreeWithMappings <- dplyr::bind_rows(
         familyTreeWithInfo,
         familyTreeWithInfo |>
             dplyr::distinct(child_concept_id) |>
@@ -208,17 +183,23 @@ getCodeCounts <- function(
 
     # - Get counts table only for descendats and mapped from
     codeCountsPerId <- dplyr::bind_rows(
-        codeCounts |> dplyr::select(-maps_to_concept_id),
-        codeCounts |> dplyr::select(-concept_id) |> dplyr::rename(concept_id = maps_to_concept_id)
-    ) |>
-        dplyr::distinct(concept_id, calendar_year, gender_concept_id, age_decile, record_counts)
+        # source concepts, remove duplicates
+        codeCounts |> 
+            dplyr::select(-concept_id) |> 
+            dplyr::rename(concept_id = maps_to_concept_id) |> 
+            dplyr::distinct(concept_id, calendar_year, gender_concept_id, age_decile, record_counts),
+        # standard concepts, agregate counts
+        codeCounts |> dplyr::select(-maps_to_concept_id) |> 
+            dplyr::group_by(concept_id, calendar_year, gender_concept_id, age_decile) |>
+            dplyr::summarise(record_counts = sum(record_counts), .groups = "drop")
+    ) 
 
-    familyTreeDescendants <- familyTreeWithRelationships |>
+    familyTreeDescendants <- familyTreeWithMappings |>
         dplyr::filter(!levels %in% c("Mapped from", "Maps to", "-1", "0")) |>
         dplyr::select(parent_concept_id, child_concept_id)
 
     ancestorTableOfDescendant <- tibble::tibble(
-        concept_id = c(conceptId, familyTreeDescendants$child_concept_id)
+        concept_id = unique(c(conceptId, familyTreeDescendants$child_concept_id))
     ) |>
         dplyr::mutate(
             ancestorTable = purrr::map(
@@ -231,48 +212,51 @@ getCodeCounts <- function(
         tidyr::unnest(ancestorTable)
 
     nodeDescendantRecordCounts <- ancestorTableOfDescendant |>
-        dplyr::inner_join(codeCountsPerId, by = c("descendant_concept_id" = "concept_id"), relationship = "many-to-many") |>
+        dplyr::inner_join(codeCountsPerId, by = c("descendant_concept_id" = "concept_id")) |>
         dplyr::group_by(concept_id, calendar_year, gender_concept_id, age_decile) |>
         dplyr::summarise(
             descendant_record_counts = sum(record_counts),
             .groups = "drop"
         )
 
-    codeCountsPerId <- codeCountsPerId |>
-        dplyr::left_join(nodeDescendantRecordCounts, by = c("concept_id", "calendar_year", "gender_concept_id", "age_decile"))  |> 
-        dplyr::mutate(descendant_record_counts = dplyr::if_else(is.na(descendant_record_counts), record_counts, descendant_record_counts)) |> 
+    stratifiedCodeCounts <- codeCountsPerId |>
+        dplyr::full_join(nodeDescendantRecordCounts, by = c("concept_id", "calendar_year", "gender_concept_id", "age_decile")) |> 
+        dplyr::mutate(
+            descendant_record_counts = dplyr::if_else(is.na(descendant_record_counts), record_counts, descendant_record_counts),
+            record_counts = dplyr::if_else(is.na(record_counts), 0, record_counts)
+        ) |>
         dplyr::rename(node_record_counts = record_counts, node_descendant_record_counts = descendant_record_counts)
-
-
-
+    browser()
     # - Get concept details
-    sql <- "SELECT * FROM @vocabularyDatabaseSchema.concept WHERE concept_id IN (@parentAndDescendantsAndMappedConceptIds);"
-    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, parentAndDescendantsAndMappedConceptIds = paste(parentAndDescendantsAndMappedConceptIds, collapse = ","))
-    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-    concepts <- DatabaseConnector::dbGetQuery(connection, sql) |>
-        tibble::as_tibble()
+    conceptsWithCodeCounts <- getConceptsWithCodeCounts_memoise(CDMdbHandler, codeCountsTable = codeCountsTable)
+    concepts <- familyTreeWithMappings |>
+        dplyr::distinct(child_concept_id) |>
+        dplyr::rename(concept_id = child_concept_id) |>
+        dplyr::left_join(conceptsWithCodeCounts, by = c("concept_id" = "concept_id"))
+
 
     # TEMP: in eunomia missing concepts
-    missingConcepts <- code_counts |>
-        dplyr::anti_join(concepts, by = "concept_id") |>
-        dplyr::distinct(concept_id) |>
+    missingConcepts <- concepts |>
         dplyr::mutate(
-            concept_name = "Missing concept Name",
-            domain_id = "NA",
-            vocabulary_id = "NA",
-            concept_class_id = "NA",
-            standard_concept = "NA",
-            concept_code = "NA",
-            valid_start_date = as.Date("1900-01-01"),
-            valid_end_date = as.Date("1900-01-01"),
-            invalid_reason = "NA"
+            concept_name = dplyr::if_else(is.na(concept_name), "Missing concept Name", concept_name),
+            domain_id = dplyr::if_else(is.na(domain_id), "NA", domain_id),
+            vocabulary_id = dplyr::if_else(is.na(vocabulary_id), "NA", vocabulary_id),
+            concept_class_id = dplyr::if_else(is.na(concept_class_id), "NA", concept_class_id),
+            standard_concept = dplyr::if_else(is.na(standard_concept), TRUE, standard_concept),
+            concept_code = dplyr::if_else(is.na(concept_code), "NA", concept_code),
+            record_counts = dplyr::if_else(is.na(record_counts), 0, record_counts),
+            descendant_record_counts = dplyr::if_else(is.na(descendant_record_counts), 0, descendant_record_counts)
         )
-    concepts <- dplyr::bind_rows(concepts, missingConcepts)
     # END TEMP
 
+    # add concept_class_id to familyTreeWithRelationships
+    conceptRelationships <- familyTreeWithMappings |>
+        dplyr::left_join(conceptsWithCodeCounts |> dplyr::select(concept_id, concept_class_id), by = c("child_concept_id" = "concept_id")) |>
+        dplyr::select(-paths)
+
     return(list(
-        concept_relationships = familyTreeWithRelationships,
-        code_counts = code_counts,
+        concept_relationships = conceptRelationships,
+        stratified_code_counts = stratifiedCodeCounts,
         concepts = concepts
     ))
 }
@@ -295,7 +279,7 @@ getCodeCounts <- function(
 #'
 #' @importFrom tibble tibble
 #' @importFrom dplyr semi_join filter mutate select bind_rows group_by summarise arrange n
-#' 
+#'
 .familyTreeToAncestorTable <- function(familyTree, conceptId) {
     descendantTable <- tibble::tibble(
         descendant_concept_id = conceptId,
@@ -338,3 +322,27 @@ getCodeCounts <- function(
 
     return(descendantTable)
 }
+
+
+#' Memoised version of getCodeCounts
+#'
+#' @description
+#' A memoised version of the getCodeCounts function that caches results to improve performance
+#' for repeated calls with the same parameters. The CDMdbHandler argument is omitted from
+#' the cache key to allow sharing across different database connections.
+#'
+#' @param CDMdbHandler A CDMdbHandler object that contains database connection details
+#' @param conceptId The concept ID to get counts and relationships for
+#'
+#' @return A list containing:
+#' \itemize{
+#'   \item `concept_relationships` - Tibble of concept relationships including 'Maps to', 'Mapped from', 'Parent', and descendant relationships
+#'   \item `concepts` - Tibble of concept details for related concepts
+#'   \item `code_counts` - Tibble of code counts from the code_counts table
+#' }
+#'
+#' @export
+getCodeCounts_memoise <- memoise::memoise(
+    getCodeCounts,
+    omit_args = "CDMdbHandler"
+)

@@ -24,8 +24,9 @@
 #'
 #' @export
 #' 
-getListOfConcepts <- function(
-    CDMdbHandler) {
+getConceptsWithCodeCounts <- function(
+    CDMdbHandler,
+    codeCountsTable = "code_counts") {
     #
     # VALIDATE
     #
@@ -42,12 +43,12 @@ getListOfConcepts <- function(
     sql <- "
     SELECT DISTINCT 
         c.concept_id, 
-        c.concept_name, c.concept_code, c.domain_id, c.vocabulary_id, c.standard_concept,
+        c.concept_name, c.domain_id, c.vocabulary_id, c.concept_class_id, c.standard_concept, c.concept_code,
         cc.record_counts, cc.descendant_record_counts
        FROM @vocabularyDatabaseSchema.concept c
-       INNER JOIN @resultsDatabaseSchema.code_counts cc
+       INNER JOIN @resultsDatabaseSchema.@codeCountsTable cc
        ON c.concept_id = cc.concept_id;"
-    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, resultsDatabaseSchema = resultsDatabaseSchema)
+    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, resultsDatabaseSchema = resultsDatabaseSchema, codeCountsTable = codeCountsTable)
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     concepts <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble() |>
@@ -56,10 +57,10 @@ getListOfConcepts <- function(
     return(concepts)
 }
 
-#' Memoised version of getListOfConcepts
+#' Memoised version of getConceptsWithCodeCounts
 #'
 #' @description
-#' A memoised version of the getListOfConcepts function that caches results to improve performance
+#' A memoised version of the getConceptsWithCodeCounts function that caches results to improve performance
 #' for repeated calls with the same parameters. The CDMdbHandler argument is omitted from
 #' the cache key to allow sharing across different database connections.
 #'
@@ -76,7 +77,7 @@ getListOfConcepts <- function(
 #' }
 #'
 #' @export
-getListOfConcepts_memoise <- memoise::memoise(
-    getListOfConcepts,
+getConceptsWithCodeCounts_memoise <- memoise::memoise(
+    getConceptsWithCodeCounts,
     omit_args = "CDMdbHandler"
 )
