@@ -20,7 +20,7 @@
 #' \dontrun{
 #' # Run with default test database
 #' runApiServer()
-#' 
+#'
 #' # Run with custom configuration
 #' config <- list(...) # your database config
 #' runApiServer(cohortTableHandlerConfig = config, port = 9000)
@@ -31,7 +31,7 @@
 #' When using the test database, code counts tables are automatically created.
 runApiServer <- function(
     cohortTableHandlerConfig = NULL,
-    host = "127.0.0.1", 
+    host = "127.0.0.1",
     port = 8585,
     ...) {
     #
@@ -41,29 +41,26 @@ runApiServer <- function(
     if (is.null(cohortTableHandlerConfig)) {
         message("No path to database config provided. Using the test FinnGen Eunomia database.")
         # if not provided, use the test FinnGen Eunomia database
-        pathToFinnGenEunomiaSqlite <- helper_FinnGen_getDatabaseFile(counts = TRUE)
+        pathToFinnGenEunomiaSqlite <- file.path(Sys.getenv("EUNOMIA_DATA_FOLDER"), "FinnGenR13_counts.sqlite")
 
-        databasesConfig <- HadesExtras::readAndParseYaml(
+        test_databasesConfig <- HadesExtras::readAndParseYaml(
             pathToYalmFile = system.file("testdata", "config", "eunomia_databasesConfig.yml", package = "ROMOPAPI"),
-            pathToGiBleedEunomiaSqlite = "",
-            pathToMIMICEunomiaSqlite = "",
             pathToFinnGenEunomiaSqlite = pathToFinnGenEunomiaSqlite
         )
 
-        cohortTableHandlerConfig <- databasesConfig[[4]]$cohortTableHandle
+        cohortTableHandlerConfig <- test_databasesConfig[[4]]$cohortTableHandler
 
         # Create CDMdbHandler
-        CDMdbHandler  <- HadesExtras::createCDMdbHandlerFromList(cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
- 
+        CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
     } else {
         # Create CDMdbHandler
-        CDMdbHandler  <- HadesExtras::createCDMdbHandlerFromList(cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+        CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
     }
 
     # Create plumber router
     pathToPlumberFile <- system.file("plumber", "plumber.R", package = "ROMOPAPI")
 
-    plumberRouter  <- plumber::pr(
+    plumberRouter <- plumber::pr(
         file = pathToPlumberFile,
         env = rlang::env(
             CDMdbHandler = CDMdbHandler

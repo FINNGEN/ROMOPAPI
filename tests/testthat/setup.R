@@ -6,8 +6,8 @@
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-DBI")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen-counts")
-# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "FinnGen-counts-lite")
-testingDatabase <- Sys.getenv("HADESEXTAS_TESTING_ENVIRONMENT")
+Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "FinnGen-counts-lite")
+Sys.setenv(EUNOMIA_DATA_FOLDER = "eunomia_data")
 
 # CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
 # createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts")
@@ -26,7 +26,7 @@ if (!(testingDatabase %in% possibleDatabases)) {
 }
 
 if (testingDatabase |> stringr::str_ends("FinnGen-counts-lite")) {
-  pathToFinnGenEunomiaSqlite <- "FinnGenR13_counts.sqlite"
+  pathToFinnGenEunomiaSqlite <- file.path(Sys.getenv("EUNOMIA_DATA_FOLDER"), "FinnGenR13_counts.sqlite")
 
   test_databasesConfig <- HadesExtras::readAndParseYaml(
     pathToYalmFile = system.file("testdata", "config", "eunomia_databasesConfig.yml", package = "ROMOPAPI"),
