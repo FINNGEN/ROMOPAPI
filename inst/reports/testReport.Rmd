@@ -3,19 +3,63 @@ title: "Dynamic Report"
 output: html_document
 params:
   conceptId: NULL
+  CDMdbHandler: NULL
+  showsMappings: FALSE
+  pruneLevels: NULL
 ---
 
 ```{r setup, include=FALSE}
+
+conceptId <- params$conceptId |> as.integer()
+CDMdbHandler <- params$CDMdbHandler
+showsMappings <- params$showsMappings
+pruneLevels <- params$pruneLevels 
+
 # Set dynamic title based on conceptId parameter
-if (!is.null(params$conceptId)) {
-  title <- paste("Dynamic Report - Concept ID:", params$conceptId)
+if (!is.null(conceptId)) {
+  title <- paste("Concept ID:", conceptId, "showsMappings:", showsMappings, "pruneLevels:", pruneLevels)
 } else {
   title <- "Dynamic Report"
 }
+
 ```
 
 # `r title`
   
 ```{r}
-summary(cars)
+results <- getCodeCounts_memoise(
+  CDMdbHandler,
+  conceptId = conceptId
+)
+
+if (length(pruneLevels) != 0 & !is.null(pruneLevels) & is.numeric(pruneLevels)) {
+  results <- pruneLevelsFromResults(results, pruneLevels)
+}
 ``` 
+
+
+
+
+Graph
+```{r}
+mermaid <- createMermaidGraphFromResults(results, showsMappings = showsMappings)
+DiagrammeR::mermaid(mermaid, width = "100%", height = "100%")
+```
+
+Table
+```{r}
+createCodeCountsTableFromResults(results)
+``` 
+
+Plot
+```{r}
+createPlotFromResults(results, showsMappings = showsMappings, width = 1000, height = 1000)
+``` 
+
+
+<!-- Load mermaid.js -->
+<script src="mermaid.min.js"></script>
+<script>
+mermaid.initialize({ startOnLoad: true });
+</script>
+

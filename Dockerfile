@@ -1,5 +1,5 @@
 FROM --platform=linux/amd64  rocker/r-ver:4.4.1
-RUN /rocker_scripts/setup_R.sh https://packagemanager.posit.co/cran/__linux__/jammy/2025-05-27
+RUN /rocker_scripts/setup_R.sh https://packagemanager.posit.co/cran/__linux__/jammy/2025-09-10
 
 # install OS dependencies including java and python 3
 RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev libncurses5-dev curl python3-dev python3.venv git \
@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev li
 && rm -rf /var/lib/apt/lists/*
 
 # Install renv and restore packages
-ARG ROMOPAPI_VERSION=0.0.3
+ARG ROMOPAPI_VERSION=0.0.4
 
 # Install renv and restore packages
 RUN --mount=type=secret,id=build_github_pat \

@@ -22,20 +22,19 @@ function(msg = "") {
 }
 
 #* Get the code counts for a given concept ID
-#* @param conceptIds A vector of concept IDs
+#* @param conceptId The concept ID to get counts and relationships for
 #* @get /getCodeCounts
-function(
-    res, conceptIds) {
-  if (!grepl("^\\d+(,\\d+)*$", conceptIds)) {
+function(res, conceptId) {
+  if (!grepl("^\\d+$", conceptId)) {
     res$status <- 400 # Bad request
-    return(list(error = jsonlite::unbox("conceptIds must be a comma-separated list of integers")))
+    return(list(error = jsonlite::unbox("conceptId must be an integer")))
   }
 
-  conceptIds <- as.integer(strsplit(conceptIds, ",")[[1]])
+  conceptId <- as.integer(conceptId)
 
   getCodeCounts_memoise(
     CDMdbHandler = CDMdbHandler,
-    conceptIds = conceptIds
+    conceptId = conceptId
   )
 }
 
@@ -51,22 +50,38 @@ function() {
 #* Get the list of concepts with code counts
 #* @get /getListOfConcepts
 function() {
- getListOfConcepts_memoise(CDMdbHandler = CDMdbHandler)
+  concepts <- getConceptsWithCodeCounts_memoise(CDMdbHandler = CDMdbHandler)
+  concepts <- concepts |>
+    dplyr::select(concept_id, concept_name, vocabulary_id, concept_code)
+  return(concepts)
 }
-
-
 
 #* @get /report
 #* @param conceptId The concept ID to include in the report
 #* @serializer html
-function(conceptId = NULL) {
-  # Render Rmd to a temporary HTML file
-  tmp_html <- tempfile(fileext = ".html")
-  rmarkdown::render(system.file("reports", "testReport.Rmd", package = "ROMOPAPI"), 
-                    output_file = tmp_html, 
-                    quiet = TRUE,
-                    params = list(conceptId = conceptId))
-  
+function(conceptId = NULL, showsMappings = FALSE, pruneLevels = NULL) {
+  conceptId <- as.integer(conceptId)
+  showsMappings <- as.logical(showsMappings)
+  pruneLevels <- as.integer(pruneLevels)
+
+  tmp_html <- createReport(conceptId, CDMdbHandler, showsMappings = showsMappings, pruneLevels = pruneLevels)
   # Return the HTML contents
   paste(readLines(tmp_html), collapse = "\n")
+}
+
+#* Serve mermaid.min.js directly
+#* @get /mermaid.min.js
+#* @serializer contentType list(type = "application/javascript")
+function() {
+  # Get the path to the mermaid.min.js file
+  file_path <- system.file("reports", "mermaid.min.js", package = "ROMOPAPI")
+
+  # Check if file exists
+  if (!file.exists(file_path)) {
+    res$status <- 404
+    return(list(error = "File not found"))
+  }
+
+  # Read and return the file content
+  readChar(file_path, file.info(file_path)$size)
 }
