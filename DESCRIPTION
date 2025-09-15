@@ -25,7 +25,15 @@ Imports:
     HadesExtras,
     rlang,
     utils,
-    memoise
+    memoise,
+    ggplot2,
+    plotly,
+    rmarkdown,
+    digest,
+    purrr,
+    reactable,
+    tidyr,
+    DiagrammeR
 Remotes:
     FINNGEN/HadesExtras
 Suggests: 
