@@ -2,20 +2,39 @@
 # SELECT DATABASE and CO2 CONFIGURATION
 #
 
-#  Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-GiBleed")
+# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-GiBleed")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-DBI")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen")
-#Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen-counts")
+# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen-counts")
+# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "FinnGen-counts-lite")
 testingDatabase <- Sys.getenv("HADESEXTAS_TESTING_ENVIRONMENT")
 
 # CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
 # createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts")
 
+# Create FinnGen counts lite database
+# pathToSqliteDatabase  <- "FinnGenR13_counts.sqlite"
+# CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+# helper_createSqliteDatabaseFromDatabase(CDMdbHandler, conceptIds = c(317009, 21601855),  pathToSqliteDatabase = pathToSqliteDatabase)
+
+
 # check correct settings
-possibleDatabases <- c( "AtlasDevelopment-DBI", "Eunomia-GiBleed", "Eunomia-FinnGen", "Eunomia-FinnGen-counts")
+possibleDatabases <- c( "AtlasDevelopment-DBI", "Eunomia-GiBleed", "Eunomia-FinnGen", "Eunomia-FinnGen-counts", "FinnGen-counts-lite")
 if (!(testingDatabase %in% possibleDatabases)) {
   message("Please set a valid testing environment in envar HADESEXTAS_TESTING_ENVIRONMENT, from: ", paste(possibleDatabases, collapse = ", "))
   stop()
+}
+
+if (testingDatabase |> stringr::str_ends("FinnGen-counts-lite")) {
+  pathToFinnGenEunomiaSqlite <- "FinnGenR13_counts.sqlite"
+
+  test_databasesConfig <- HadesExtras::readAndParseYaml(
+    pathToYalmFile = system.file("testdata", "config", "eunomia_databasesConfig.yml", package = "ROMOPAPI"),
+    pathToFinnGenEunomiaSqlite = pathToFinnGenEunomiaSqlite
+  )
+
+  test_cohortTableHandlerConfig <- test_databasesConfig[[4]]$cohortTableHandler
+
 }
 
 

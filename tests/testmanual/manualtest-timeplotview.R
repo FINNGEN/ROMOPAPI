@@ -13,6 +13,7 @@ conceptId <- 45596282 # asthma ICD10
 conceptId <- 21601855       # ATC C10AA
 conceptId <- 21601823
 conceptId <- 21601487
+conceptId <- 782748
 
 
 results <- getCodeCounts(
@@ -80,7 +81,7 @@ browseURL(report.html)
 ## Cut to level 2 and remove ingredients
 results3 <- pruneLevelsFromResults(results, pruneLevels = 2, pruneClass = "Ingredient")
 createMermaidGraphFromResults(results3) |> clipr::write_clip()
-report.html <- createReport(conceptId, CDMdbHandler, showsMappings = FALSE, pruneLevels = 2, pruneClass = "Ingredient")
+report.html <- createReport(conceptId, CDMdbHandler, showsMappings = FALSE, pruneLevels = 2)
 browseURL(report.html)
 
 
@@ -102,3 +103,31 @@ results5 <- pruneLevelsFromResults(results, pruneLevels = 4, pruneClass = "Ingre
 createMermaidGraphFromResults(results5) |> clipr::write_clip()
 report.html <- createReport(conceptId, CDMdbHandler, showsMappings = FALSE, pruneLevels = 3, pruneClass = "Ingredient")
 browseURL(report.html)
+
+
+
+# ATC level 5: ATC C10AA07
+
+conceptId <- 21601862
+
+results <- getCodeCounts(
+    CDMdbHandler,
+    conceptId = conceptId
+)
+
+createMermaidGraphFromResults(results) |> clipr::write_clip()
+report.html <- createReport(conceptId, CDMdbHandler, showsMappings = FALSE)
+browseURL(report.html)
+
+
+results2 <- pruneLevelsFromResults(results, pruneLevels = 100, pruneClass = "Clinical Drug Comp")
+createMermaidGraphFromResults(results2) |> clipr::write_clip()
+
+
+
+conceptId <- 21602515
+
+results <- getCodeCounts(
+    CDMdbHandler,
+    conceptId = conceptId
+)

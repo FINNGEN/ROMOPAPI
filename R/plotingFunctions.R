@@ -277,7 +277,7 @@ createPlotFromResults <- function(results, showsMappings = FALSE, ...) {
       data = stackAreasData,
       ggplot2::aes(x = calendar_year, y = record_counts, fill = concept_lable)
     ) +
-    ggplot2::geom_bar(stat = "identity", position = "stack") +
+    ggplot2::geom_area(stat = "identity", position = "stack") +
     ggplot2::geom_line(
       data = lineData,
       ggplot2::aes(x = calendar_year, y = node_descendant_record_counts),
