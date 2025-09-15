@@ -6,14 +6,15 @@
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-DBI")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen-counts")
-Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "FinnGen-counts-lite")
-Sys.setenv(EUNOMIA_DATA_FOLDER = "eunomia_data")
+#Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "FinnGen-counts-lite")
+#Sys.setenv(EUNOMIA_DATA_FOLDER = "eunomia_data")
+testingDatabase <- Sys.getenv("HADESEXTAS_TESTING_ENVIRONMENT")
 
 # CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
 # createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts")
 
 # Create FinnGen counts lite database
-# pathToSqliteDatabase  <- "FinnGenR13_counts.sqlite"
+# pathToSqliteDatabase  <- "eunomia_data/FinnGenR13_counts.sqlite"
 # CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
 # helper_createSqliteDatabaseFromDatabase(CDMdbHandler, conceptIds = c(317009, 21601855),  pathToSqliteDatabase = pathToSqliteDatabase)
 

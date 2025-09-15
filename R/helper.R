@@ -137,31 +137,26 @@ helper_createSqliteDatabaseFromDatabase <- function(
   targetVocabularyDatabaseSchema <- "main"
   targetResultsDatabaseSchema <- "main"
 
+  conceptIdsToExtract <- c()
+  for (conceptId in conceptIds) {
+    results <- getCodeCounts(
+      CDMdbHandler,
+      conceptId = conceptId
+    )
 
+    conceptIdsToExtract <- c(conceptIdsToExtract, results$concepts$concept_id)
+  }
 
-  # Get concept ids for descendants, descendants of descendants, and parent 
-  sql <- "SELECT DISTINCT ca2.descendant_concept_id AS concept_id 
-          FROM @vocabularyDatabaseSchema.concept_ancestor AS ca1
-          LEFT JOIN @vocabularyDatabaseSchema.concept_ancestor ca2
-          ON ca1.descendant_concept_id = ca2.ancestor_concept_id
-          WHERE ca1.ancestor_concept_id IN (@conceptIds)
-          UNION ALL
-          SELECT DISTINCT ca3.ancestor_concept_id AS concept_id 
-          FROM @vocabularyDatabaseSchema.concept_ancestor AS ca3
-          WHERE ca3.descendant_concept_id IN (@conceptIds) AND ca3.min_levels_of_separation = 1
-          "
-
-  sql <- SqlRender::render(sql, vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","))
-  sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
-  conceptIds <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
-    tibble::as_tibble() |>
-    pull(concept_id)
-
+  conceptIdsToExtract <- conceptIdsToExtract |> unique()
 
   # Get concept table
   sql <- "SELECT DISTINCT c.* FROM @vocabularyDatabaseSchema.concept c
-          WHERE c.concept_id IN (@conceptIds)"
-  sql <- SqlRender::render(sql, vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","))
+          WHERE c.concept_id IN (@conceptIdsToExtract)"
+  sql <- SqlRender::render(
+    sql,
+    vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema,
+    conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ",")
+  )
   sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
   concept <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
     tibble::as_tibble()
@@ -176,8 +171,12 @@ helper_createSqliteDatabaseFromDatabase <- function(
 
   # Concept ancestor table
   sql <- "SELECT DISTINCT ca.* FROM @vocabularyDatabaseSchema.concept_ancestor ca
-         WHERE ca.ancestor_concept_id IN (@conceptIds) "
-  sql <- SqlRender::render(sql, vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","))
+         WHERE ca.descendant_concept_id IN (@conceptIdsToExtract) "
+  sql <- SqlRender::render(
+    sql,
+    vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema,
+    conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ",")
+  )
   sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
   conceptAncestor <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
     tibble::as_tibble()
@@ -192,8 +191,13 @@ helper_createSqliteDatabaseFromDatabase <- function(
 
   # Code counts table
   sql <- "SELECT DISTINCT cc.* FROM @resultsDatabaseSchema.@codeCountsTable cc
-         WHERE cc.concept_id IN (@conceptIds)"
-  sql <- SqlRender::render(sql, resultsDatabaseSchema = sourceResultsDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","), codeCountsTable = codeCountsTable)
+         WHERE cc.concept_id IN (@conceptIdsToExtract)"
+  sql <- SqlRender::render(
+    sql,
+    resultsDatabaseSchema = sourceResultsDatabaseSchema,
+    conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ","),
+    codeCountsTable = codeCountsTable
+  )
   sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
   codeCounts <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
     tibble::as_tibble()
@@ -208,9 +212,12 @@ helper_createSqliteDatabaseFromDatabase <- function(
 
   # stratified code counts table
   sql <- "SELECT DISTINCT cc.* FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable cc
-         WHERE cc.concept_id IN (@conceptIds)"
-  sql <- SqlRender::render(sql, resultsDatabaseSchema = sourceResultsDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","), 
-  stratifiedCodeCountsTable = paste0("stratified_", codeCountsTable))
+         WHERE cc.concept_id IN (@conceptIdsToExtract) OR cc.maps_to_concept_id IN (@conceptIdsToExtract)"
+  sql <- SqlRender::render(sql,
+    resultsDatabaseSchema = sourceResultsDatabaseSchema,
+    conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ","),
+    stratifiedCodeCountsTable = paste0("stratified_", codeCountsTable)
+  )
   sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
   stratifiedCodeCounts <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
     tibble::as_tibble()
