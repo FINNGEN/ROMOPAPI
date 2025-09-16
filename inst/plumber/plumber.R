@@ -32,10 +32,15 @@ function(res, conceptId) {
 
   conceptId <- as.integer(conceptId)
 
+  tryCatch({
   getCodeCounts_memoise(
     CDMdbHandler = CDMdbHandler,
     conceptId = conceptId
   )
+  }, error = function(e) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox(e$message)))
+  })
 }
 
 

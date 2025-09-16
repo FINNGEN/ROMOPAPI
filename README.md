@@ -7,7 +7,7 @@ API to access OMOP CDM (Observational Medical Outcomes Partnership Common Data M
 You can install ROMOPAPI from GitHub with:
 
 ```r
-# install.packages("remotes")
+install.packages("remotes")
 remotes::install_github("FINNGEN/ROMOPAPI")
 ```
 
@@ -22,33 +22,34 @@ Create a folder to store the testing databases. This saves time as the databases
 ```r
 library(ROMOPAPI)
 
-
-# Set the folder to store the testing databases
-Sys.setenv(EUNOMIA_DATA_FOLDER = "<full_path_to_local_eunomia_data_folder>")
-
-# Run the API server with default settings (uses test FinnGen Eunomia database)
+# Run the API server with default settings (uses internal testing database with minimal data)
 runApiServer()
-
 ```
 
 This will start the API server on port 8585.
 
-The main endpoint is: http://127.0.0.1:8585/getCodeCounts?conceptIds=<concept_id_1>,<concept_id_2>,...
+#### Testing endpoints
 
-For example, http://127.0.0.1:8585/getCodeCounts?conceptIds=201826
+The main endpoint for testing is: http://127.0.0.1:8585/report?conceptId=<concept_id>
 
-This will return the code counts for the concept ids 201826.
+For example, http://127.0.0.1:8585/report?conceptId=317009
+
+This will return an HTML report for the concept id 317009.
+
+#### Production endpoints
+
+The main endpoint for production is: http://127.0.0.1:8585/getCodeCounts?conceptId=<concept_id>
+
+This will return the code counts for the concept ids 317009.
 
 Separated in 3 tables:
 
 - `concept_relationship`: relationships between conceptIds
 - `concept`: information about the conceptIds
-- `code_counts`: patient counts by conceptId stratified by gender, year, and age decile
-
+- `stratified_code_counts`: patient counts by conceptId stratified by gender, year, and age decile
 
 
 See the API documentation for more details: http://127.0.0.1:8585/__docs__/
-
 
 ### Running the API Server with a custom database
 
@@ -73,36 +74,16 @@ cohortTableHandler:
         resultsDatabaseSchema: main
 ```
 
-If it is the first time running the API server with the custom database, you need to run the following command to create the code counts table.
+If it is the first time running the API server with the custom database, you need add the parameter `buildCountsTable = TRUE` to the `runApiServer` function.
 
 ```r
 databaseConfig <- yaml::read_yaml("path/to/database_config.yml")
 
- CDMdbHandler  <- HadesExtras_createCDMdbHandlerFromList(
-  databaseConfig$cohortTableHandler, 
-  loadConnectionChecksLevel = "basicChecks"
-)
- 
-ROMOPAPI::createCodeCountsTable(
-  CDMdbHandler = CDMdbHandler
+ROMOPAPI::runApiServer(
+  cohortTableHandlerConfig = databaseConfig$cohortTableHandler,
+  buildCountsTable = TRUE
 )
 ```
-
-Run the API server with the custom configuration.
-
-```r
-library(ROMOPAPI)
-
-databaseConfig <- yaml::read_yaml("path/to/database_config.yml")
-
-# Run the API server with custom configuration
-runApiServer(
-  cohortTableHandlerConfig = databaseConfig,
-  host = "0.0.0.0",  # Allow external connections
-  port = 8080
-)
-```
-
 
 # DEVELOPMENT
 
@@ -115,7 +96,6 @@ databasesConfig <- HadesExtras_readAndParseYaml(system.file("testdata", "config"
 bigrquery::bq_auth(path = Sys.getenv("GCP_SERVICE_KEY"))
 # Run the API server with default settings (uses test FinnGen Eunomia database)
 runApiServer(cohortTableHandlerConfig = databasesConfig$BQ5k$cohortTableHandler)
-
 ```
 
 

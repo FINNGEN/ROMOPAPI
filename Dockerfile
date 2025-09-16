@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev li
 && rm -rf /var/lib/apt/lists/*
 
 # Install renv and restore packages
-ARG ROMOPAPI_VERSION=0.0.4
+ARG ROMOPAPI_VERSION=0.0.8
 
 # Install renv and restore packages
 RUN --mount=type=secret,id=build_github_pat \
@@ -33,11 +33,6 @@ RUN --mount=type=secret,id=build_github_pat \
 
 # Expose the port that the API will run on
 EXPOSE 8585
-
-# Create a directory for Eunomia data
-RUN mkdir -p /eunomia_data
-ENV EUNOMIA_DATA_FOLDER=/eunomia_data
-COPY eunomia_data/FinnGenR13_counts.sqlite /eunomia_data/FinnGenR13_counts.sqlite
 
 # Run the API server
 CMD ["Rscript", "-e", "ROMOPAPI::runApiServer(host = '0.0.0.0', port = 8585)"] 

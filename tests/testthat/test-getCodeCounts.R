@@ -103,6 +103,24 @@ test_that("getCodeCounts works", {
 
 })
 
+test_that("getCodeCounts returns error if conceptId is not found", {
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+  withr::defer({
+    CDMdbHandler <- NULL
+    gc()
+  })
+
+  expect_error(
+    getCodeCounts(
+      CDMdbHandler,
+      conceptId = c(1000000000)
+    )
+  )
+
+})
+
+
+
 
 test_that(".familyTreeToAncestorTable works", {
   familyTree <- tibble::tribble(

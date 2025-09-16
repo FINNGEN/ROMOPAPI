@@ -122,6 +122,10 @@ getCodeCounts <- function(
     familyTree <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble()
 
+    if (nrow(familyTree) == 0) {
+        stop("No family tree found for conceptId: ", conceptId)
+    }
+
     ancestorTable <- .familyTreeToAncestorTable(familyTree, conceptId)
 
     familyTreeWithInfo <- familyTree |>
