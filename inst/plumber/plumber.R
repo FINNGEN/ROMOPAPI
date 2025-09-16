@@ -59,12 +59,13 @@ function() {
 #* @get /report
 #* @param conceptId The concept ID to include in the report
 #* @serializer html
-function(conceptId = NULL, showsMappings = FALSE, pruneLevels = NULL) {
+function(conceptId = NULL, showsMappings = FALSE, pruneLevels = NULL, pruneClass = NULL) {
   conceptId <- as.integer(conceptId)
   showsMappings <- as.logical(showsMappings)
   pruneLevels <- as.integer(pruneLevels)
+  pruneClass <- as.character(pruneClass)
 
-  tmp_html <- createReport(conceptId, CDMdbHandler, showsMappings = showsMappings, pruneLevels = pruneLevels)
+  tmp_html <- createReport(conceptId, CDMdbHandler, showsMappings = showsMappings, pruneLevels = pruneLevels, pruneClass = pruneClass)
   # Return the HTML contents
   paste(readLines(tmp_html), collapse = "\n")
 }

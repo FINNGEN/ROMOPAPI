@@ -6,6 +6,7 @@ params:
   CDMdbHandler: NULL
   showsMappings: FALSE
   pruneLevels: NULL
+  pruneClass: NULL
 ---
 
 ```{r setup, include=FALSE}
@@ -14,6 +15,7 @@ conceptId <- params$conceptId |> as.integer()
 CDMdbHandler <- params$CDMdbHandler
 showsMappings <- params$showsMappings
 pruneLevels <- params$pruneLevels 
+pruneClass <- params$pruneClass
 
 # Set dynamic title based on conceptId parameter
 if (!is.null(conceptId)) {
@@ -32,8 +34,8 @@ results <- getCodeCounts_memoise(
   conceptId = conceptId
 )
 
-if (length(pruneLevels) != 0 & !is.null(pruneLevels) & is.numeric(pruneLevels)) {
-  results <- pruneLevelsFromResults(results, pruneLevels)
+if ((length(pruneLevels) != 0 & !is.null(pruneLevels) & is.numeric(pruneLevels)) | (!is.null(pruneClass))) {
+  results <- pruneLevelsFromResults(results, pruneLevels, pruneClass = pruneClass)
 }
 ``` 
 

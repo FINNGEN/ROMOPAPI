@@ -22,7 +22,6 @@ Imports:
     tibble,
     dplyr,
     Eunomia,
-    HadesExtras,
     rlang,
     utils,
     memoise,
@@ -33,9 +32,11 @@ Imports:
     purrr,
     reactable,
     tidyr,
-    DiagrammeR
-Remotes:
-    FINNGEN/HadesExtras
+    DiagrammeR,
+    R6,
+    ResultModelManager,
+    yaml
+    
 Suggests: 
     testthat (>= 3.0.0),
     bigrquery,

@@ -8,6 +8,7 @@ runApiServer(
   cohortTableHandlerConfig = NULL,
   host = "127.0.0.1",
   port = 8585,
+  buildCountsTable = FALSE,
   ...
 )
 }

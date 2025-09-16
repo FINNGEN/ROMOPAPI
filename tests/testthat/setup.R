@@ -5,39 +5,35 @@
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-GiBleed")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-DBI")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen")
-# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen-counts")
-#Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "FinnGen-counts-lite")
-#Sys.setenv(EUNOMIA_DATA_FOLDER = "eunomia_data")
+# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "OnlyCounts-FinnGen")
 testingDatabase <- Sys.getenv("HADESEXTAS_TESTING_ENVIRONMENT")
-
-# CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
-# createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts")
-
-# Create FinnGen counts lite database
-# pathToSqliteDatabase  <- "eunomia_data/FinnGenR13_counts.sqlite"
-# CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
-# helper_createSqliteDatabaseFromDatabase(CDMdbHandler, conceptIds = c(317009, 21601855),  pathToSqliteDatabase = pathToSqliteDatabase)
+buildCountsTable <- Sys.getenv("BUILD_COUNTS_TABLE")
 
 
 # check correct settings
-possibleDatabases <- c( "AtlasDevelopment-DBI", "Eunomia-GiBleed", "Eunomia-FinnGen", "Eunomia-FinnGen-counts", "FinnGen-counts-lite")
+possibleDatabases <- c("Eunomia-GiBleed", "Eunomia-MIMIC", "AtlasDevelopment-DBI", "Eunomia-FinnGen", "OnlyCounts-FinnGen")
 if (!(testingDatabase %in% possibleDatabases)) {
   message("Please set a valid testing environment in envar HADESEXTAS_TESTING_ENVIRONMENT, from: ", paste(possibleDatabases, collapse = ", "))
   stop()
 }
 
-if (testingDatabase |> stringr::str_ends("FinnGen-counts-lite")) {
-  pathToFinnGenEunomiaSqlite <- file.path(Sys.getenv("EUNOMIA_DATA_FOLDER"), "FinnGenR13_counts.sqlite")
-
-  test_databasesConfig <- HadesExtras::readAndParseYaml(
-    pathToYalmFile = system.file("testdata", "config", "eunomia_databasesConfig.yml", package = "ROMOPAPI"),
-    pathToFinnGenEunomiaSqlite = pathToFinnGenEunomiaSqlite
-  )
-
-  test_cohortTableHandlerConfig <- test_databasesConfig[[4]]$cohortTableHandler
-
+if (! buildCountsTable %in% c("TRUE", "FALSE")) {
+  message(" BUILD_COUNTS_TABLE not found seting to FALSE")
+  buildCountsTable <- "FALSE"
 }
 
+#
+# Package testing database with only the needed tables
+#
+if (testingDatabase |> stringr::str_starts("OnlyCounts-FinnGen")) {
+  test_databasesConfig <- HadesExtras_readAndParseYaml(
+    pathToYalmFile = system.file("testdata", "config", "onlyCounts_databasesConfig.yml", package = "ROMOPAPI"), 
+    pathToFinnGenCountsSqlite = helper_FinnGen_getDatabaseFileCounts()
+  )
+  test_cohortTableHandlerConfig <- test_databasesConfig[[1]]$cohortTableHandler
+
+  buildCountsTable <- "FALSE"
+}
 
 #
 # Eunomia Databases
@@ -60,11 +56,8 @@ if (testingDatabase |> stringr::str_starts("Eunomia")) {
   if (testingDatabase |> stringr::str_ends("FinnGen")) {
     pathToFinnGenEunomiaSqlite <- helper_FinnGen_getDatabaseFile()
   }
-  if (testingDatabase |> stringr::str_ends("FinnGen-counts")) {
-    pathToFinnGenEunomiaSqlite <- helper_FinnGen_getDatabaseFile(counts = TRUE)
-  }
 
-  test_databasesConfig <- HadesExtras::readAndParseYaml(
+  test_databasesConfig <- HadesExtras_readAndParseYaml(
     pathToYalmFile = system.file("testdata", "config", "eunomia_databasesConfig.yml", package = "ROMOPAPI"),
     pathToGiBleedEunomiaSqlite = pathToGiBleedEunomiaSqlite,
     pathToMIMICEunomiaSqlite = pathToMIMICEunomiaSqlite,
@@ -77,13 +70,10 @@ if (testingDatabase |> stringr::str_starts("Eunomia")) {
   if (testingDatabase |> stringr::str_ends("MIMIC")) {
     test_cohortTableHandlerConfig <- test_databasesConfig[[2]]$cohortTableHandler
   }
-  if (testingDatabase |> stringr::str_ends("FinnGen") | testingDatabase |> stringr::str_ends("FinnGen-counts")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig[[4]]$cohortTableHandler
+  if (testingDatabase |> stringr::str_ends("FinnGen")) {
+    test_cohortTableHandlerConfig <- test_databasesConfig[[3]]$cohortTableHandler
   }
-
 }
-
-
 
 
 #
@@ -97,7 +87,7 @@ if (testingDatabase %in% c("AtlasDevelopment-DBI")) {
 
   bigrquery::bq_auth(path = Sys.getenv("GCP_SERVICE_KEY"))
 
-  test_databasesConfig <- HadesExtras::readAndParseYaml(
+  test_databasesConfig <- HadesExtras_readAndParseYaml(
     pathToYalmFile = system.file("testdata", "config", "atlasDev_databasesConfig.yml", package = "ROMOPAPI")
   )
 
@@ -112,11 +102,12 @@ if (testingDatabase %in% c("AtlasDevelopment-DBI")) {
 message("************* Testing on: ")
 message("Database: ", testingDatabase)
 
-#  CDMdbHandler  <- HadesExtras::createCDMdbHandlerFromList(
-#   test_cohortTableHandlerConfig, 
-#   loadConnectionChecksLevel = "basicChecks"
-# )
+if (buildCountsTable == "TRUE") {
+  message("************* Building counts table")
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+  createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts")
+}else{
+  message("************* Not building counts table")
+}
 
-# createCodeCountsTable(
-#   CDMdbHandler = CDMdbHandler
-# )
+

@@ -4,7 +4,7 @@
 \alias{helper_FinnGen_getDatabaseFile}
 \title{Get FinnGen Eunomia database file}
 \usage{
-helper_FinnGen_getDatabaseFile(df = "R13", counts = FALSE)
+helper_FinnGen_getDatabaseFile(df = "R13")
 }
 \arguments{
 \item{counts}{Logical. If TRUE, creates a counts database with aggregated statistics.

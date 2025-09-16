@@ -3,7 +3,7 @@ options(bigQueryConnectorInsertDelay = 1)
 options(bigQueryConnectorDdlDelay = 1)
 
 tictoc::tic()
-CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
 tictoc::toc()
 
 conceptId <- c(317009)  # asthma snomde

@@ -33,28 +33,31 @@ runApiServer <- function(
     cohortTableHandlerConfig = NULL,
     host = "127.0.0.1",
     port = 8585,
+    buildCountsTable = FALSE,
     ...) {
     #
     # VALIDATE
     #
 
     if (is.null(cohortTableHandlerConfig)) {
-        message("No path to database config provided. Using the test FinnGen Eunomia database.")
-        # if not provided, use the test FinnGen Eunomia database
-        pathToFinnGenEunomiaSqlite <- file.path(Sys.getenv("EUNOMIA_DATA_FOLDER"), "FinnGenR13_counts.sqlite")
-
-        test_databasesConfig <- HadesExtras::readAndParseYaml(
-            pathToYalmFile = system.file("testdata", "config", "eunomia_databasesConfig.yml", package = "ROMOPAPI"),
-            pathToFinnGenEunomiaSqlite = pathToFinnGenEunomiaSqlite
+        message("No path to database config provided. Using the test counts only database.")
+        # if not provided, use the test counts only database
+        test_databasesConfig <- HadesExtras_readAndParseYaml(
+            pathToYalmFile = system.file("testdata", "config", "onlyCounts_databasesConfig.yml", package = "ROMOPAPI"),
+            pathToFinnGenCountsSqlite = helper_FinnGen_getDatabaseFileCounts()
         )
-
-        cohortTableHandlerConfig <- test_databasesConfig[[4]]$cohortTableHandler
+       
+        cohortTableHandlerConfig <- test_databasesConfig[[1]]$cohortTableHandler
 
         # Create CDMdbHandler
-        CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+        CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
     } else {
         # Create CDMdbHandler
-        CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+        CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+    }
+
+    if (buildCountsTable == TRUE) {
+        createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts")
     }
 
     # Create plumber router

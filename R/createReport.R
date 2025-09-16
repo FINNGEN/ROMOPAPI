@@ -1,8 +1,9 @@
-createReport <- function(conceptId, CDMdbHandler, showsMappings = FALSE, pruneLevels = NULL) {
+createReport <- function(conceptId, CDMdbHandler, showsMappings = FALSE, pruneLevels = NULL, pruneClass = NULL) {
     conceptId |> checkmate::assertIntegerish()
     CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
     showsMappings |> checkmate::assertLogical(null.ok = TRUE)
     pruneLevels |> checkmate::assertIntegerish(null.ok = TRUE)
+    pruneClass |> checkmate::assertCharacter(null.ok = TRUE)
 
     # Render Rmd to a temporary HTML file
     tmp_html <- tempfile(fileext = ".html")
@@ -13,7 +14,8 @@ createReport <- function(conceptId, CDMdbHandler, showsMappings = FALSE, pruneLe
             conceptId = conceptId,
             CDMdbHandler = CDMdbHandler,
             showsMappings = showsMappings,
-            pruneLevels = pruneLevels
+            pruneLevels = pruneLevels,
+            pruneClass = pruneClass
         )
     )
 
