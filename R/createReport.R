@@ -42,12 +42,12 @@
 #' 
 #' @export
 #' 
-createReport <- function(conceptId, CDMdbHandler, showsMappings = FALSE, pruneLevels = NULL, pruneClass = NULL) {
+createReport <- function(conceptId, CDMdbHandler, showsMappings = FALSE, pruneLevels = 0L, pruneClass = '') {
     conceptId |> checkmate::assertIntegerish()
     CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
-    showsMappings |> checkmate::assertLogical(null.ok = TRUE)
-    pruneLevels |> checkmate::assertIntegerish(null.ok = TRUE)
-    pruneClass |> checkmate::assertCharacter(null.ok = TRUE)
+    showsMappings |> checkmate::assertLogical()
+    pruneLevels |> checkmate::assertIntegerish()
+    pruneClass |> checkmate::assertCharacter()
 
     # Render Rmd to a temporary HTML file
     tmp_html <- tempfile(fileext = ".html")

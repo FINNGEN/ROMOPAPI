@@ -34,7 +34,7 @@ results <- getCodeCounts_memoise(
   conceptId = conceptId
 )
 
-if ((length(pruneLevels) != 0 & !is.null(pruneLevels) & is.numeric(pruneLevels)) | (!is.null(pruneClass))) {
+if (pruneLevels != 0L | pruneClass != '') {
   results <- pruneLevelsFromResults(results, pruneLevels, pruneClass = pruneClass)
 }
 ``` 
