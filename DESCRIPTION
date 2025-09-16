@@ -4,8 +4,6 @@ Version: 0.1.0
 Authors@R: 
     person("Javier", "Gracia-Tabuenca", , "javier.graciatabuenca@tuni.fi", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
-Author: Javier Gracia-Tabuenca
-Maintainer: Javier Gracia-Tabuenca <javier.graciatabuenca@tuni.fi>
 Description: ROMOPAPI provides an API to access OMOP CDM databases. It includes functions for creating code counts tables, atomic code counts tables, and observation counts tables. The package supports both local SQLite databases and remote database connections through DBI.
 License: MIT + file LICENSE
 Encoding: UTF-8
@@ -36,7 +34,6 @@ Imports:
     R6,
     ResultModelManager,
     yaml
-    
 Suggests: 
     testthat (>= 3.0.0),
     bigrquery,

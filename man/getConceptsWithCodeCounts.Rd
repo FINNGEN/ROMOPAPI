@@ -8,6 +8,8 @@ getConceptsWithCodeCounts(CDMdbHandler, codeCountsTable = "code_counts")
 }
 \arguments{
 \item{CDMdbHandler}{A CDMdbHandler object that contains database connection details}
+
+\item{codeCountsTable}{Name of the code counts table in the results schema. Defaults to "code_counts"}
 }
 \value{
 A tibble with columns:

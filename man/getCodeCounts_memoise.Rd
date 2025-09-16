@@ -10,6 +10,8 @@ getCodeCounts_memoise(CDMdbHandler, conceptId, codeCountsTable = "code_counts")
 \item{CDMdbHandler}{A CDMdbHandler object that contains database connection details}
 
 \item{conceptId}{The concept ID to get counts and relationships for}
+
+\item{codeCountsTable}{Name of the code counts table in the results schema. Defaults to "code_counts"}
 }
 \value{
 A list containing:

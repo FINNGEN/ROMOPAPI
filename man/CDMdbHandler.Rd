@@ -29,6 +29,8 @@ A class for handling CDM database connections and operations
 
 \item{\code{cdmDatabaseSchema}}{Schema name for the CDM database}
 
+\item{\code{resultsDatabaseSchema}}{Schema name for the results database}
+
 \item{\code{connectionStatusLog}}{Log of connection status and operations}
 
 \item{\code{vocabularyInfo}}{Information about the vocabulary tables}
@@ -80,6 +82,8 @@ A class for handling CDM database connections and operations
 \item{\code{cdmDatabaseSchema}}{Name of the CDM database schema}
 
 \item{\code{vocabularyDatabaseSchema}}{(Optional) Name of the vocabulary database schema (default is cdmDatabaseSchema)}
+
+\item{\code{resultsDatabaseSchema}}{(Optional) Name of the results database schema (default is cdmDatabaseSchema)}
 
 \item{\code{loadConnectionChecksLevel}}{(Optional) Level of checks to perform when loading the connection (default is "allChecks")
 Reload connection}

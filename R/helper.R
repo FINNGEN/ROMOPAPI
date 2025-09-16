@@ -2,11 +2,9 @@
 #'
 #' @description
 #' Downloads and extracts the FinnGen Eunomia database if it doesn't exist locally.
-#' Copies the database to a temporary directory and returns the path. Optionally
-#' creates a counts database with aggregated statistics.
+#' Copies the database to a temporary directory and returns the path.
 #'
-#' @param counts Logical. If TRUE, creates a counts database with aggregated statistics.
-#'   Defaults to FALSE.
+#' @param df Character string specifying the FinnGen dataset version. Defaults to "R13".
 #'
 #' @return Path to the FinnGen Eunomia SQLite database file (temporary copy)
 #'

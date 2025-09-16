@@ -7,6 +7,7 @@
 #' for concepts that are actively used in the database.
 #'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
+#' @param codeCountsTable Name of the code counts table in the results schema. Defaults to "code_counts"
 #'
 #' @return A tibble with columns:
 #' \itemize{
@@ -65,7 +66,10 @@ getConceptsWithCodeCounts <- function(
 #' the cache key to allow sharing across different database connections.
 #'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
+#' @param codeCountsTable Name of the code counts table in the results schema. Defaults to "code_counts"
 #'
+#' @importFrom memoise memoise
+#' 
 #' @return A tibble with columns:
 #' \itemize{
 #'   \item `concept_id` - The OMOP concept ID

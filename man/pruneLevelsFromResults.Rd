@@ -10,6 +10,9 @@ pruneLevelsFromResults(results, pruneLevels, pruneClass = NULL)
 \item{results}{A list of results from getCodeCounts}
 
 \item{pruneLevels}{The levels to prune}
+
+\item{pruneClass}{Character string specifying a concept class to filter results.
+NULL includes all concept classes. Common values include "Ingredient", "Clinical Drug", etc.}
 }
 \value{
 A list of results with the levels pruned

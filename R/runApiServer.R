@@ -9,6 +9,7 @@
 #'   If NULL, uses test Eunomia database
 #' @param host Host address to run the API server on. Defaults to "127.0.0.1"
 #' @param port Port number to run the API server on. Defaults to 8585
+#' @param buildCountsTable Logical indicating whether to build code counts tables. Defaults to FALSE
 #' @param ... Additional arguments passed to plumber::pr_run()
 #'
 #' @importFrom plumber pr pr_run pr_set_docs pr_set_api_spec

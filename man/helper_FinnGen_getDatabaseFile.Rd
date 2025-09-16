@@ -7,16 +7,14 @@
 helper_FinnGen_getDatabaseFile(df = "R13")
 }
 \arguments{
-\item{counts}{Logical. If TRUE, creates a counts database with aggregated statistics.
-Defaults to FALSE.}
+\item{df}{Character string specifying the FinnGen dataset version. Defaults to "R13".}
 }
 \value{
 Path to the FinnGen Eunomia SQLite database file (temporary copy)
 }
 \description{
 Downloads and extracts the FinnGen Eunomia database if it doesn't exist locally.
-Copies the database to a temporary directory and returns the path. Optionally
-creates a counts database with aggregated statistics.
+Copies the database to a temporary directory and returns the path.
 }
 \note{
 This function requires the \code{EUNOMIA_DATA_FOLDER} environment variable to be set
