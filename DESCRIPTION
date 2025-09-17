@@ -1,6 +1,6 @@
 Package: ROMOPAPI
 Title: ROMOPAPI
-Version: 0.1.0
+Version: 1.0.0
 Authors@R: 
     person("Javier", "Gracia-Tabuenca", , "javier.graciatabuenca@tuni.fi", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
@@ -33,11 +33,11 @@ Imports:
     DiagrammeR,
     R6,
     ResultModelManager,
-    yaml
+    yaml,
+    stringr
 Suggests: 
     testthat (>= 3.0.0),
     bigrquery,
-    stringr,
     withr,
     knitr
 Config/testthat/edition: 3

@@ -6,6 +6,7 @@ source("tests/testthat/setup.R")
 # List of conceptIds to extract
 conceptIds <- c(
     317009, # Snomed: Asthma
+    45596282, # ICD10: Asthma
     21601855 # ATC level 4: C10AA (Statins)
 )
 

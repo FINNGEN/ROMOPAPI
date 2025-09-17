@@ -40,8 +40,6 @@ if (pruneLevels != 0L | pruneClass != '') {
 ``` 
 
 
-
-
 Graph
 ```{r}
 mermaid <- createMermaidGraphFromResults(results, showsMappings = showsMappings)
