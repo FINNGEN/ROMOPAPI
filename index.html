@@ -33,7 +33,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="index.html">ROMOPAPI</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
       </span>
     </div>
 
@@ -53,6 +53,9 @@
       <a href="articles/use_cases.html">use_cases</a>
     </li>
   </ul>
+</li>
+<li>
+  <a href="news/index.html">Changelog</a>
 </li>
       </ul>
 <ul class="nav navbar-nav navbar-right">
@@ -215,6 +218,29 @@
 </ul>
 </li>
 </ol>
+</div>
+</div>
+<div class="section level1">
+<h1 id="docker">Docker<a class="anchor" aria-label="anchor" href="#docker"></a>
+</h1>
+<div class="section level2">
+<h2 id="existing-docker-image">Existing docker image<a class="anchor" aria-label="anchor" href="#existing-docker-image"></a>
+</h2>
+<p>Existing docker image is available at: <a href="https://hub.docker.com/repository/docker/javiergrata/romopapi/" class="external-link uri">https://hub.docker.com/repository/docker/javiergrata/romopapi/</a></p>
+<pre><code>docker run -p 8585:8585 javiergrata/romopapi</code></pre>
+</div>
+<div class="section level2">
+<h2 id="build-the-docker-image">Build the docker image<a class="anchor" aria-label="anchor" href="#build-the-docker-image"></a>
+</h2>
+<p>A GITHUBPAT.txt file with the GitHub personal access token is needed in the root of the repository.</p>
+<pre><code>docker build --secret id=build_github_pat,src=GITHUBPAT.txt -t romopapi .</code></pre>
+<p>Optionally, the ROMOPAPI_BRANCH can be set to the branch to be used the BUILD_CACHE_BUSTER can be set current time to force a rebuild of changes in the repository.</p>
+<pre><code>docker build --secret id=build_github_pat,src=GITHUBPAT.txt --build-arg ROMOPAPI_BRANCH=main --build-arg BUILD_CACHE_BUSTER=$(date +%s) -t romopapi .</code></pre>
+</div>
+<div class="section level2">
+<h2 id="run-the-docker-container">Run the docker container<a class="anchor" aria-label="anchor" href="#run-the-docker-container"></a>
+</h2>
+<pre><code>docker run -p 8585:8585 romopapi</code></pre>
 </div>
 </div>
 
