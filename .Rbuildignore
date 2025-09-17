@@ -11,3 +11,5 @@
 ^\.Rcheck/
 ^GITHUBPAT\.txt$
 
+^doc$
+^Meta$

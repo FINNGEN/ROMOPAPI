@@ -1,3 +1,10 @@
+#' Create a Mermaid graph visualization from results
+#' @param results List containing concept relationships and counts data
+#' @param showsMappings Logical indicating whether to show concept mappings
+#' @return String containing Mermaid graph definition
+#' @importFrom dplyr group_by summarise left_join filter if_else mutate anti_join pull bind_rows
+#' @export
+#' 
 createMermaidGraphFromResults <- function(
     results,
     showsMappings = FALSE) {
@@ -101,6 +108,11 @@ createMermaidGraphFromResults <- function(
 }
 
 
+#' Clean concept name for Mermaid compatibility
+#' @param name Character string to clean
+#' @return Cleaned character string
+#' @keywords internal
+#' 
 .cleanConceptNameForMermaid <- function(name) {
   # Clean concept name for Mermaid compatibility
   # Escape special characters instead of removing them
@@ -125,6 +137,14 @@ createMermaidGraphFromResults <- function(
 
 
 
+#' Create a reactable table from results
+#' @param results List containing concept relationships and counts data
+#' @return A reactable table object
+#' @importFrom dplyr group_by summarise left_join filter select distinct rename arrange
+#' @importFrom tidyr nest
+#' @importFrom reactable reactable colDef
+#' @export
+#' 
 createCodeCountsTableFromResults <- function(results) {
   concept_relationships <- results$concept_relationships
   concepts <- results$concepts
@@ -201,6 +221,16 @@ createCodeCountsTableFromResults <- function(results) {
 
 
 
+#' Create a plotly visualization from results
+#' @param results List containing concept relationships and counts data
+#' @param showsMappings Logical indicating whether to show concept mappings
+#' @param ... Additional arguments passed to plotly::ggplotly
+#' @return A plotly object
+#' @importFrom dplyr group_by summarise left_join filter mutate case_when rename distinct arrange bind_rows select pull inner_join
+#' @importFrom ggplot2 ggplot aes geom_area geom_line theme_minimal scale_fill_manual theme
+#' @importFrom plotly ggplotly layout
+#' @export
+#' 
 createPlotFromResults <- function(results, showsMappings = FALSE, ...) {
   parentConceptIds <- results$concept_relationships |>
     dplyr::filter(!levels %in% c("Mapped from", "Maps to")) |>
@@ -292,6 +322,12 @@ createPlotFromResults <- function(results, showsMappings = FALSE, ...) {
     plotly::layout(legend = list(orientation = "h", y = 1.1))
 }
 
+#' Convert concept ID to RGB color
+#' @param conceptId Numeric concept ID
+#' @return Character string with hex color code
+#' @importFrom digest digest
+#' @keywords internal
+#' 
 .conceptIdToRGB <- function(conceptId) {
   # get the hash of the conceptId
   hash <- digest::digest(conceptId, algo = "sha256")
@@ -327,6 +363,8 @@ createPlotFromResults <- function(results, showsMappings = FALSE, ...) {
 #'   NULL includes all concept classes. Common values include "Ingredient", "Clinical Drug", etc.
 #'
 #' @return A list of results with the levels pruned
+#' @importFrom dplyr mutate if_else filter select pull
+#' @importFrom stringr str_detect str_sub
 #' @export
 #' 
 pruneLevelsFromResults <- function(results, pruneLevels, pruneClass = NULL) {

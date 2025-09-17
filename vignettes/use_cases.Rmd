@@ -29,20 +29,142 @@ CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(cohortTableHandlerConfig,
 ```
 
 
-# Use case 1: What are the descendants of a concept in the database?
+## Use case 1: What are the descendants of a concept in the database?
+
+**Background:** Hierarchy can be expored in Athena, or in Atlas, in Vocabulary > Concept > Hierarchy. 
+However, this shows only the imediate descendants (children) and includes all concepts in the vocabulary, when we may want only these present in the database.
+
+For example, what are the descendants of the standard concept SNOMED 'Asthma' with concept id 317009?
 
 ```{r}
-getCodeCounts(CDMdbHandler, conceptId = 317009)
+results_snomed_asthma <- getCodeCounts(CDMdbHandler, conceptId = 317009)
 ```
 
-# Use case 2: How each descendant contributes to the descendant record counts of a concept, over time, and by gender and age?
+```{r}
+mermaid <- createMermaidGraphFromResults(results_snomed_asthma)
+DiagrammeR::mermaid(mermaid, width = "100%", height = "100%")
+```
+
+Same can be explore in a table format.
+```{r}
+createCodeCountsTableFromResults(results_snomed_asthma)
+``` 
+
+If, the ancestor table has been created also for non-standard concepts, this can be used also for non-standard concepts.
+
+For example, what are the descendants of the non-standard concept ICD10 'Asthma' with concept id 45596282?
+
+```{r}
+#results_icd10_asthma <- getCodeCounts(CDMdbHandler, conceptId = 45596282)
+```
+
+```{r}
+# mermaid <- createMermaidGraphFromResults(results_icd10_asthma)
+# DiagrammeR::mermaid(mermaid, width = "100%", height = "100%")
+```
+
+## Use case 2: How each descendant contributes to the descendant record counts of a concept, over time,(and by gender and age)?
+
+**Background:** Incidence rates can be expored in Atlas, in Data Sources. 
+However, this shows only the incidence rates for selected concept only and does not show the contribution of each descendant concept to the incidence rate.
+
+For the Asthma SNOMED concept, example.
+```{r}
+createPlotFromResults(results_snomed_asthma, showsMappings = FALSE, width = 800, height = 800)
+``` 
+
+The plor show with a black line the total number of descendant record counts for the Asthma SNOMED concept code.
+
+The stacked areas show the number of record counts for each descendant concept, over time.
+
+
+## Use case 3: What non-standard concepts map to a standard concept and its descendants?
+
+**Background:** Mapped concepts can be expored in Athena, or in Atlas, in Vocabulary > Concept > Relationships, or by creating a Concept Set.  
+However, this shows all the mapped concepts, not only the ones that are present in the database.
+
+For the Asthma SNOMED concept, example.
+
+We want to know what non-standard concepts map not only to the Asthma SNOMED concept, but also to its descendants.
+
+```{r}
+mermaid <- createMermaidGraphFromResults(results_snomed_asthma, showsMappings = TRUE)
+DiagrammeR::mermaid(mermaid, width = "100%", height = "100%")
+```
+
+Same can be explore in a table format by opening the arrows.
+```{r}
+createCodeCountsTableFromResults(results_snomed_asthma)
+``` 
+
+## Use case 4: How each source concept contributes to the descendant record counts of a concept, over time, and by gender and age?
+
+**Background:** This cannot be done in Atlas.
+
+For the Asthma SNOMED concept, example.
+```{r}
+createPlotFromResults(results_snomed_asthma, showsMappings = TRUE, width = 800, height = 800)
+``` 
+
+In this case the stacked areas show the number of record counts for each source concept, over time.
+
+
+## Use case 5: All the above, but grouping descendants by tree level or concept class?
+
+Sometimes the tree of descendant may become to granular. 
+
+For example, in the case of drugs, if take ATC level 4 C10AA for statins with concept id 21601855, the tree and plot of descendant may become to detailed,
+as it takes all the lowest rxnorm packages concepts.
+
+```{r}
+results_atc_c10aa <- getCodeCounts(CDMdbHandler, conceptId = 21601855)
+```
+
+```{r}
+mermaid <- createMermaidGraphFromResults(results_atc_c10aa)
+DiagrammeR::mermaid(mermaid, width = "100%", height = "100%")
+``` 
+
+
+If we are interested only in the inmediate descendants ATC level 5s, we can prune the tree by setting pruneLevels to 2.
+```{r}
+results_atc_c10aa_pruned <- pruneLevelsFromResults(results_atc_c10aa, pruneLevels = 2)
+```
+
+```{r}
+mermaid <- createMermaidGraphFromResults(results_atc_c10aa_pruned)
+DiagrammeR::mermaid(mermaid, width = "100%", height = "100%")
+``` 
+
+However, this is still including the Ingredient concepts in addition to the ATC level 5s. Which mostly, include the same descendant that the ATC level 5s.
+This becames a problem if we want to plot the contribution over time, as the stacked areas will include both the descendant of the Ingredient concepts and the ATC level 5s. 
+This makes the stacked areas to be double of the root node descendant record counts (black line).
+
+```{r}
+createPlotFromResults(results_atc_c10aa_pruned, showsMappings = FALSE, width = 800, height = 800)
+``` 
+
+
+If we are interested only in the ATC level 5s, we can prune the tree by setting pruneClass to "Ingredient".
+```{r}
+results_atc_c10aa_pruned_ingredient <- pruneLevelsFromResults(results_atc_c10aa, pruneLevels = 2, pruneClass = "Ingredient")
+```
+
+```{r}
+mermaid <- createMermaidGraphFromResults(results_atc_c10aa_pruned_ingredient)
+DiagrammeR::mermaid(mermaid, width = "100%", height = "100%")
+``` 
+
+The plot will now show only the ATC level 5s and now the stacked areas will be the same as the root node descendant record counts (black line).
+```{r}
+createPlotFromResults(results_atc_c10aa_pruned_ingredient, showsMappings = FALSE, width = 800, height = 800)
+``` 
 
 
 
 
-# Use case 3: What non-standard concepts map to a standard concept and its descendants?
-
-
-
-
-# Use case 4: How each source concept contributes to the descendant record counts of a concept, over time, and by gender and age?
+<!-- Load mermaid.js -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+mermaid.initialize({ startOnLoad: true });
+</script>
