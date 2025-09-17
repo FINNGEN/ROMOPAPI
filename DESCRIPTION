@@ -33,11 +33,11 @@ Imports:
     DiagrammeR,
     R6,
     ResultModelManager,
-    yaml
+    yaml,
+    stringr
 Suggests: 
     testthat (>= 3.0.0),
     bigrquery,
-    stringr,
     withr,
     knitr
 Config/testthat/edition: 3

@@ -135,3 +135,35 @@ Based on the example output, getCodeCounts returns a list with 3 components:
    - concept_code: Original code in source vocabulary
    - record_counts: Number of events for this specific concept
    - descendant_record_counts: Number of events including descendant concepts
+
+# Docker
+
+## Existing docker image
+
+Existing docker image is available at: https://hub.docker.com/repository/docker/javiergrata/romopapi/
+
+```
+docker run -p 8585:8585 javiergrata/romopapi
+```
+
+## Build the docker image
+
+A GITHUBPAT.txt file with the GitHub personal access token is needed in the root of the repository.
+
+```
+docker build --secret id=build_github_pat,src=GITHUBPAT.txt -t romopapi .
+```
+
+Optionally, the ROMOPAPI_BRANCH can be set to the branch to be used the BUILD_CACHE_BUSTER can be set current time to force a rebuild of changes in the repository.
+
+```
+docker build --secret id=build_github_pat,src=GITHUBPAT.txt --build-arg ROMOPAPI_BRANCH=main --build-arg BUILD_CACHE_BUSTER=$(date +%s) -t romopapi .
+```
+
+## Run the docker container
+
+```
+docker run -p 8585:8585 romopapi
+```
+
+
