@@ -15,6 +15,8 @@ conceptId <- 21601823
 conceptId <- 21601487
 conceptId <- 782748
 
+conceptId <- 21602735
+
 
 results <- getCodeCounts(
     CDMdbHandler,

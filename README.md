@@ -107,23 +107,31 @@ runApiServer(cohortTableHandlerConfig = databasesConfig$BQ5k$cohortTableHandler)
 Based on the example output, getCodeCounts returns a list with 3 components:
 
 1. concept_relationships - A tibble containing:
-   - concept_id_1: 🔑 Source concept ID
-   - concept_id_2: 🔑 Target concept ID 
-   - relationship_id:  Type of relationship (e.g. "Parent", "Root", "Mapped from", etc.)
-    - "Parent" means that concept_id_1 is a parent of concept_id_2
-    - "Root" concept_id is same as concept_id_2 and is the root of the concept hierarchy
-    - "Mapped from" means that concept_id_1 is mapped from concept_id_2
-    - "Mapped to" means that concept_id_1 is mapped to concept_id_2
-    - "n-m" means that concept_id_1 is a descendant of concept_id_2, where n is the min number of levels of the hierarchy and m is the max number of levels of the hierarchy
+   - parent_concept_id: 🔑 Parent concept ID
+   - child_concept_id: 🔑 Child concept ID 
+   - levels: Hierarchy level information (e.g. "-1", "0", "1-1", "2-2", "3-3", "Mapped from")
+    - "-1" means the child is a parent of the root concept
+    - "0" means the concept is the root of the hierarchy
+    - "n-n" means the child is n levels below the parent in the hierarchy
+    - "Mapped from" means the child is mapped from another vocabulary
+    - "Maps to" means the child is mapped to another vocabulary
+   - concept_class_id: Type of concept (e.g. "Clinical Finding", "ICD10 code")
 
-2. code_counts - A tibble containing:
+2. stratified_code_counts - A tibble containing:
    - concept_id: 🔑Concept identifier
    - calendar_year: Year of the counts
    - gender_concept_id: Gender concept ID
    - age_decile: Age group by decade
-   - record_counts: Number of events for this specific concept
-   - descendant_record_counts: Number of events including descendant concepts
+   - node_record_counts: Number of events for this specific concept
+   - node_descendant_record_counts: Number of events including descendant concepts
 
 3. concepts - A tibble containing concept :
- as seen in [concept table](https://ohdsi.github.io/CommonDataModel/cdm54.html#concept)
- where concept_id is the key column.
+   - concept_id: 🔑 Concept identifier
+   - concept_name: Name/description of the concept
+   - domain_id: Domain the concept belongs to (e.g. "Condition")
+   - vocabulary_id: Source vocabulary (e.g. "SNOMED", "ICD10")
+   - concept_class_id: Type of concept (e.g. "Clinical Finding", "ICD10 code")
+   - standard_concept: Boolean indicating if this is a standard concept
+   - concept_code: Original code in source vocabulary
+   - record_counts: Number of events for this specific concept
+   - descendant_record_counts: Number of events including descendant concepts
