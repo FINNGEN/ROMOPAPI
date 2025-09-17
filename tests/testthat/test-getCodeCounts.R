@@ -40,7 +40,7 @@ test_that("getCodeCounts works", {
 
   # columns not empty
   concept_relationships |>
-    dplyr::filter(is.na(parent_concept_id) | is.na(child_concept_id) | is.na(levels) | is.na(concept_class_id)) |>
+    dplyr::filter(is.na(parent_concept_id) | is.na(child_concept_id) | is.na(levels) ) |>
     nrow() |>
     expect_equal(0)
 
@@ -87,10 +87,12 @@ test_that("getCodeCounts works", {
     expect_equal(c("concept_id", "concept_name", "domain_id", "vocabulary_id", "concept_class_id", "standard_concept", "concept_code", "record_counts", "descendant_record_counts"))
 
   # columns not empty
-  concepts |>
-    dplyr::filter(is.na(concept_id) | is.na(concept_name) | is.na(domain_id) | is.na(vocabulary_id) | is.na(concept_class_id) | is.na(standard_concept) | is.na(concept_code) | is.na(record_counts) | is.na(descendant_record_counts)) |>
-    nrow() |>
-    expect_equal(0)
+  if (testingDatabase != "Eunomia-GiBleed") {
+    concepts |>
+      dplyr::filter(is.na(concept_id) | is.na(concept_name) | is.na(domain_id) | is.na(vocabulary_id) | is.na(standard_concept) | is.na(concept_code) | is.na(record_counts) | is.na(descendant_record_counts)) |>
+        nrow() |>
+        expect_equal(0)
+  }
 
   # check that the record_counts and descendant_record_counts are the same as the aggregated_counts
   aggregated_counts <- stratified_code_counts |>

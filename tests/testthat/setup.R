@@ -9,7 +9,6 @@
 testingDatabase <- Sys.getenv("HADESEXTAS_TESTING_ENVIRONMENT")
 buildCountsTable <- Sys.getenv("BUILD_COUNTS_TABLE")
 
-
 # check correct settings
 possibleDatabases <- c("Eunomia-GiBleed", "Eunomia-MIMIC", "AtlasDevelopment-DBI", "Eunomia-FinnGen", "OnlyCounts-FinnGen")
 if (!(testingDatabase %in% possibleDatabases)) {

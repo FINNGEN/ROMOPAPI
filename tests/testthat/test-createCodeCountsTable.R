@@ -15,6 +15,11 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
     CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable))
   })
 
+  domain  <- tibble::tribble(
+    ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
+    "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date", "condition_source_concept_id"
+  )
+
   # codeAtomicCountsWithDuplicatedCounts
   suppressWarnings(
     createStratifiedCodeCountsTable(CDMdbHandler, domains = domain, stratifiedCodeCountsTable = stratifiedCodeCountsTable)

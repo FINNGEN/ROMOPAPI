@@ -8,8 +8,8 @@ createReport(
   conceptId,
   CDMdbHandler,
   showsMappings = FALSE,
-  pruneLevels = NULL,
-  pruneClass = NULL
+  pruneLevels = 0L,
+  pruneClass = ""
 )
 }
 \arguments{

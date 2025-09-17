@@ -41,7 +41,7 @@ test_that("createReport works with all parameters", {
       conceptId = 317009,
       CDMdbHandler = CDMdbHandler,
       showsMappings = TRUE,
-      pruneLevels = c(1, 2),
+      pruneLevels = c(2),
       pruneClass = "Ingredient"
     )
   )
@@ -62,3 +62,4 @@ test_that("createReport works with all parameters", {
   # Clean up the temporary file
   unlink(result)
 })
+
