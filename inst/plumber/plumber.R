@@ -24,18 +24,24 @@ function(msg = "") {
 #* Get the code counts for a given concept ID
 #* @param conceptId The concept ID to get counts and relationships for
 #* @get /getCodeCounts
-function(res, conceptId) {
-  if (!grepl("^\\d+$", conceptId)) {
+function(res, conceptId=0L) {
+
+  conceptId <- as.integer(conceptId)
+
+  if (is.na(conceptId)) {
     res$status <- 400 # Bad request
     return(list(error = jsonlite::unbox("conceptId must be an integer")))
   }
 
-  conceptId <- as.integer(conceptId)
-
+  tryCatch({
   getCodeCounts_memoise(
     CDMdbHandler = CDMdbHandler,
     conceptId = conceptId
   )
+  }, error = function(e) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox(e$message)))
+  })
 }
 
 
@@ -59,12 +65,31 @@ function() {
 #* @get /report
 #* @param conceptId The concept ID to include in the report
 #* @serializer html
-function(conceptId = NULL, showsMappings = FALSE, pruneLevels = NULL) {
+function(res, conceptId=0L, showsMappings = FALSE, pruneLevels = 0L, pruneClass = '') {
+
   conceptId <- as.integer(conceptId)
   showsMappings <- as.logical(showsMappings)
   pruneLevels <- as.integer(pruneLevels)
+  pruneClass <- as.character(pruneClass)
 
-  tmp_html <- createReport(conceptId, CDMdbHandler, showsMappings = showsMappings, pruneLevels = pruneLevels)
+  if (is.na(conceptId)) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("conceptId must be an integer")))
+  }
+  if (is.na(showsMappings)) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("showsMappings must be a logical")))
+  }
+  if (is.na(pruneLevels)) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("pruneLevels must be an integer")))
+  }
+  if (is.na(pruneClass)) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("pruneClass must be a character")))
+  }
+
+  tmp_html <- createReport(conceptId, CDMdbHandler, showsMappings = showsMappings, pruneLevels = pruneLevels, pruneClass = pruneClass)
   # Return the HTML contents
   paste(readLines(tmp_html), collapse = "\n")
 }
@@ -72,7 +97,7 @@ function(conceptId = NULL, showsMappings = FALSE, pruneLevels = NULL) {
 #* Serve mermaid.min.js directly
 #* @get /mermaid.min.js
 #* @serializer contentType list(type = "application/javascript")
-function() {
+function(res) {
   # Get the path to the mermaid.min.js file
   file_path <- system.file("reports", "mermaid.min.js", package = "ROMOPAPI")
 

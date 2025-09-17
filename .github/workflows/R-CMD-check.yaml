@@ -4,6 +4,7 @@ on:
   push:
     branches: [main, master]
   pull_request:
+    branches: [main, master, development]
 
 name: R-CMD-check.yaml
 
@@ -19,15 +20,16 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          # - {os: macos-latest,   r: 'release'}
-          # - {os: windows-latest, r: 'release'}
-          # - {os: ubuntu-latest,   r: 'devel', http-user-agent: 'release'}
+          #- {os: macos-latest,   r: 'release'}
+          #- {os: windows-latest, r: 'release'}
+          #- {os: ubuntu-latest,   r: 'devel', http-user-agent: 'release'}
           - {os: ubuntu-latest,   r: 'release'}
-          # - {os: ubuntu-latest,   r: 'oldrel-1'}
+          #- {os: ubuntu-latest,   r: 'oldrel-1'}
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
+      EUNOMIA_DATA_FOLDER: ${{ github.workspace }}/eunomia_data
 
     steps:
       - uses: actions/checkout@v4

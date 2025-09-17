@@ -2,11 +2,9 @@
 #'
 #' @description
 #' Downloads and extracts the FinnGen Eunomia database if it doesn't exist locally.
-#' Copies the database to a temporary directory and returns the path. Optionally
-#' creates a counts database with aggregated statistics.
+#' Copies the database to a temporary directory and returns the path.
 #'
-#' @param counts Logical. If TRUE, creates a counts database with aggregated statistics.
-#'   Defaults to FALSE.
+#' @param df Character string specifying the FinnGen dataset version. Defaults to "R13".
 #'
 #' @return Path to the FinnGen Eunomia SQLite database file (temporary copy)
 #'
@@ -27,7 +25,7 @@
 #' @note
 #' This function requires the `EUNOMIA_DATA_FOLDER` environment variable to be set
 #' to the path of the Eunomia data folder.
-helper_FinnGen_getDatabaseFile <- function(df = "R13", counts = FALSE) {
+helper_FinnGen_getDatabaseFile <- function(df = "R13") {
   if (Sys.getenv("EUNOMIA_DATA_FOLDER") == "") {
     message("EUNOMIA_DATA_FOLDER not set. Please set this environment variable to the path of the Eunomia data folder.")
     stop()
@@ -38,10 +36,8 @@ helper_FinnGen_getDatabaseFile <- function(df = "R13", counts = FALSE) {
 
   finngen.zip <- paste0("FinnGen", df, "_v5.4.zip")
   finngen.sqlite <- paste0("FinnGen", df, "_v5.4.sqlite")
-  finngen.counts.sqlite <- paste0("FinnGen", df, "_v5.4_counts.sqlite")
 
   pathToDatabase <- file.path(eunomiaDataFolder, finngen.sqlite)
-  pathToDatabaseCounts <- file.path(eunomiaDataFolder, finngen.counts.sqlite)
 
   # Download the database if it doesn't exist
   if (!file.exists(file.path(eunomiaDataFolder, finngen.zip)) |
@@ -59,51 +55,11 @@ helper_FinnGen_getDatabaseFile <- function(df = "R13", counts = FALSE) {
       verbose = TRUE
     )
   }
-
-  # make a copy if counts database doesn't exist
-  if (!file.exists(pathToDatabaseCounts) & counts) {
-    file.copy(
-      from = file.path(eunomiaDataFolder, finngen.sqlite),
-      to = pathToDatabaseCounts,
-      overwrite = TRUE
-    )
-    # create code counts table
-    connectionList <- list(
-      database = list(
-        databaseId = "F1",
-        databaseName = "FinnGen",
-        databaseDescription = "Eunomia database FinnGen"
-      ),
-      connection = list(
-        connectionDetailsSettings = list(
-          dbms = "sqlite",
-          server = pathToDatabaseCounts
-        )
-      ),
-      cdm = list(
-        cdmDatabaseSchema = "main",
-        vocabularyDatabaseSchema = "main"
-      ),
-      cohortTable = list(
-        cohortDatabaseSchema = "main",
-        cohortTableName = "test_cohort_table_<timestamp>"
-      )
-    )
-    CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(connectionList, loadConnectionChecksLevel = "basicChecks")
-    createCodeCountsTable(CDMdbHandler)
-    CDMdbHandler$finalize()
-  }
-
-  if (counts) {
-    pathFromCopyDatabase <- pathToDatabaseCounts
-  } else {
-    pathFromCopyDatabase <- pathToDatabase
-  }
-
+  
   # copy to a temp folder
   pathToCopyDatabase <- file.path(tempdir(), finngen.sqlite)
   file.copy(
-    from = pathFromCopyDatabase,
+    from = pathToDatabase,
     to = pathToCopyDatabase,
     overwrite = TRUE
   )
@@ -112,8 +68,62 @@ helper_FinnGen_getDatabaseFile <- function(df = "R13", counts = FALSE) {
 }
 
 
+#' Get FinnGen counts-only database file
+#'
+#' @description
+#' Creates a copy of the FinnGen R13 counts-only SQLite database from the package's test data.
+#' This database contains pre-computed counts and aggregated statistics for testing
+#' and development purposes.
+#'
+#' @return Path to the FinnGen R13 counts-only SQLite database file (temporary copy)
+#'
+#' @export
+#'
+helper_FinnGen_getDatabaseFileCounts <- function() {
+  
+  finngen.sqlite <- paste0("FinnGenR13_countsOnly.sqlite")
+
+  pathToDatabase <- system.file("testdata", "data", finngen.sqlite, package = "ROMOPAPI")
+
+  # copy to a temp folder
+  pathToCopyDatabase <- file.path(tempdir(), finngen.sqlite)
+  file.copy(
+    from = pathToDatabase,
+    to = pathToCopyDatabase,
+    overwrite = TRUE
+  )
+
+  return(pathToCopyDatabase)
+  
+}
 
 
+
+
+#' Create SQLite database from CDM database
+#'
+#' @description
+#' Creates a new SQLite database by extracting specific concept data from a CDM database.
+#' The function extracts concept information, concept ancestors, code counts, and
+#' stratified code counts for the specified concept IDs and creates a new SQLite
+#' database with this subset of data.
+#'
+#' @param CDMdbHandler A CDMdbHandler object containing database connection details
+#' @param conceptIds Vector of concept IDs to extract. Defaults to c(317009, 21601855)
+#' @param pathToSqliteDatabase Path where the new SQLite database should be created.
+#'   Defaults to a temporary file with .sqlite extension
+#' @param codeCountsTable Name of the code counts table in the source database.
+#'   Defaults to "code_counts"
+#'
+#' @return No return value. Creates a new SQLite database file at the specified path.
+#'
+#' @importFrom checkmate assertClass assertString
+#' @importFrom DatabaseConnector createConnectionDetails connect disconnect insertTable dbGetQuery
+#' @importFrom SqlRender render translate
+#' @importFrom tibble as_tibble
+#'
+#' @export
+#'
 helper_createSqliteDatabaseFromDatabase <- function(
     CDMdbHandler,
     conceptIds = c(317009, 21601855),
@@ -137,31 +147,26 @@ helper_createSqliteDatabaseFromDatabase <- function(
   targetVocabularyDatabaseSchema <- "main"
   targetResultsDatabaseSchema <- "main"
 
+  conceptIdsToExtract <- c()
+  for (conceptId in conceptIds) {
+    results <- getCodeCounts(
+      CDMdbHandler,
+      conceptId = conceptId
+    )
 
+    conceptIdsToExtract <- c(conceptIdsToExtract, results$concepts$concept_id)
+  }
 
-  # Get concept ids for descendants, descendants of descendants, and parent 
-  sql <- "SELECT DISTINCT ca2.descendant_concept_id AS concept_id 
-          FROM @vocabularyDatabaseSchema.concept_ancestor AS ca1
-          LEFT JOIN @vocabularyDatabaseSchema.concept_ancestor ca2
-          ON ca1.descendant_concept_id = ca2.ancestor_concept_id
-          WHERE ca1.ancestor_concept_id IN (@conceptIds)
-          UNION ALL
-          SELECT DISTINCT ca3.ancestor_concept_id AS concept_id 
-          FROM @vocabularyDatabaseSchema.concept_ancestor AS ca3
-          WHERE ca3.descendant_concept_id IN (@conceptIds) AND ca3.min_levels_of_separation = 1
-          "
-
-  sql <- SqlRender::render(sql, vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","))
-  sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
-  conceptIds <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
-    tibble::as_tibble() |>
-    pull(concept_id)
-
+  conceptIdsToExtract <- conceptIdsToExtract |> unique()
 
   # Get concept table
   sql <- "SELECT DISTINCT c.* FROM @vocabularyDatabaseSchema.concept c
-          WHERE c.concept_id IN (@conceptIds)"
-  sql <- SqlRender::render(sql, vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","))
+          WHERE c.concept_id IN (@conceptIdsToExtract)"
+  sql <- SqlRender::render(
+    sql,
+    vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema,
+    conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ",")
+  )
   sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
   concept <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
     tibble::as_tibble()
@@ -176,8 +181,12 @@ helper_createSqliteDatabaseFromDatabase <- function(
 
   # Concept ancestor table
   sql <- "SELECT DISTINCT ca.* FROM @vocabularyDatabaseSchema.concept_ancestor ca
-         WHERE ca.ancestor_concept_id IN (@conceptIds) "
-  sql <- SqlRender::render(sql, vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","))
+         WHERE ca.descendant_concept_id IN (@conceptIdsToExtract) "
+  sql <- SqlRender::render(
+    sql,
+    vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema,
+    conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ",")
+  )
   sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
   conceptAncestor <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
     tibble::as_tibble()
@@ -192,8 +201,13 @@ helper_createSqliteDatabaseFromDatabase <- function(
 
   # Code counts table
   sql <- "SELECT DISTINCT cc.* FROM @resultsDatabaseSchema.@codeCountsTable cc
-         WHERE cc.concept_id IN (@conceptIds)"
-  sql <- SqlRender::render(sql, resultsDatabaseSchema = sourceResultsDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","), codeCountsTable = codeCountsTable)
+         WHERE cc.concept_id IN (@conceptIdsToExtract)"
+  sql <- SqlRender::render(
+    sql,
+    resultsDatabaseSchema = sourceResultsDatabaseSchema,
+    conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ","),
+    codeCountsTable = codeCountsTable
+  )
   sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
   codeCounts <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
     tibble::as_tibble()
@@ -208,9 +222,12 @@ helper_createSqliteDatabaseFromDatabase <- function(
 
   # stratified code counts table
   sql <- "SELECT DISTINCT cc.* FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable cc
-         WHERE cc.concept_id IN (@conceptIds)"
-  sql <- SqlRender::render(sql, resultsDatabaseSchema = sourceResultsDatabaseSchema, conceptIds = paste(conceptIds, collapse = ","), 
-  stratifiedCodeCountsTable = paste0("stratified_", codeCountsTable))
+         WHERE cc.concept_id IN (@conceptIdsToExtract) OR cc.maps_to_concept_id IN (@conceptIdsToExtract)"
+  sql <- SqlRender::render(sql,
+    resultsDatabaseSchema = sourceResultsDatabaseSchema,
+    conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ","),
+    stratifiedCodeCountsTable = paste0("stratified_", codeCountsTable)
+  )
   sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
   stratifiedCodeCounts <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
     tibble::as_tibble()

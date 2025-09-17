@@ -323,6 +323,8 @@ createPlotFromResults <- function(results, showsMappings = FALSE, ...) {
 #'
 #' @param results A list of results from getCodeCounts
 #' @param pruneLevels The levels to prune
+#' @param pruneClass Character string specifying a concept class to filter results.
+#'   NULL includes all concept classes. Common values include "Ingredient", "Clinical Drug", etc.
 #'
 #' @return A list of results with the levels pruned
 #' @export

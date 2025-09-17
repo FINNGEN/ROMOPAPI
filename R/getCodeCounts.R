@@ -7,6 +7,7 @@
 #'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
 #' @param conceptId The concept ID to get counts and relationships for
+#' @param codeCountsTable Name of the code counts table in the results schema. Defaults to "code_counts"
 #'
 #' @return A list containing:
 #' \itemize{
@@ -120,6 +121,10 @@ getCodeCounts <- function(
     # Gets tree of descendants and the code counts for each descendant
     familyTree <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble()
+
+    if (nrow(familyTree) == 0) {
+        stop("No family tree found for conceptId: ", conceptId)
+    }
 
     ancestorTable <- .familyTreeToAncestorTable(familyTree, conceptId)
 
@@ -333,7 +338,10 @@ getCodeCounts <- function(
 #'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
 #' @param conceptId The concept ID to get counts and relationships for
+#' @param codeCountsTable Name of the code counts table in the results schema. Defaults to "code_counts"
 #'
+#' @importFrom memoise memoise
+#' 
 #' @return A list containing:
 #' \itemize{
 #'   \item `concept_relationships` - Tibble of concept relationships including 'Maps to', 'Mapped from', 'Parent', and descendant relationships

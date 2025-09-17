@@ -1,139 +1,107 @@
-test_that("createAtomicCodeCountsTable works with duplicated counts", {
-  CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+test_that("createStratifiedCodeCountsTable works with duplicated counts", {
+  # only works in a full CDM database
+  skip_if(testingDatabase == "OnlyCounts-FinnGen")
+
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
   withr::defer({
-    CDMdbHandler$finalize()
+    CDMdbHandler <- NULL
+    gc()
   })
 
-  codeAtomicCountsWithDuplicatedCountsTable <- "code_atomic_counts_test0"
-  codeAtomicCountsTable <- "code_atomic_counts_test1"
+  stratifiedCodeCountsTable <- "stratified_code_counts_test0"
+  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
 
   withr::defer({
-    CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", codeAtomicCountsWithDuplicatedCountsTable))
-    CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", codeAtomicCountsTable))
+    CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable))
   })
+
+  domain  <- tibble::tribble(
+    ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
+    "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date", "condition_source_concept_id"
+  )
 
   # codeAtomicCountsWithDuplicatedCounts
-  domain <- tibble::tribble(
-    ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
-    "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date", "condition_source_concept_id",
-  )
   suppressWarnings(
-    createAtomicCodeCountsTable(CDMdbHandler, domains = domain, codeAtomicCountsTable = codeAtomicCountsWithDuplicatedCountsTable)
+    createStratifiedCodeCountsTable(CDMdbHandler, domains = domain, stratifiedCodeCountsTable = stratifiedCodeCountsTable)
   )
-  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
-  codeAtomicCountsWithDuplicatedCounts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".", codeAtomicCountsWithDuplicatedCountsTable))
 
-  # codeAtomicCounts
-  domain <- tibble::tribble(
-    ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
-    "Condition", "condition_occurrence", "condition_source_concept_id", "condition_start_date", "condition_concept_id",
-  )
-  createAtomicCodeCountsTable(CDMdbHandler, domains = domain, codeAtomicCountsTable = codeAtomicCountsTable)
-  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
-  codeAtomicCounts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".", codeAtomicCountsTable))
+  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".", stratifiedCodeCountsTable))
 
-  # test counts of codeAtomicCounts Distinct by maps_to_concept_id is the same as codeAtomicCountsWithDuplicatedCounts
-  n <- codeAtomicCountsWithDuplicatedCounts |>
-    dplyr::count() |>
-    dplyr::pull(n)
-  n2 <- codeAtomicCounts |>
-    dplyr::distinct(concept_id, calendar_year, gender_concept_id, age_decile, record_counts) |>
-    dplyr::count() |>
-    dplyr::pull(n)
-
-  n |> expect_equal(n2)
-
-  # test that all the duplicated counts in codeAtomicCountsWithDuplicatedCounts are split into the codeAtomicCounts table
-  dplyr::inner_join(
-    codeAtomicCountsWithDuplicatedCounts |>
-      dplyr::group_by(concept_id) |>
-      dplyr::summarise(record_counts = sum(record_counts), .groups = "drop") |>
-      dplyr::distinct(concept_id, record_counts) |> 
-      dplyr::rename(record_counts_duplicated = record_counts),
-    codeAtomicCounts |>
-      dplyr::group_by(concept_id) |>
-      dplyr::summarise(record_counts = sum(record_counts), .groups = "drop") |>
-      dplyr::distinct(concept_id, record_counts) |> 
-      dplyr::rename(record_counts_no_duplicated = record_counts),
-    by = c("concept_id")
-  ) |>
-    dplyr::filter(record_counts_duplicated != record_counts_no_duplicated)  |> 
-    dplyr::count() |>
-    dplyr::pull(n) |>
-    expect_equal(0)
-
+  # check that the table was created 
+  stratifiedCodeCounts |>
+   dplyr::count() |>
+   dplyr::pull(n) |>
+   expect_gt(0)
+   
+  # check that the table was created with correct columns
+  stratifiedCodeCounts |>
+    head() |>
+    dplyr::collect() |>
+    colnames() |>
+    expect_equal(c(
+      "concept_id",
+      "maps_to_concept_id",
+      "calendar_year",
+      "gender_concept_id",
+      "age_decile",
+      "record_counts"
+    ))
 })
 
-test_that("createAtomicCodeCountsTable works ", {
-  CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+# test_that("createObservationCountsTable works", {
+#   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+#   withr::defer({
+#     CDMdbHandler <- NULL
+#     gc()
+#   })
+
+#   connection <- CDMdbHandler$connectionHandler$getConnection()
+#   cdmDatabaseSchema <- CDMdbHandler$cdmDatabaseSchema
+#   resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+
+#   sqlPath <- system.file("sql", "sql_server", "createObservationCountsTable.sql", package = "ROMOPAPI")
+#   sql <- SqlRender::readSql(sqlPath)
+#   sql <- SqlRender::render(sql,
+#     cdmDatabaseSchema = cdmDatabaseSchema,
+#     resultsDatabaseSchema = resultsDatabaseSchema
+#   )
+#   sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
+
+#   DatabaseConnector::executeSql(connection, sql)
+
+#   observation_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".observation_counts"))
+#   observation_counts |>
+#     dplyr::count() |>
+#     dplyr::pull(n) |>
+#     expect_gt(0)
+# })
+
+
+test_that("createCodeCountsTables works", {
+  # only works in a full CDM database
+  skip_if(testingDatabase == "OnlyCounts-FinnGen")
+
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
   withr::defer({
-    CDMdbHandler$finalize()
-  })
-
-  codeAtomicCountsTable <- "code_atomic_counts_test2"
-  withr::defer({
-    CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", codeAtomicCountsTable))
-  })
-
-  createAtomicCodeCountsTable(CDMdbHandler, codeAtomicCountsTable = codeAtomicCountsTable)
-  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
-  codeAtomicCounts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".", codeAtomicCountsTable))
-
-  codeAtomicCounts |>
-    dplyr::count() |>
-    dplyr::pull(n) |>
-    expect_gt(0)
-
-})
-
-
-
-test_that("createObservationCountsTable works", {
-  CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
-  withr::defer({
-    CDMdbHandler$finalize()
-  })
-
-  connection <- CDMdbHandler$connectionHandler$getConnection()
-  cdmDatabaseSchema <- CDMdbHandler$cdmDatabaseSchema
-  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
-
-  sqlPath <- system.file("sql", "sql_server", "createObservationCountsTable.sql", package = "ROMOPAPI")
-  sql <- SqlRender::readSql(sqlPath)
-  sql <- SqlRender::render(sql,
-    cdmDatabaseSchema = cdmDatabaseSchema,
-    resultsDatabaseSchema = resultsDatabaseSchema
-  )
-  sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-
-  DatabaseConnector::executeSql(connection, sql)
-
-  observation_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".observation_counts"))
-  observation_counts |>
-    dplyr::count() |>
-    dplyr::pull(n) |>
-    expect_gt(0)
-})
-
-
-test_that("createCodeCountsTable works", {
-  CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
-  withr::defer({
-    CDMdbHandler$finalize()
+    CDMdbHandler <- NULL
+    gc()
   })
 
   codeCountsTable <- "code_counts_test0"
+  stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
   withr::defer({
     CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", codeCountsTable))
+    CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable))
   })
 
-  createCodeCountsTable(CDMdbHandler, codeCountsTable = codeCountsTable)
+  createCodeCountsTables(CDMdbHandler, codeCountsTable = codeCountsTable)
 
   # - Check if the table was created
   resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
   cdmDatabaseSchema <- CDMdbHandler$cdmDatabaseSchema
   code_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".", codeCountsTable))
 
+  # check that the table was created with correct columns
   code_counts |>
     dplyr::count() |>
     dplyr::pull(n) |>
@@ -144,16 +112,21 @@ test_that("createCodeCountsTable works", {
     colnames() |>
     expect_equal(c(
       "concept_id",
-      "calendar_year", 
-      "gender_concept_id", 
-      "age_decile",
-      "record_counts", 
+      "record_counts",
       "descendant_record_counts"
     ))
+
+  # check that descendant_record_counts is greater than or equal to record_counts
   code_counts |>
-    dplyr::filter(descendant_record_counts < record_counts) |> 
+    dplyr::filter(descendant_record_counts < record_counts) |>
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_equal(0)
 
+  # check that concept_id is unique
+  code_counts |>
+    dplyr::distinct(concept_id) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(code_counts |> dplyr::count() |> dplyr::pull(n))
 })

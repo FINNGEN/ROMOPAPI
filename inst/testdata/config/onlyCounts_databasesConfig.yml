@@ -1,0 +1,20 @@
+FC:
+  cohortTableHandler:
+    database:
+      databaseId: FC
+      databaseName: FinnGenCounts
+      databaseDescription: Counts only FinnGen
+    connection:
+      connectionDetailsSettings:
+          dbms: sqlite
+          server: <pathToFinnGenCountsSqlite>
+    cdm:
+        cdmDatabaseSchema: main
+        vocabularyDatabaseSchema: main
+    cohortTable:
+        cohortDatabaseSchema: main
+        cohortTableName: test_cohort_table_<timestamp>
+  atlasConfig:
+    webapiurl: https://api.ohdsi.org/WebAPI
+    sourcekey:
+    resultsshchema:

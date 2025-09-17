@@ -9,3 +9,5 @@
 ^errorReportSql\.txt$
 ^\.git/
 ^\.Rcheck/
+^GITHUBPAT\.txt$
+

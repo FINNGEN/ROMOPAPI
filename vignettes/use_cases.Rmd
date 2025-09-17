@@ -1,0 +1,48 @@
+---
+title: "use_cases"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{use_cases}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(ROMOPAPI)
+
+test_databasesConfig <- HadesExtras_readAndParseYaml(
+  pathToYalmFile = system.file("testdata", "config", "onlyCounts_databasesConfig.yml", package = "ROMOPAPI"),
+  pathToFinnGenCountsSqlite = helper_FinnGen_getDatabaseFileCounts()
+)
+
+cohortTableHandlerConfig <- test_databasesConfig[[1]]$cohortTableHandler
+
+# Create CDMdbHandler
+CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+```
+
+
+# Use case 1: What are the descendants of a concept in the database?
+
+```{r}
+getCodeCounts(CDMdbHandler, conceptId = 317009)
+```
+
+# Use case 2: How each descendant contributes to the descendant record counts of a concept, over time, and by gender and age?
+
+
+
+
+# Use case 3: What non-standard concepts map to a standard concept and its descendants?
+
+
+
+
+# Use case 4: How each source concept contributes to the descendant record counts of a concept, over time, and by gender and age?

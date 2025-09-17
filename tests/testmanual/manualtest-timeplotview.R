@@ -3,7 +3,7 @@ options(bigQueryConnectorInsertDelay = 1)
 options(bigQueryConnectorDdlDelay = 1)
 
 tictoc::tic()
-CDMdbHandler <- HadesExtras::createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
 tictoc::toc()
 
 conceptId <- c(317009)  # asthma snomde
@@ -14,6 +14,8 @@ conceptId <- 21601855       # ATC C10AA
 conceptId <- 21601823
 conceptId <- 21601487
 conceptId <- 782748
+
+conceptId <- 21602735
 
 
 results <- getCodeCounts(

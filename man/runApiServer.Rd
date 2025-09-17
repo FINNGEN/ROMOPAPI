@@ -8,6 +8,7 @@ runApiServer(
   cohortTableHandlerConfig = NULL,
   host = "127.0.0.1",
   port = 8585,
+  buildCountsTable = FALSE,
   ...
 )
 }
@@ -18,6 +19,8 @@ If NULL, uses test Eunomia database}
 \item{host}{Host address to run the API server on. Defaults to "127.0.0.1"}
 
 \item{port}{Port number to run the API server on. Defaults to 8585}
+
+\item{buildCountsTable}{Logical indicating whether to build code counts tables. Defaults to FALSE}
 
 \item{...}{Additional arguments passed to plumber::pr_run()}
 }

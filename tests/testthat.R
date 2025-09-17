@@ -9,4 +9,11 @@
 library(testthat)
 library(ROMOPAPI)
 
+
+Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "OnlyCounts-FinnGen")
+Sys.setenv(BUILD_COUNTS_TABLE = "FALSE")
+test_check("ROMOPAPI")
+
+Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-GiBleed")
+Sys.setenv(BUILD_COUNTS_TABLE = "TRUE")
 test_check("ROMOPAPI")

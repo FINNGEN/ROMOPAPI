@@ -7,7 +7,7 @@ API to access OMOP CDM (Observational Medical Outcomes Partnership Common Data M
 You can install ROMOPAPI from GitHub with:
 
 ```r
-# install.packages("remotes")
+install.packages("remotes")
 remotes::install_github("FINNGEN/ROMOPAPI")
 ```
 
@@ -22,33 +22,34 @@ Create a folder to store the testing databases. This saves time as the databases
 ```r
 library(ROMOPAPI)
 
-
-# Set the folder to store the testing databases
-Sys.setenv(EUNOMIA_DATA_FOLDER = "<full_path_to_local_eunomia_data_folder>")
-
-# Run the API server with default settings (uses test FinnGen Eunomia database)
+# Run the API server with default settings (uses internal testing database with minimal data)
 runApiServer()
-
 ```
 
 This will start the API server on port 8585.
 
-The main endpoint is: http://127.0.0.1:8585/getCodeCounts?conceptIds=<concept_id_1>,<concept_id_2>,...
+#### Testing endpoints
 
-For example, http://127.0.0.1:8585/getCodeCounts?conceptIds=201826
+The main endpoint for testing is: http://127.0.0.1:8585/report?conceptId=<concept_id>
 
-This will return the code counts for the concept ids 201826.
+For example, http://127.0.0.1:8585/report?conceptId=317009
+
+This will return an HTML report for the concept id 317009.
+
+#### Production endpoints
+
+The main endpoint for production is: http://127.0.0.1:8585/getCodeCounts?conceptId=<concept_id>
+
+This will return the code counts for the concept ids 317009.
 
 Separated in 3 tables:
 
 - `concept_relationship`: relationships between conceptIds
 - `concept`: information about the conceptIds
-- `code_counts`: patient counts by conceptId stratified by gender, year, and age decile
-
+- `stratified_code_counts`: patient counts by conceptId stratified by gender, year, and age decile
 
 
 See the API documentation for more details: http://127.0.0.1:8585/__docs__/
-
 
 ### Running the API Server with a custom database
 
@@ -73,36 +74,16 @@ cohortTableHandler:
         resultsDatabaseSchema: main
 ```
 
-If it is the first time running the API server with the custom database, you need to run the following command to create the code counts table.
+If it is the first time running the API server with the custom database, you need add the parameter `buildCountsTable = TRUE` to the `runApiServer` function.
 
 ```r
 databaseConfig <- yaml::read_yaml("path/to/database_config.yml")
 
- CDMdbHandler  <- HadesExtras::createCDMdbHandlerFromList(
-  databaseConfig$cohortTableHandler, 
-  loadConnectionChecksLevel = "basicChecks"
-)
- 
-ROMOPAPI::createCodeCountsTable(
-  CDMdbHandler = CDMdbHandler
+ROMOPAPI::runApiServer(
+  cohortTableHandlerConfig = databaseConfig$cohortTableHandler,
+  buildCountsTable = TRUE
 )
 ```
-
-Run the API server with the custom configuration.
-
-```r
-library(ROMOPAPI)
-
-databaseConfig <- yaml::read_yaml("path/to/database_config.yml")
-
-# Run the API server with custom configuration
-runApiServer(
-  cohortTableHandlerConfig = databaseConfig,
-  host = "0.0.0.0",  # Allow external connections
-  port = 8080
-)
-```
-
 
 # DEVELOPMENT
 
@@ -111,11 +92,10 @@ runApiServer(
 ```r
 library(ROMOPAPI)
 
-databasesConfig <- HadesExtras::readAndParseYaml(system.file("testdata", "config", "atlasDev_databasesConfig.yml", package = "ROMOPAPI"))
+databasesConfig <- HadesExtras_readAndParseYaml(system.file("testdata", "config", "atlasDev_databasesConfig.yml", package = "ROMOPAPI"))
 bigrquery::bq_auth(path = Sys.getenv("GCP_SERVICE_KEY"))
 # Run the API server with default settings (uses test FinnGen Eunomia database)
 runApiServer(cohortTableHandlerConfig = databasesConfig$BQ5k$cohortTableHandler)
-
 ```
 
 
@@ -127,23 +107,31 @@ runApiServer(cohortTableHandlerConfig = databasesConfig$BQ5k$cohortTableHandler)
 Based on the example output, getCodeCounts returns a list with 3 components:
 
 1. concept_relationships - A tibble containing:
-   - concept_id_1: 🔑 Source concept ID
-   - concept_id_2: 🔑 Target concept ID 
-   - relationship_id:  Type of relationship (e.g. "Parent", "Root", "Mapped from", etc.)
-    - "Parent" means that concept_id_1 is a parent of concept_id_2
-    - "Root" concept_id is same as concept_id_2 and is the root of the concept hierarchy
-    - "Mapped from" means that concept_id_1 is mapped from concept_id_2
-    - "Mapped to" means that concept_id_1 is mapped to concept_id_2
-    - "n-m" means that concept_id_1 is a descendant of concept_id_2, where n is the min number of levels of the hierarchy and m is the max number of levels of the hierarchy
+   - parent_concept_id: 🔑 Parent concept ID
+   - child_concept_id: 🔑 Child concept ID 
+   - levels: Hierarchy level information (e.g. "-1", "0", "1-1", "2-2", "3-3", "Mapped from")
+    - "-1" means the child is a parent of the root concept
+    - "0" means the concept is the root of the hierarchy
+    - "n-n" means the child is n levels below the parent in the hierarchy
+    - "Mapped from" means the child is mapped from another vocabulary
+    - "Maps to" means the child is mapped to another vocabulary
+   - concept_class_id: Type of concept (e.g. "Clinical Finding", "ICD10 code")
 
-2. code_counts - A tibble containing:
+2. stratified_code_counts - A tibble containing:
    - concept_id: 🔑Concept identifier
    - calendar_year: Year of the counts
    - gender_concept_id: Gender concept ID
    - age_decile: Age group by decade
-   - record_counts: Number of events for this specific concept
-   - descendant_record_counts: Number of events including descendant concepts
+   - node_record_counts: Number of events for this specific concept
+   - node_descendant_record_counts: Number of events including descendant concepts
 
 3. concepts - A tibble containing concept :
- as seen in [concept table](https://ohdsi.github.io/CommonDataModel/cdm54.html#concept)
- where concept_id is the key column.
+   - concept_id: 🔑 Concept identifier
+   - concept_name: Name/description of the concept
+   - domain_id: Domain the concept belongs to (e.g. "Condition")
+   - vocabulary_id: Source vocabulary (e.g. "SNOMED", "ICD10")
+   - concept_class_id: Type of concept (e.g. "Clinical Finding", "ICD10 code")
+   - standard_concept: Boolean indicating if this is a standard concept
+   - concept_code: Original code in source vocabulary
+   - record_counts: Number of events for this specific concept
+   - descendant_record_counts: Number of events including descendant concepts

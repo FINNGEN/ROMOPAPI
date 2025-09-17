@@ -2,7 +2,7 @@ FROM --platform=linux/amd64  rocker/r-ver:4.4.1
 RUN /rocker_scripts/setup_R.sh https://packagemanager.posit.co/cran/__linux__/jammy/2025-09-10
 
 # install OS dependencies including java and python 3
-RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev libncurses5-dev curl python3-dev python3.venv git \
+RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev libncurses5-dev curl python3-dev python3.venv git pandoc \
     # rjava
     libssl-dev libcurl4-openssl-dev  libpcre2-dev libicu-dev \
     # xml2
@@ -21,29 +21,19 @@ RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev li
 && rm -rf /var/lib/apt/lists/*
 
 # Install renv and restore packages
-ARG ROMOPAPI_VERSION=0.0.4
+ARG ROMOPAPI_BRANCH=master
+ARG BUILD_CACHE_BUSTER=1
 
 # Install renv and restore packages
 RUN --mount=type=secret,id=build_github_pat \
     cp /usr/local/lib/R/etc/Renviron /tmp/Renviron \
     && echo "GITHUB_PAT=$(cat /run/secrets/build_github_pat)" >> /usr/local/lib/R/etc/Renviron \
     && Rscript -e 'install.packages("remotes")' \
-    && Rscript -e 'remotes::install_github("FINNGEN/ROMOPAPI")' \
+    && Rscript -e 'remotes::install_github("FINNGEN/ROMOPAPI@${ROMOPAPI_BRANCH}")' \
     && cp /tmp/Renviron /usr/local/lib/R/etc/Renviron;
 
 # Expose the port that the API will run on
 EXPOSE 8585
-
-# Create a directory for Eunomia data
-RUN mkdir -p /eunomia_data
-ENV EUNOMIA_DATA_FOLDER=/eunomia_data
-COPY FinnGenR12_v5.4_counts.sqlite /eunomia_data/FinnGenR12_v5.4_counts.sqlite
-# Create empty files to avoid Eunomia from downloading the database
-RUN echo 'n' > /eunomia_data/FinnGenR12_v5.4.zip
-RUN echo 'n' > /eunomia_data/FinnGenR12_v5.4.sqlite
-
-# Copy the database into the container
-RUN Rscript -e 'ROMOPAPI::helper_FinnGen_getDatabaseFile(counts = TRUE)'
 
 # Run the API server
 CMD ["Rscript", "-e", "ROMOPAPI::runApiServer(host = '0.0.0.0', port = 8585)"] 
