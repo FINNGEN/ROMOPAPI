@@ -44,6 +44,8 @@ temp_concept_ancestor AS (
         SELECT DISTINCT
             maps_to_concept_id, calendar_year, gender_concept_id, age_decile, record_counts
         FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable
+        -- do not take if maps_to_concept_id is a standard concept
+        WHERE concept_id != maps_to_concept_id
      )
      GROUP BY
          maps_to_concept_id
