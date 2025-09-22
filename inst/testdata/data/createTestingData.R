@@ -7,7 +7,8 @@ source("tests/testthat/setup.R")
 conceptIds <- c(
     317009, # Snomed: Asthma
     45596282, # ICD10: Asthma
-    21601855 # ATC level 4: C10AA (Statins)
+    21601855, # ATC level 4: C10AA (Statins)
+    320136 # Disorder of respiratory …# big 
 )
 
 CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
@@ -44,3 +45,15 @@ dplyr::tbl(connection, "stratified_code_counts") |>
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_gt(0)
+
+
+# 
+Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "OnlyCounts-FinnGen")
+source("tests/testthat/setup.R")
+
+CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+
+conceptId <- 21601855
+
+report.html <- createReport(conceptId, CDMdbHandler, showsMappings = FALSE)
+browseURL(report.html)
