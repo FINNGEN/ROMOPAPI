@@ -51,7 +51,7 @@ test_that("getConceptsWithCodeCounts works", {
 
   # Check that all concept_ids are unique
   result |>
-    dplyr::count(concept_id) |>
+    dplyr::count(concept_id, sort = TRUE) |>
     dplyr::filter(n > 1) |>
     nrow() |>
     expect_equal(0)
