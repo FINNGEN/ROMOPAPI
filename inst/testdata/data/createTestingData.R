@@ -7,7 +7,8 @@ source("tests/testthat/setup.R")
 conceptIds <- c(
     317009, # Snomed: Asthma
     45596282, # ICD10: Asthma
-    21601855 # ATC level 4: C10AA (Statins)
+    21601855, # ATC level 4: C10AA (Statins)
+    2010001615 # test endpoint
 )
 
 CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
