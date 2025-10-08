@@ -53,7 +53,8 @@ getConceptsWithCodeCounts <- function(
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     concepts <- DatabaseConnector::dbGetQuery(connection, sql) |>
         tibble::as_tibble() |>
-        dplyr::mutate(standard_concept = dplyr::if_else(is.na(standard_concept), FALSE, TRUE))
+        dplyr::mutate(standard_concept = dplyr::if_else(is.na(standard_concept), FALSE, TRUE)) |> 
+        dplyr::mutate(concept_id = as.double(concept_id))
 
     return(concepts)
 }
