@@ -90,7 +90,7 @@ if (testingDatabase %in% c("AtlasDevelopment-DBI")) {
     pathToYalmFile = system.file("testdata", "config", "atlasDev_databasesConfig.yml", package = "ROMOPAPI")
   )
 
-  test_cohortTableHandlerConfig <- test_databasesConfig[[1]]$cohortTableHandler
+  test_cohortTableHandlerConfig <- test_databasesConfig[[2]]$cohortTableHandler
 }
 
 
