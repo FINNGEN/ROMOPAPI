@@ -17,10 +17,13 @@ conceptId <- 782748
 
 conceptId <- 21602735
 
+conceptId <- 2010001615 # test endpoint
+
 
 results <- getCodeCounts(
     CDMdbHandler,
-    conceptId = conceptId
+    conceptId = conceptId, 
+    codeCountsTable = "code_counts"
 )
 
 

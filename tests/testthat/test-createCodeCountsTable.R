@@ -25,7 +25,7 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
     createStratifiedCodeCountsTable(CDMdbHandler, domains = domain, stratifiedCodeCountsTable = stratifiedCodeCountsTable)
   )
 
-  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".", stratifiedCodeCountsTable))
+  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(resultsDatabaseSchema, ".", stratifiedCodeCountsTable)))
 
   # check that the table was created 
   stratifiedCodeCounts |>
@@ -99,7 +99,7 @@ test_that("createCodeCountsTables works", {
   # - Check if the table was created
   resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
   cdmDatabaseSchema <- CDMdbHandler$cdmDatabaseSchema
-  code_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".", codeCountsTable))
+  code_counts <- CDMdbHandler$connectionHandler$tbl(I(paste0(resultsDatabaseSchema, ".", codeCountsTable)))
 
   # check that the table was created with correct columns
   code_counts |>
