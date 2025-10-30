@@ -118,8 +118,7 @@ helper_FinnGen_getDatabaseFileCounts <- function() {
 #' @return No return value. Creates a new SQLite database file at the specified path.
 #'
 #' @importFrom checkmate assertClass assertString
-#' @importFrom DatabaseConnector createConnectionDetails connect disconnect insertTable dbGetQuery
-#' @importFrom SqlRender render translate
+#' @importFrom DatabaseConnector createConnectionDetails connect disconnect insertTable renderTranslateQuerySql
 #' @importFrom tibble as_tibble
 #'
 #' @export
@@ -162,13 +161,13 @@ helper_createSqliteDatabaseFromDatabase <- function(
   # Get concept table
   sql <- "SELECT DISTINCT c.* FROM @vocabularyDatabaseSchema.concept c
           WHERE c.concept_id IN (@conceptIdsToExtract)"
-  sql <- SqlRender::render(
-    sql,
+
+  concept <- DatabaseConnector::renderTranslateQuerySql(
+    connection = sourceConnection,
+    sql = sql,
     vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema,
     conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ",")
-  )
-  sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
-  concept <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
+  ) |>
     tibble::as_tibble()
 
   targetConnection |> DatabaseConnector::insertTable(
@@ -182,13 +181,12 @@ helper_createSqliteDatabaseFromDatabase <- function(
   # Concept ancestor table
   sql <- "SELECT DISTINCT ca.* FROM @vocabularyDatabaseSchema.concept_ancestor ca
          WHERE ca.descendant_concept_id IN (@conceptIdsToExtract) "
-  sql <- SqlRender::render(
-    sql,
+  conceptAncestor <- DatabaseConnector::renderTranslateQuerySql(
+    connection = sourceConnection,
+    sql = sql,
     vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema,
     conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ",")
-  )
-  sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
-  conceptAncestor <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
+  ) |>
     tibble::as_tibble()
 
   targetConnection |> DatabaseConnector::insertTable(
@@ -202,14 +200,13 @@ helper_createSqliteDatabaseFromDatabase <- function(
   # Code counts table
   sql <- "SELECT DISTINCT cc.* FROM @resultsDatabaseSchema.@codeCountsTable cc
          WHERE cc.concept_id IN (@conceptIdsToExtract)"
-  sql <- SqlRender::render(
-    sql,
+  codeCounts <- DatabaseConnector::renderTranslateQuerySql(
+    connection = sourceConnection,
+    sql = sql,
     resultsDatabaseSchema = sourceResultsDatabaseSchema,
     conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ","),
     codeCountsTable = codeCountsTable
-  )
-  sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
-  codeCounts <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
+  ) |>
     tibble::as_tibble()
 
   targetConnection |> DatabaseConnector::insertTable(
@@ -223,13 +220,13 @@ helper_createSqliteDatabaseFromDatabase <- function(
   # stratified code counts table
   sql <- "SELECT DISTINCT cc.* FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable cc
          WHERE cc.concept_id IN (@conceptIdsToExtract) OR cc.maps_to_concept_id IN (@conceptIdsToExtract)"
-  sql <- SqlRender::render(sql,
+  stratifiedCodeCounts <- DatabaseConnector::renderTranslateQuerySql(
+    connection = sourceConnection,
+    sql = sql,
     resultsDatabaseSchema = sourceResultsDatabaseSchema,
     conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ","),
     stratifiedCodeCountsTable = paste0("stratified_", codeCountsTable)
-  )
-  sql <- SqlRender::translate(sql, targetDialect = sourceConnection@dbms)
-  stratifiedCodeCounts <- DatabaseConnector::dbGetQuery(sourceConnection, sql) |>
+  ) |>
     tibble::as_tibble()
 
   targetConnection |> DatabaseConnector::insertTable(

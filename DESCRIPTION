@@ -1,6 +1,6 @@
 Package: ROMOPAPI
 Title: ROMOPAPI
-Version: 1.0.0
+Version: 2.0.0
 Authors@R: 
     person("Javier", "Gracia-Tabuenca", , "javier.graciatabuenca@tuni.fi", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
@@ -9,7 +9,7 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 Language: en
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 URL: https://github.com/javier-gracia-tabuenca-tuni/ROMOPAPI
 BugReports: https://github.com/javier-gracia-tabuenca-tuni/ROMOPAPI/issues
 Imports:
@@ -35,6 +35,8 @@ Imports:
     ResultModelManager,
     yaml,
     stringr
+Remotes:
+    javier-gracia-tabuenca-tuni/DatabaseConnector@bigquery-DBI-2
 Suggests: 
     testthat (>= 3.0.0),
     bigrquery,
