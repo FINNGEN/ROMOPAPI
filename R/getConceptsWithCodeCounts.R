@@ -19,7 +19,7 @@
 #'
 #' @importFrom checkmate assertClass
 #' @importFrom SqlRender render translate
-#' @importFrom DatabaseConnector dbGetQuery
+#' @importFrom DatabaseConnector renderTranslateQuerySql
 #' @importFrom tibble as_tibble
 #' @importFrom dplyr mutate if_else
 #'
@@ -49,9 +49,13 @@ getConceptsWithCodeCounts <- function(
        FROM @vocabularyDatabaseSchema.concept c
        INNER JOIN @resultsDatabaseSchema.@codeCountsTable cc
        ON c.concept_id = cc.concept_id;"
-    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema, resultsDatabaseSchema = resultsDatabaseSchema, codeCountsTable = codeCountsTable)
-    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-    concepts <- DatabaseConnector::dbGetQuery(connection, sql) |>
+    concepts <- DatabaseConnector::renderTranslateQuerySql(
+        connection = connection,
+        sql = sql,
+        vocabularyDatabaseSchema = vocabularyDatabaseSchema,
+        resultsDatabaseSchema = resultsDatabaseSchema,
+        codeCountsTable = codeCountsTable
+    ) |>
         tibble::as_tibble() |>
         dplyr::mutate(standard_concept = dplyr::if_else(is.na(standard_concept), FALSE, TRUE)) |> 
         dplyr::mutate(concept_id = as.double(concept_id))

@@ -18,7 +18,7 @@
 #'
 #' @importFrom checkmate assertClass assertIntegerish
 #' @importFrom SqlRender render translate
-#' @importFrom DatabaseConnector dbGetQuery
+#' @importFrom DatabaseConnector renderTranslateQuerySql
 #' @importFrom tibble as_tibble
 #' @importFrom dplyr pull bind_rows
 #'
@@ -109,18 +109,16 @@ getCodeCounts <- function(
     WHERE parent_concept_id IN (SELECT DISTINCT child_concept_id FROM temp_tree ) OR child_concept_id IN (@conceptId)
     "
 
-    sql <- SqlRender::render(
-        sql,
+    # Gets tree of descendants and the code counts for each descendant
+    familyTree <- DatabaseConnector::renderTranslateQuerySql(
+        connection = connection,
+        sql = sql,
         vocabularyDatabaseSchema = vocabularyDatabaseSchema,
         conceptId = conceptId,
         resultsDatabaseSchema = resultsDatabaseSchema,
         stratifiedCodeCountsTable = stratifiedCodeCountsTable
-    )
-    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-
-    # Gets tree of descendants and the code counts for each descendant
-    familyTree <- DatabaseConnector::dbGetQuery(connection, sql) |>
-        tibble::as_tibble()
+    ) |>
+    tibble::as_tibble()
 
     if (nrow(familyTree) == 0) {
         stop("No family tree found for conceptId: ", conceptId)
@@ -157,14 +155,13 @@ getCodeCounts <- function(
 
     # - Get counts and derive 'Maps to' and 'Mapped from' from that
     sql <- "SELECT * FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable WHERE concept_id IN (@conceptIds) OR maps_to_concept_id IN (@conceptIds);"
-    sql <- SqlRender::render(
-        sql,
+    codeCounts <- DatabaseConnector::renderTranslateQuerySql(
+        connection = connection,
+        sql = sql,
         resultsDatabaseSchema = resultsDatabaseSchema,
         conceptIds = paste(conceptIdsToGetCounts, collapse = ","),
         stratifiedCodeCountsTable = stratifiedCodeCountsTable
-    )
-    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-    codeCounts <- DatabaseConnector::dbGetQuery(connection, sql) |>
+    ) |>
         tibble::as_tibble()
 
     # - Derive 'Maps to' and 'Mapped from'
