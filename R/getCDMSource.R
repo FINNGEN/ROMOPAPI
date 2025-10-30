@@ -11,7 +11,7 @@
 #'
 #' @importFrom checkmate assertClass
 #' @importFrom SqlRender render translate
-#' @importFrom DatabaseConnector dbGetQuery
+#' @importFrom DatabaseConnector renderTranslateQuerySql
 #' @importFrom tibble as_tibble
 #'
 #' @export
@@ -33,9 +33,11 @@ getCDMSource <- function(
     #
 
     sql <- "SELECT * FROM @vocabularyDatabaseSchema.cdm_source;"
-    sql <- SqlRender::render(sql, vocabularyDatabaseSchema = vocabularyDatabaseSchema)
-    sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
-    cdm_source <- DatabaseConnector::dbGetQuery(connection, sql) |> tibble::as_tibble()
+    cdm_source <- DatabaseConnector::renderTranslateQuerySql(
+        connection = connection,
+        sql = sql,
+        vocabularyDatabaseSchema = vocabularyDatabaseSchema
+    ) |> tibble::as_tibble()
 
     return(cdm_source)
 }
