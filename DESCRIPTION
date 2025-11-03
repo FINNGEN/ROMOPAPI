@@ -34,7 +34,8 @@ Imports:
     R6,
     ResultModelManager,
     yaml,
-    stringr
+    stringr,
+    ParallelLogger
 Remotes:
     javier-gracia-tabuenca-tuni/DatabaseConnector@bigquery-DBI-2
 Suggests: 

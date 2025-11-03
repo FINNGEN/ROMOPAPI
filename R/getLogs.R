@@ -8,8 +8,7 @@
 #' @return A character vector with each log line as a string.
 #'
 #' @export
-getLogs <- function(
-    CDMdbHandler) {
+getLogs <- function() {
     ParallelLogger::logInfo("getLogs: Getting logs")
     #
     fileName <- getOption("parallelLoggerTempFile")
