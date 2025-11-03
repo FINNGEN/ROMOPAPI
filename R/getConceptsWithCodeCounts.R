@@ -37,6 +37,8 @@ getConceptsWithCodeCounts <- function(
     vocabularyDatabaseSchema <- CDMdbHandler$vocabularyDatabaseSchema
     resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
 
+    ParallelLogger::logInfo("getConceptsWithCodeCounts: Getting concepts with code counts")
+
     #
     # FUNCTION
     #
