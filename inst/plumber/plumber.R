@@ -110,3 +110,19 @@ function(res) {
   # Read and return the file content
   readChar(file_path, file.info(file_path)$size)
 }
+
+#* Get the logs
+#* @get /getLogs
+function() {
+  logs <- getLogs()
+  return(logs)
+}
+
+#* Send feedback to the API server
+#* @post /sendFeedback
+function(res, feedback = "") {
+  feedback <- as.character(feedback)
+  sendFeedback(feedback)
+  res$status <- 200
+  return(list(message = "Feedback sent"))
+}

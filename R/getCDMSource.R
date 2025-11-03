@@ -18,7 +18,7 @@
 #'
 getCDMSource <- function(
     CDMdbHandler) {
-    message("getCDMSource")
+    ParallelLogger::logInfo("getCDMSource: Getting CDM source information")
     #
     # VALIDATE
     #

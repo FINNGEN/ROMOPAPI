@@ -36,7 +36,7 @@ getCodeCounts <- function(
     CDMdbHandler,
     conceptId,
     codeCountsTable = "code_counts") {
-    message("getCodeCounts: ", conceptId)
+    ParallelLogger::logInfo("getCodeCounts: Getting code counts for conceptId: ", conceptId)
     #
     # VALIDATE
     #

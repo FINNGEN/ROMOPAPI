@@ -40,8 +40,11 @@ runApiServer <- function(
     # VALIDATE
     #
 
+    fct_setUpLogger()
+    ParallelLogger::logInfo("Starting ROMOPAPI API server")
+
     if (is.null(cohortTableHandlerConfig)) {
-        message("No path to database config provided. Using the test counts only database.")
+        ParallelLogger::logInfo("No path to database config provided. Using the test counts only database.")
         # if not provided, use the test counts only database
         test_databasesConfig <- HadesExtras_readAndParseYaml(
             pathToYalmFile = system.file("testdata", "config", "onlyCounts_databasesConfig.yml", package = "ROMOPAPI"),
@@ -58,6 +61,7 @@ runApiServer <- function(
     }
 
     if (buildCountsTable == TRUE) {
+        ParallelLogger::logInfo("Building code counts tables")
         createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts")
     }
 
