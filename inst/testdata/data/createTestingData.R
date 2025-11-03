@@ -8,7 +8,8 @@ conceptIds <- c(
     317009, # Snomed: Asthma
     45596282, # ICD10: Asthma
     21601855, # ATC level 4: C10AA (Statins)
-    2010001615 # test endpoint
+    #2010001615, # test endpoint
+    320136 # Big graph, parent of Asthma snomed concept (Disorders of the respiratory system)
 )
 
 CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
@@ -45,3 +46,4 @@ dplyr::tbl(connection, "stratified_code_counts") |>
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_gt(0)
+
