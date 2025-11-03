@@ -20,17 +20,21 @@
 <url><loc>/reference/create_api.html</loc></url>
 <url><loc>/reference/dot-cleanConceptNameForMermaid.html</loc></url>
 <url><loc>/reference/dot-conceptIdToRGB.html</loc></url>
+<url><loc>/reference/dot-createConsoleAppenderForSandboxLogging.html</loc></url>
 <url><loc>/reference/dot-familyTreeToAncestorTable.html</loc></url>
+<url><loc>/reference/fct_setUpLogger.html</loc></url>
 <url><loc>/reference/getCDMSource.html</loc></url>
 <url><loc>/reference/getCodeCounts.html</loc></url>
 <url><loc>/reference/getCodeCounts_memoise.html</loc></url>
 <url><loc>/reference/getConceptsWithCodeCounts.html</loc></url>
 <url><loc>/reference/getConceptsWithCodeCounts_memoise.html</loc></url>
+<url><loc>/reference/getLogs.html</loc></url>
 <url><loc>/reference/helper_FinnGen_getDatabaseFile.html</loc></url>
 <url><loc>/reference/helper_FinnGen_getDatabaseFileCounts.html</loc></url>
 <url><loc>/reference/helper_createSqliteDatabaseFromDatabase.html</loc></url>
 <url><loc>/reference/index.html</loc></url>
 <url><loc>/reference/pruneLevelsFromResults.html</loc></url>
 <url><loc>/reference/runApiServer.html</loc></url>
+<url><loc>/reference/sendFeedback.html</loc></url>
 </urlset>
 
