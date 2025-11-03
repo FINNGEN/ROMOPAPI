@@ -13,8 +13,8 @@ BQ5k:
           bigint: integer64
       tempEmulationSchema: atlas-development-270609.sandbox
     cdm:
-        cdmDatabaseSchema: atlas-development-270609.finngen_omop_r13_v3
-        vocabularyDatabaseSchema: atlas-development-270609.finngen_omop_r13_v3
+        cdmDatabaseSchema: atlas-development-270609.finngen_omop_r13_v3_5k
+        vocabularyDatabaseSchema: atlas-development-270609.finngen_omop_r13_v3_5k
         resultsDatabaseSchema: atlas-development-270609.sandbox
     cohortTable:
         cohortDatabaseSchema: atlas-development-270609.sandbox
