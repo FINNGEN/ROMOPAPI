@@ -173,7 +173,9 @@ getCodeCounts <- function(
             dplyr::distinct(concept_id, maps_to_concept_id) |>
             dplyr::rename(maps_to_concept_id = concept_id, concept_id = maps_to_concept_id) |>
             dplyr::mutate(levels = "Maps to")
-    )
+    ) |> 
+    # If concept maps to itself, bcs concept in concept and source concept columns, dont take it
+    dplyr::filter(concept_id != maps_to_concept_id)
 
     familyTreeWithMappings <- dplyr::bind_rows(
         familyTreeWithInfo,
@@ -194,7 +196,9 @@ getCodeCounts <- function(
         codeCounts |> dplyr::select(-maps_to_concept_id) |> 
             dplyr::group_by(concept_id, calendar_year, gender_concept_id, age_decile) |>
             dplyr::summarise(record_counts = sum(record_counts), .groups = "drop")
-    ) 
+    )  |> 
+    # If concept maps to itself, bcs concept in concept and source concept columns, dont take it
+    dplyr::distinct()
 
     familyTreeDescendants <- familyTreeWithMappings |>
         dplyr::filter(!levels %in% c("Mapped from", "Maps to", "-1", "0")) |>

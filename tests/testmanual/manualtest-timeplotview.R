@@ -17,7 +17,7 @@ conceptId <- 782748
 
 conceptId <- 21602735
 
-conceptId <- 2010001615 # test endpoint
+conceptId <- 44500401 # test endpoint
 
 
 results <- getCodeCounts(
@@ -25,7 +25,6 @@ results <- getCodeCounts(
     conceptId = conceptId, 
     codeCountsTable = "code_counts"
 )
-
 
 createMermaidGraphFromResults(results) |> clipr::write_clip()
 

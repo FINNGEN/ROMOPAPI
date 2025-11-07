@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev li
 
 # Install renv and restore packages
 ARG ROMOPAPI_BRANCH=main
-ARG BUILD_CACHE_BUSTER=1
+ARG BUILD_CACHE_BUSTER=2
 
 # Install renv and restore packages
 RUN --mount=type=secret,id=build_github_pat \
