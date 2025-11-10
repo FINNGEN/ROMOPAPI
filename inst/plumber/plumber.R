@@ -45,10 +45,10 @@ function(res, conceptId=0L) {
 }
 
 
-#* Get the CDM source information
-#* @get /getCDMSource
+#* Get the API information
+#* @get /getAPIInfo
 function() {
-  getCDMSource(
+  getAPIInfo(
     CDMdbHandler = CDMdbHandler
   )
 }
