@@ -8,8 +8,10 @@ conceptIds <- c(
     317009, # Snomed: Asthma
     45596282, # ICD10: Asthma
     21601855, # ATC level 4: C10AA (Statins)
-    #2010001615, # test endpoint
-    320136 # Big graph, parent of Asthma snomed concept (Disorders of the respiratory system)
+    2010001618, # test endpoint
+    2010001635, # test endpoint not data
+    320136, # Big graph, parent of Asthma snomed concept (Disorders of the respiratory system)
+    4024567# biger
 )
 
 CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
