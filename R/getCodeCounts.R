@@ -106,7 +106,9 @@ getCodeCounts <- function(
     )
     -- take only parents who are someones children, or are the parents  of the concept id
     SELECT * FROM temp_tree tt
-    WHERE parent_concept_id IN (SELECT DISTINCT child_concept_id FROM temp_tree ) OR child_concept_id IN (@conceptId)
+    WHERE parent_concept_id IN (SELECT DISTINCT child_concept_id FROM temp_tree ) OR 
+      child_concept_id IN (@conceptId) OR
+      parent_concept_id IN (@conceptId) -- when concept is top in tree
     "
 
     # Gets tree of descendants and the code counts for each descendant
@@ -173,7 +175,9 @@ getCodeCounts <- function(
             dplyr::distinct(concept_id, maps_to_concept_id) |>
             dplyr::rename(maps_to_concept_id = concept_id, concept_id = maps_to_concept_id) |>
             dplyr::mutate(levels = "Maps to")
-    )
+    ) |> 
+    # If concept maps to itself, bcs concept in concept and source concept columns, dont take it
+    dplyr::filter(concept_id != maps_to_concept_id)
 
     familyTreeWithMappings <- dplyr::bind_rows(
         familyTreeWithInfo,
@@ -194,7 +198,9 @@ getCodeCounts <- function(
         codeCounts |> dplyr::select(-maps_to_concept_id) |> 
             dplyr::group_by(concept_id, calendar_year, gender_concept_id, age_decile) |>
             dplyr::summarise(record_counts = sum(record_counts), .groups = "drop")
-    ) 
+    )  |> 
+    # If concept maps to itself, bcs concept in concept and source concept columns, dont take it
+    dplyr::distinct()
 
     familyTreeDescendants <- familyTreeWithMappings |>
         dplyr::filter(!levels %in% c("Mapped from", "Maps to", "-1", "0")) |>

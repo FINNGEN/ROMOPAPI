@@ -8,8 +8,8 @@ conceptIds <- c(
     317009, # Snomed: Asthma
     45596282, # ICD10: Asthma
     21601855, # ATC level 4: C10AA (Statins)
-    #2010001615, # test endpoint
-    320136 # Big graph, parent of Asthma snomed concept (Disorders of the respiratory system)
+    320136, # Big graph, parent of Asthma snomed concept (Disorders of the respiratory system)
+    4024567# biger
 )
 
 CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
@@ -25,7 +25,7 @@ connection  <- DatabaseConnector::connect(DatabaseConnector::createConnectionDet
 
 DatabaseConnector::dbListTables(connection) |> 
     sort() |>
-    expect_equal(c("code_counts", "concept", "concept_ancestor", "stratified_code_counts"))
+    expect_equal(c("cdm_source", "code_counts", "concept", "concept_ancestor", "stratified_code_counts"))
 
 dplyr::tbl(connection, "concept") |>
     dplyr::count() |>
@@ -43,6 +43,11 @@ dplyr::tbl(connection, "code_counts") |>
     expect_gt(0)
 
 dplyr::tbl(connection, "stratified_code_counts") |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
+
+dplyr::tbl(connection, "cdm_source") |>
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_gt(0)

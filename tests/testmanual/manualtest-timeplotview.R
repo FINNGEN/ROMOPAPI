@@ -17,7 +17,7 @@ conceptId <- 782748
 
 conceptId <- 21602735
 
-conceptId <- 2010001615 # test endpoint
+conceptId <- 2010001618 # test endpoint
 
 
 results <- getCodeCounts(

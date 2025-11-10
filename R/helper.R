@@ -237,6 +237,23 @@ helper_createSqliteDatabaseFromDatabase <- function(
     tempTable = FALSE,
   )
 
+  # get CDMsource 
+  sql <- "SELECT DISTINCT c.* FROM @vocabularyDatabaseSchema.cdm_source c"
+  cdmSource <- DatabaseConnector::renderTranslateQuerySql(
+    connection = sourceConnection,
+    sql = sql,
+    vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema
+  ) |>
+    tibble::as_tibble()
+
+  targetConnection |> DatabaseConnector::insertTable(
+    tableName = "cdm_source",
+    data = cdmSource,
+    dropTableIfExists = TRUE,
+    createTable = TRUE,
+    tempTable = FALSE,
+  )
+
   # disconnect
   targetConnection |> DatabaseConnector::disconnect()
   sourceConnection |> DatabaseConnector::disconnect()
