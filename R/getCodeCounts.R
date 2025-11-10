@@ -106,7 +106,9 @@ getCodeCounts <- function(
     )
     -- take only parents who are someones children, or are the parents  of the concept id
     SELECT * FROM temp_tree tt
-    WHERE parent_concept_id IN (SELECT DISTINCT child_concept_id FROM temp_tree ) OR child_concept_id IN (@conceptId)
+    WHERE parent_concept_id IN (SELECT DISTINCT child_concept_id FROM temp_tree ) OR 
+      child_concept_id IN (@conceptId) OR
+      parent_concept_id IN (@conceptId) -- when concept is top in tree
     "
 
     # Gets tree of descendants and the code counts for each descendant
