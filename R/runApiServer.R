@@ -65,6 +65,11 @@ runApiServer <- function(
         createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts")
     }
 
+    # Call getConceptsWithCodeCounts, to populate the cache
+    ParallelLogger::logInfo("Populating cache with concepts with code counts")
+    getConceptsWithCodeCounts_memoise(CDMdbHandler)
+
+
     # Create plumber router
     pathToPlumberFile <- system.file("plumber", "plumber.R", package = "ROMOPAPI")
 

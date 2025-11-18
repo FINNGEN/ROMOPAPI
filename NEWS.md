@@ -1,3 +1,6 @@
+# ROMOPAPI 2.1.1
+- Added caching concepts with code counts at startup
+
 # ROMOPAPI 2.1.0
 - Added getAPIInfo endpoint to API
 - Updated db with large tree
