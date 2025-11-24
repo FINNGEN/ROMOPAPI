@@ -14,6 +14,8 @@ conceptIds <- c(
 )
 
 CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+# uncomment to create code counts tables
+createCodeCountsTables(CDMdbHandler)
 helper_createSqliteDatabaseFromDatabase(
     CDMdbHandler,
     conceptIds = conceptIds,
