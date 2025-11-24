@@ -1,3 +1,7 @@
+# ROMOPAPI 
+- Added number_of_descendants to concepts with code counts
+- Added conceptId 21600744 to testing data
+
 # ROMOPAPI 2.1.1
 - Added caching concepts with code counts at startup
 
