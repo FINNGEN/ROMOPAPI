@@ -113,7 +113,8 @@ test_that("createCodeCountsTables works", {
     expect_equal(c(
       "concept_id",
       "record_counts",
-      "descendant_record_counts"
+      "descendant_record_counts",
+      "number_of_descendants"
     ))
 
   # check that descendant_record_counts is greater than or equal to record_counts
@@ -129,4 +130,27 @@ test_that("createCodeCountsTables works", {
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_equal(code_counts |> dplyr::count() |> dplyr::pull(n))
+
+  # check that number_of_descendants is greater than or equal to 1
+  code_counts |>
+    dplyr::filter(number_of_descendants < 1) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # check that all with record_counts = descendant_record_counts have  number_of_descendants = 1
+  code_counts |>
+    dplyr::filter(record_counts == descendant_record_counts) |>
+    dplyr::filter(number_of_descendants != 1) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # check that all with number_of_descendants > 1 have record_counts > descendant_record_counts
+  code_counts |>
+    dplyr::filter(number_of_descendants > 1) |>
+    dplyr::filter(record_counts > descendant_record_counts) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
 })

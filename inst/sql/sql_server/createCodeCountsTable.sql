@@ -3,7 +3,8 @@ DROP TABLE IF EXISTS @resultsDatabaseSchema.@codeCountsTable;
 CREATE TABLE @resultsDatabaseSchema.@codeCountsTable (
   concept_id int,
   record_counts int,
-  descendant_record_counts int
+  descendant_record_counts int,
+  number_of_descendants int
 );
 
 INSERT INTO @resultsDatabaseSchema.@codeCountsTable 
@@ -57,7 +58,8 @@ descendant_counts AS (
     SELECT 
         ca.ancestor_concept_id AS concept_id,
         COALESCE(cc.record_counts, 0) AS record_counts,
-        SUM(COALESCE(cctosum.record_counts, 0)) AS descendant_record_counts
+        SUM(COALESCE(cctosum.record_counts, 0)) AS descendant_record_counts,
+        COUNT(*) AS number_of_descendants
     FROM
         temp_concept_ancestor ca 
     INNER JOIN
@@ -77,6 +79,7 @@ descendant_counts AS (
 SELECT 
     CAST(ccd.concept_id AS BIGINT) AS concept_id,
     CAST(ccd.record_counts AS BIGINT) AS record_counts,
-    CAST(ccd.descendant_record_counts AS BIGINT) AS descendant_record_counts
+    CAST(ccd.descendant_record_counts AS BIGINT) AS descendant_record_counts,
+    CAST(ccd.number_of_descendants AS BIGINT) AS number_of_descendants
 FROM
     descendant_counts ccd;
