@@ -18,7 +18,7 @@ test_that("getConceptsWithCodeCounts works", {
   # Check column names match expected structure
   expected_columns <- c("concept_id", "concept_name", "domain_id", "vocabulary_id", 
                        "concept_class_id", "standard_concept", "concept_code", 
-                       "record_counts", "descendant_record_counts")
+                       "record_counts", "descendant_record_counts", "number_of_descendants")
   
   result |>
     colnames() |>
