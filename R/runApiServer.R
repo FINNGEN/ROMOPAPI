@@ -8,7 +8,7 @@
 #' @param cohortTableHandlerConfig Configuration for connecting to the OMOP CDM database.
 #'   If NULL, uses test Eunomia database
 #' @param host Host address to run the API server on. Defaults to "127.0.0.1"
-#' @param port Port number to run the API server on. Defaults to 8585
+#' @param port Port number to run the API server on. Defaults to 8564
 #' @param buildCountsTable Logical indicating whether to build code counts tables. Defaults to FALSE
 #' @param ... Additional arguments passed to plumber::pr_run()
 #'
@@ -33,7 +33,7 @@
 runApiServer <- function(
     cohortTableHandlerConfig = NULL,
     host = "127.0.0.1",
-    port = 8585,
+    port = 8564,
     buildCountsTable = FALSE,
     ...) {
     #

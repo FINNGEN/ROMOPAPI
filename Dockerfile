@@ -22,18 +22,18 @@ RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev li
 
 # Install renv and restore packages
 ARG ROMOPAPI_BRANCH=main
-ARG BUILD_CACHE_BUSTER=3
+ARG BUILD_CACHE_BUSTER=5
 
 # Install renv and restore packages
 RUN --mount=type=secret,id=build_github_pat \
     cp /usr/local/lib/R/etc/Renviron /tmp/Renviron \
     && echo "GITHUB_PAT=$(cat /run/secrets/build_github_pat)" >> /usr/local/lib/R/etc/Renviron \
     && Rscript -e 'install.packages("remotes")' \
-    && Rscript -e 'remotes::install_github("FINNGEN/ROMOPAPI")' \
+    && Rscript -e 'remotes::install_github("FINNGEN/ROMOPAPI@'$ROMOPAPI_BRANCH'")' \
     && cp /tmp/Renviron /usr/local/lib/R/etc/Renviron;
 
 # Expose the port that the API will run on
-EXPOSE 8585
+EXPOSE 8564
 
 # Run the API server
-CMD ["Rscript", "-e", "ROMOPAPI::runApiServer(host = '0.0.0.0', port = 8585)"] 
+CMD ["Rscript", "-e", "ROMOPAPI::runApiServer(host = '0.0.0.0', port = 8564)"] 

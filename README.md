@@ -26,19 +26,19 @@ library(ROMOPAPI)
 runApiServer()
 ```
 
-This will start the API server on port 8585.
+This will start the API server on port 8564.
 
 #### Testing endpoints
 
-The main endpoint for testing is: http://127.0.0.1:8585/report?conceptId=<concept_id>
+The main endpoint for testing is: http://127.0.0.1:8564/report?conceptId=<concept_id>
 
-For example, http://127.0.0.1:8585/report?conceptId=317009
+For example, http://127.0.0.1:8564/report?conceptId=317009
 
 This will return an HTML report for the concept id 317009.
 
 #### Production endpoints
 
-The main endpoint for production is: http://127.0.0.1:8585/getCodeCounts?conceptId=<concept_id>
+The main endpoint for production is: http://127.0.0.1:8564/getCodeCounts?conceptId=<concept_id>
 
 This will return the code counts for the concept ids 317009.
 
@@ -49,7 +49,7 @@ Separated in 3 tables:
 - `stratified_code_counts`: patient counts by conceptId stratified by gender, year, and age decile
 
 
-See the API documentation for more details: http://127.0.0.1:8585/__docs__/
+See the API documentation for more details: http://127.0.0.1:8564/__docs__/
 
 ### Running the API Server with a custom database
 
@@ -143,7 +143,7 @@ Based on the example output, getCodeCounts returns a list with 3 components:
 Existing docker image is available at: https://hub.docker.com/repository/docker/javiergrata/romopapi/
 
 ```
-docker run -p 8585:8585 javiergrata/romopapi
+docker run -p 8564:8564 javiergrata/romopapi
 ```
 
 ## Build the docker image
@@ -163,7 +163,7 @@ docker build --secret id=build_github_pat,src=GITHUBPAT.txt --build-arg ROMOPAPI
 ## Run the docker container
 
 ```
-docker run -p 8585:8585 romopapi
+docker run -p 8564:8564 romopapi
 ```
 
 
