@@ -47,7 +47,7 @@ getConceptsWithCodeCounts <- function(
     SELECT DISTINCT 
         c.concept_id, 
         c.concept_name, c.domain_id, c.vocabulary_id, c.concept_class_id, c.standard_concept, c.concept_code,
-        cc.record_counts, cc.descendant_record_counts
+        cc.record_counts, cc.descendant_record_counts, cc.number_of_descendants
        FROM @vocabularyDatabaseSchema.concept c
        INNER JOIN @resultsDatabaseSchema.@codeCountsTable cc
        ON c.concept_id = cc.concept_id;"

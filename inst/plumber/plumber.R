@@ -58,7 +58,7 @@ function() {
 function() {
   concepts <- getConceptsWithCodeCounts_memoise(CDMdbHandler = CDMdbHandler)
   concepts <- concepts |>
-    dplyr::select(concept_id, concept_name, vocabulary_id, concept_code)
+    dplyr::select(concept_id, concept_name, vocabulary_id, concept_code, number_of_descendants)
   return(concepts)
 }
 

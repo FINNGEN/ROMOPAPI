@@ -9,10 +9,13 @@ conceptIds <- c(
     45596282, # ICD10: Asthma
     21601855, # ATC level 4: C10AA (Statins)
     320136, # Big graph, parent of Asthma snomed concept (Disorders of the respiratory system)
-    4024567# biger
+    4024567,# biger
+    21600744 # bug in plot
 )
 
 CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+# uncomment to create code counts tables
+createCodeCountsTables(CDMdbHandler)
 helper_createSqliteDatabaseFromDatabase(
     CDMdbHandler,
     conceptIds = conceptIds,

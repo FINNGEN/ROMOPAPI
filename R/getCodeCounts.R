@@ -236,7 +236,8 @@ getCodeCounts <- function(
         dplyr::rename(node_record_counts = record_counts, node_descendant_record_counts = descendant_record_counts)
 
     # - Get concept details
-    conceptsWithCodeCounts <- getConceptsWithCodeCounts_memoise(CDMdbHandler, codeCountsTable = codeCountsTable)
+    conceptsWithCodeCounts <- getConceptsWithCodeCounts_memoise(CDMdbHandler, codeCountsTable = codeCountsTable) |> 
+        dplyr::select(-number_of_descendants)
     concepts <- familyTreeWithMappings |>
         dplyr::distinct(child_concept_id) |>
         dplyr::rename(concept_id = child_concept_id) |>
