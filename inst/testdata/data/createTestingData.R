@@ -1,5 +1,5 @@
 # Get connection
-Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-DBI")
+Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-full")
 Sys.setenv(BUILD_COUNTS_TABLE = "FALSE")
 source("tests/testthat/setup.R")
 

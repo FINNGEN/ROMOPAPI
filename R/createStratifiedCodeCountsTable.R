@@ -41,7 +41,9 @@
 createStratifiedCodeCountsTable <- function(
     CDMdbHandler,
     domains = NULL, 
-    stratifiedCodeCountsTable = "stratified_code_counts") {
+    stratifiedCodeCountsTable = "stratified_code_counts", 
+    visitSourceGroupConceptIds = 0
+    ) {
     #
     # VALIDATE
     #
@@ -50,6 +52,7 @@ createStratifiedCodeCountsTable <- function(
     vocabularyDatabaseSchema <- CDMdbHandler$vocabularyDatabaseSchema
     cdmDatabaseSchema <- CDMdbHandler$cdmDatabaseSchema
     resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+
 
     if (is.null(domains)) {
         domains <- tibble::tribble(
@@ -80,6 +83,7 @@ createStratifiedCodeCountsTable <- function(
     CREATE TABLE @resultsDatabaseSchema.@stratifiedCodeCountsTable (
         concept_id INTEGER,
         maps_to_concept_id INTEGER,
+        visit_group_concept_id INTEGER,
         calendar_year INTEGER,
         gender_concept_id INTEGER,
         age_decile INTEGER,
@@ -102,7 +106,8 @@ createStratifiedCodeCountsTable <- function(
             table_name = domain$table_name,
             concept_id_field = domain$concept_id_field,
             date_field = domain$date_field,
-            maps_to_concept_id_field = domain$maps_to_concept_id_field
+            maps_to_concept_id_field = domain$maps_to_concept_id_field, 
+            visit_group_concept_ids = paste0(visitSourceGroupConceptIds, collapse = ", ")
         )
 
         sql <- SqlRender::translate(sql, targetDialect = connection@dbms)

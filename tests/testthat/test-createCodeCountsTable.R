@@ -2,7 +2,10 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
   # only works in a full CDM database
   skip_if(testingDatabase == "OnlyCounts-FinnGen")
 
-  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
   withr::defer({
     CDMdbHandler <- NULL
     gc()
@@ -12,27 +15,40 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
   resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
 
   withr::defer({
-    CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable))
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ",
+      resultsDatabaseSchema,
+      ".",
+      stratifiedCodeCountsTable
+    ))
   })
 
-  domain  <- tibble::tribble(
-    ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
-    "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date", "condition_source_concept_id"
+  domain <- tibble::tribble(
+    ~domain_id  , ~table_name            , ~concept_id_field      , ~date_field            , ~maps_to_concept_id_field     ,
+    "Condition" , "condition_occurrence" , "condition_concept_id" , "condition_start_date" , "condition_source_concept_id"
   )
 
   # codeAtomicCountsWithDuplicatedCounts
   suppressWarnings(
-    createStratifiedCodeCountsTable(CDMdbHandler, domains = domain, stratifiedCodeCountsTable = stratifiedCodeCountsTable)
+    createStratifiedCodeCountsTable(
+      CDMdbHandler,
+      domains = domain,
+      stratifiedCodeCountsTable = stratifiedCodeCountsTable
+    )
   )
 
-  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(resultsDatabaseSchema, ".", stratifiedCodeCountsTable)))
+  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    resultsDatabaseSchema,
+    ".",
+    stratifiedCodeCountsTable
+  )))
 
-  # check that the table was created 
+  # check that the table was created
   stratifiedCodeCounts |>
-   dplyr::count() |>
-   dplyr::pull(n) |>
-   expect_gt(0)
-   
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
+
   # check that the table was created with correct columns
   stratifiedCodeCounts |>
     head() |>
@@ -41,6 +57,100 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
     expect_equal(c(
       "concept_id",
       "maps_to_concept_id",
+      "visit_group_concept_id",
+      "calendar_year",
+      "gender_concept_id",
+      "age_decile",
+      "record_counts"
+    ))
+})
+
+test_that("createStratifiedCodeCountsTable works with visit_source_group_concept_ids", {
+  # only works in a full CDM database
+  skip_if(testingDatabase == "OnlyCounts-FinnGen")
+
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
+  withr::defer({
+    CDMdbHandler <- NULL
+    gc()
+  })
+
+  stratifiedCodeCountsTable <- "stratified_code_counts_test0"
+  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+
+  withr::defer({
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ",
+      resultsDatabaseSchema,
+      ".",
+      stratifiedCodeCountsTable
+    ))
+  })
+
+  domain <- tibble::tribble(
+    ~domain_id  , ~table_name            , ~concept_id_field      , ~date_field            , ~maps_to_concept_id_field     ,
+    "Condition" , "condition_occurrence" , "condition_concept_id" , "condition_start_date" , "condition_source_concept_id"
+  )
+
+  visitSourceGroupConceptIds = c(
+    # longitudinal
+    2002330246, # INPAT
+    2002330247, # OPER_IN
+    2002330248, # OPER_OUT
+    2002330249, # OUTPAT
+    2002330250, # PRIM_OUT
+    2002330102, # REIM
+    2002330104, # DEATH
+    2002330101, # PURCH
+    2002330103, # CANC
+    # registers
+    2002330245, # KANTA
+    2002330106, # BIOBANK
+    2002330186, # KIDNEY
+    2002330119, # VISION
+    2002330105, # BIRTH_MOTHER
+    # Drugs
+    2002330251, # PRESCRIPTION
+    2002330252, # DELIVERY
+    2002330253, # PRESCRIPTION_DELIVERY
+    2002330254, # DELIVERY_KELA
+    2002330255 # PRESCRIPTION_DELIVERY_KELA
+  )
+
+  # codeAtomicCountsWithDuplicatedCounts
+  suppressWarnings(
+    createStratifiedCodeCountsTable(
+      CDMdbHandler,
+      domains = domain,
+      stratifiedCodeCountsTable = stratifiedCodeCountsTable,
+      visitSourceGroupConceptIds = visitSourceGroupConceptIds
+    )
+  )
+
+  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    resultsDatabaseSchema,
+    ".",
+    stratifiedCodeCountsTable
+  )))
+
+  # check that the table was created
+  stratifiedCodeCounts |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
+
+  # check that the table was created with correct columns
+  stratifiedCodeCounts |>
+    head() |>
+    dplyr::collect() |>
+    colnames() |>
+    expect_equal(c(
+      "concept_id",
+      "maps_to_concept_id",
+      "visit_group_concept_id",
       "calendar_year",
       "gender_concept_id",
       "age_decile",
@@ -76,12 +186,14 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
 #     expect_gt(0)
 # })
 
-
 test_that("createCodeCountsTables works", {
   # only works in a full CDM database
   skip_if(testingDatabase == "OnlyCounts-FinnGen")
 
-  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
   withr::defer({
     CDMdbHandler <- NULL
     gc()
@@ -90,8 +202,18 @@ test_that("createCodeCountsTables works", {
   codeCountsTable <- "code_counts_test0"
   stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
   withr::defer({
-    CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", codeCountsTable))
-    CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable))
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ",
+      resultsDatabaseSchema,
+      ".",
+      codeCountsTable
+    ))
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ",
+      resultsDatabaseSchema,
+      ".",
+      stratifiedCodeCountsTable
+    ))
   })
 
   createCodeCountsTables(CDMdbHandler, codeCountsTable = codeCountsTable)
@@ -99,7 +221,11 @@ test_that("createCodeCountsTables works", {
   # - Check if the table was created
   resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
   cdmDatabaseSchema <- CDMdbHandler$cdmDatabaseSchema
-  code_counts <- CDMdbHandler$connectionHandler$tbl(I(paste0(resultsDatabaseSchema, ".", codeCountsTable)))
+  code_counts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    resultsDatabaseSchema,
+    ".",
+    codeCountsTable
+  )))
 
   # check that the table was created with correct columns
   code_counts |>

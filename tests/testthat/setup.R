@@ -3,14 +3,15 @@
 #
 
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-GiBleed")
-# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-DBI")
+# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-MIMIC")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen")
-# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "OnlyCounts-FinnGen")
+# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-5k")
+# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-full")
 testingDatabase <- Sys.getenv("HADESEXTAS_TESTING_ENVIRONMENT")
 buildCountsTable <- Sys.getenv("BUILD_COUNTS_TABLE")
 
 # check correct settings
-possibleDatabases <- c("Eunomia-GiBleed", "Eunomia-MIMIC", "AtlasDevelopment-DBI", "Eunomia-FinnGen", "OnlyCounts-FinnGen")
+possibleDatabases <- c("Eunomia-GiBleed", "Eunomia-MIMIC", "Eunomia-FinnGen", "AtlasDevelopment-5k", "AtlasDevelopment-full", "OnlyCounts-FinnGen")
 if (!(testingDatabase %in% possibleDatabases)) {
   message("Please set a valid testing environment in envar HADESEXTAS_TESTING_ENVIRONMENT, from: ", paste(possibleDatabases, collapse = ", "))
   stop()
@@ -26,10 +27,10 @@ if (! buildCountsTable %in% c("TRUE", "FALSE")) {
 #
 if (testingDatabase |> stringr::str_starts("OnlyCounts-FinnGen")) {
   test_databasesConfig <- HadesExtras_readAndParseYaml(
-    pathToYalmFile = system.file("testdata", "config", "onlyCounts_databasesConfig.yml", package = "ROMOPAPI"), 
+    pathToYalmFile = system.file("testdata", "config", "databasesConfig.yml", package = "ROMOPAPI"), 
     pathToFinnGenCountsSqlite = helper_FinnGen_getDatabaseFileCounts()
   )
-  test_cohortTableHandlerConfig <- test_databasesConfig[[1]]$cohortTableHandler
+  test_cohortTableHandlerConfig <- test_databasesConfig$FC$cohortTableHandler
 
   buildCountsTable <- "FALSE"
 }
@@ -43,34 +44,27 @@ if (testingDatabase |> stringr::str_starts("Eunomia")) {
     stop()
   }
 
-  pathToGiBleedEunomiaSqlite <- ""
-  pathToMIMICEunomiaSqlite <- ""
-  pathToFinnGenEunomiaSqlite <- ""
-  if (testingDatabase |> stringr::str_ends("GiBleed")) {
-    pathToGiBleedEunomiaSqlite <- Eunomia::getDatabaseFile("GiBleed", overwrite = FALSE)
-  }
-  if (testingDatabase |> stringr::str_ends("MIMIC")) {
-    pathToMIMICEunomiaSqlite <- Eunomia::getDatabaseFile("MIMIC", overwrite = FALSE)
-  }
-  if (testingDatabase |> stringr::str_ends("FinnGen")) {
-    pathToFinnGenEunomiaSqlite <- helper_FinnGen_getDatabaseFile()
-  }
+  pathToGiBleedEunomiaSqlite <- Eunomia::getDatabaseFile("GiBleed", overwrite = FALSE)
+  pathToMIMICEunomiaSqlite <- Eunomia::getDatabaseFile("MIMIC", overwrite = FALSE)
 
   test_databasesConfig <- HadesExtras_readAndParseYaml(
-    pathToYalmFile = system.file("testdata", "config", "eunomia_databasesConfig.yml", package = "ROMOPAPI"),
+    pathToYalmFile = system.file("testdata", "config", "databasesConfig.yml", package = "ROMOPAPI"),
     pathToGiBleedEunomiaSqlite = pathToGiBleedEunomiaSqlite,
     pathToMIMICEunomiaSqlite = pathToMIMICEunomiaSqlite,
-    pathToFinnGenEunomiaSqlite = pathToFinnGenEunomiaSqlite
+    pathToFinnGenEunomiaSqlite = helper_FinnGen_getDatabaseFile()
   )
 
   if (testingDatabase |> stringr::str_ends("GiBleed")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig[[1]]$cohortTableHandler
+    test_cohortTableHandlerConfig <- test_databasesConfig$E1$cohortTableHandler
   }
   if (testingDatabase |> stringr::str_ends("MIMIC")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig[[2]]$cohortTableHandler
+    test_cohortTableHandlerConfig <- test_databasesConfig$E2$cohortTableHandler
   }
   if (testingDatabase |> stringr::str_ends("FinnGen")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig[[3]]$cohortTableHandler
+    test_cohortTableHandlerConfig <- test_databasesConfig$E3$cohortTableHandler
+  }
+  if (testingDatabase |> stringr::str_ends("FinnGen")) {
+    test_cohortTableHandlerConfig <- test_databasesConfig$E4$cohortTableHandler
   }
 }
 
@@ -78,7 +72,7 @@ if (testingDatabase |> stringr::str_starts("Eunomia")) {
 #
 # AtlasDevelopmet-DBI Database
 #
-if (testingDatabase %in% c("AtlasDevelopment-DBI")) {
+if (testingDatabase |> stringr::str_starts("AtlasDevelopment")) {
   if (Sys.getenv("GCP_SERVICE_KEY") == "") {
     message("GCP_SERVICE_KEY not set. Please set this environment variable to the path of the GCP service key.")
     stop()
@@ -87,12 +81,16 @@ if (testingDatabase %in% c("AtlasDevelopment-DBI")) {
   bigrquery::bq_auth(path = Sys.getenv("GCP_SERVICE_KEY"))
 
   test_databasesConfig <- HadesExtras_readAndParseYaml(
-    pathToYalmFile = system.file("testdata", "config", "atlasDev_databasesConfig.yml", package = "ROMOPAPI")
+    pathToYalmFile = system.file("testdata", "config", "databasesConfig.yml", package = "ROMOPAPI")
   )
 
-  test_cohortTableHandlerConfig <- test_databasesConfig[[2]]$cohortTableHandler
+  if (testingDatabase |> stringr::str_ends("5k")) {
+    test_cohortTableHandlerConfig <- test_databasesConfig$BQ5k$cohortTableHandler
+  }
+  if (testingDatabase |> stringr::str_ends("full")) {
+    test_cohortTableHandlerConfig <- test_databasesConfig$BQfull$cohortTableHandler
+  }
 }
-
 
 
 #
