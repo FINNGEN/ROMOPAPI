@@ -126,3 +126,9 @@ function(res, feedback = "") {
   res$status <- 200
   return(list(message = "Feedback sent"))
 }
+
+#* Get the list of visit type names
+#* @get /getVisitTypeNames
+function() {
+  getVisitTypeNames_memoise(CDMdbHandler = CDMdbHandler)
+}
