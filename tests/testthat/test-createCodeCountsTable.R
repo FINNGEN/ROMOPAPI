@@ -1,6 +1,6 @@
 test_that("createStratifiedCodeCountsTable works with duplicated counts", {
   # only works in a full CDM database
-  skip_if(testingDatabase == "AtlasDevelopment-5k")
+  skip_if(testingDatabase != "AtlasDevelopment-5k")
 
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
     test_cohortTableHandlerConfig,
@@ -74,7 +74,7 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
 
 test_that("createStratifiedCodeCountsTable works with visit_source_group_concept_ids", {
   # only works in a full CDM database
-  skip_if(testingDatabase == "AtlasDevelopment-5k")
+  skip_if(testingDatabase != "AtlasDevelopment-5k")
 
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
     test_cohortTableHandlerConfig,
@@ -182,7 +182,7 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
 
 test_that("createStratifiedCodeCountsTable works with visit_source_group_concept_ids if one missing takes childern", {
   # only works in a full CDM database
-  skip_if(testingDatabase == "AtlasDevelopment-5k")
+  skip_if(testingDatabase != "AtlasDevelopment-5k")
 
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
     test_cohortTableHandlerConfig,
@@ -317,7 +317,7 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
 
 test_that("createCodeCountsTables works", {
   # only works in a full CDM database
-  skip_if(testingDatabase == "AtlasDevelopment-5k")
+  skip_if(testingDatabase != "AtlasDevelopment-5k")
 
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
     test_cohortTableHandlerConfig,
@@ -415,7 +415,7 @@ test_that("createCodeCountsTables works", {
 
 test_that("createCodeCountsTables works stratified by visit_group_concept_id", {
   # only works in a full CDM database
-  skip_if(testingDatabase == "AtlasDevelopment-5k")
+  skip_if(testingDatabase != "AtlasDevelopment-5k")
 
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
     test_cohortTableHandlerConfig,
