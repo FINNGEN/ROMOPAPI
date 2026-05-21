@@ -160,13 +160,21 @@ helper_createSqliteDatabaseFromDatabase <- function(
 
   # Get concept table
   sql <- "SELECT DISTINCT c.* FROM @vocabularyDatabaseSchema.concept c
-          WHERE c.concept_id IN (@conceptIdsToExtract)"
-
+          WHERE c.concept_id IN (@conceptIdsToExtract)
+          -- Include also the concepts in visit_group_concept_id in stratified_code_counts table
+          UNION
+          SELECT DISTINCT c.* FROM @vocabularyDatabaseSchema.concept c
+          JOIN @resultsDatabaseSchema.@stratifiedCodeCountsTable scc ON c.concept_id = scc.visit_group_concept_id
+          WHERE scc.concept_id IN (@conceptIdsToExtract) OR scc.maps_to_concept_id IN (@conceptIdsToExtract)
+          "
+  
   concept <- DatabaseConnector::renderTranslateQuerySql(
     connection = sourceConnection,
     sql = sql,
     vocabularyDatabaseSchema = sourceVocabularyDatabaseSchema,
-    conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ",")
+    conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ","),
+    resultsDatabaseSchema = sourceResultsDatabaseSchema,
+    stratifiedCodeCountsTable = paste0("stratified_", codeCountsTable)
   ) |>
     tibble::as_tibble()
 

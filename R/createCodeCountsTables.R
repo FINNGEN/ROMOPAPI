@@ -35,14 +35,16 @@
 #' \dontrun{
 #' # Create code counts table for all domains
 #' createCodeCountsTable(CDMdbHandler)
-#' 
+#'
 #' # Create code counts table for specific domains only
 #' createCodeCountsTable(CDMdbHandler, domains = c("Condition", "Drug"))
 #' }
 createCodeCountsTables <- function(
     CDMdbHandler,
-    domains = NULL, 
-    codeCountsTable = "code_counts") {
+    domains = NULL,
+    codeCountsTable = "code_counts",
+    visitSourceGroupConceptIds = 0
+) {
     #
     # VALIDATE
     #
@@ -58,13 +60,23 @@ createCodeCountsTables <- function(
 
     # - Create stratified code counts table
     stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
-    createStratifiedCodeCountsTable(CDMdbHandler, domains = domains, stratifiedCodeCountsTable = stratifiedCodeCountsTable)
-
+    createStratifiedCodeCountsTable(
+        CDMdbHandler,
+        domains = domains,
+        stratifiedCodeCountsTable = stratifiedCodeCountsTable,
+        visitSourceGroupConceptIds = visitSourceGroupConceptIds
+    )
 
     # - Create code counts table
-    sqlPath <- system.file("sql", "sql_server", "createCodeCountsTable.sql", package = "ROMOPAPI")
+    sqlPath <- system.file(
+        "sql",
+        "sql_server",
+        "createCodeCountsTable.sql",
+        package = "ROMOPAPI"
+    )
     sql <- SqlRender::readSql(sqlPath)
-    sql <- SqlRender::render(sql,
+    sql <- SqlRender::render(
+        sql,
         cdmDatabaseSchema = cdmDatabaseSchema,
         resultsDatabaseSchema = resultsDatabaseSchema,
         codeCountsTable = codeCountsTable,

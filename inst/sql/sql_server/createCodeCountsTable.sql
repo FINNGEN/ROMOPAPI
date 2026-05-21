@@ -43,7 +43,7 @@ temp_concept_ancestor AS (
          SUM(record_counts) AS record_counts
      FROM (
         SELECT DISTINCT
-            maps_to_concept_id, calendar_year, gender_concept_id, age_decile, record_counts
+            maps_to_concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile, record_counts
         FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable
         -- do not take if maps_to_concept_id is a standard concept
         WHERE concept_id != maps_to_concept_id
