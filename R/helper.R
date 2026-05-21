@@ -99,7 +99,6 @@ helper_FinnGen_getDatabaseFileCounts <- function() {
 
 
 
-
 #' Create SQLite database from CDM database
 #'
 #' @description

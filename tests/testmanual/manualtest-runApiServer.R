@@ -1,9 +1,7 @@
 
 
-databaseConfig <- yaml::read_yaml("inst/testdata/config/onlyCounts_databasesConfig.yml")
-
 ROMOPAPI::runApiServer(
-  cohortTableHandlerConfig = databaseConfig$cohortTableHandler,
+  cohortTableHandlerConfig = NULL,
   buildCountsTable = FALSE
 )
 
