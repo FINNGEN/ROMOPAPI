@@ -1,5 +1,6 @@
 # ROMOPAPI 2.3.0
-- Include stratification by visit
+- /getCodeCounts now retuns one more column `visit_group_concept_id` in `stratified_code_counts` table, this is the register they come from 
+- New endpoint /getVisitTypeNames returns a table with the names and codes for `visit_group_concept_id`s
 
 # ROMOPAPI 2.2.0
 - Added number_of_descendants to concepts with code counts
