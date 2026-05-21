@@ -85,7 +85,7 @@ if (testingDatabase |> stringr::str_starts("AtlasDevelopment")) {
   )
 
   if (testingDatabase |> stringr::str_ends("5k")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig$BQ5k$cohortTableHandler
+    test_cohortTableHandlerConfig <- test_databasesConfig$BQ5K$cohortTableHandler
   }
   if (testingDatabase |> stringr::str_ends("full")) {
     test_cohortTableHandlerConfig <- test_databasesConfig$BQfull$cohortTableHandler

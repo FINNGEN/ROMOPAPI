@@ -14,6 +14,9 @@ FROM (
         -- get all person_ids with the concept_id with in a valid observation period
         -- calculate the calendar year, gender_concept_id, age_decile
         -- calculate the min_calendar_year, used to find the first event in history  per code and person 
+        -- if visit_source_group_concept_ids are provided, calculate the visit_group_concept_id based on the given groups, 
+        --   if not on a given visit_group_concept_id keep the original visit_source_concept_id as visit_group_concept_id
+        --   if not event has a visit_occurrence_id or visit_source_concept_id, assign 0 as visit_group_concept_id
         SELECT 
                 p.person_id AS person_id,
                 t.@concept_id_field AS concept_id,
@@ -21,7 +24,7 @@ FROM (
                 YEAR(t.@date_field) AS calendar_year,
                 p.gender_concept_id AS gender_concept_id,
                 FLOOR((YEAR(t.@date_field) - p.year_of_birth) / 10) AS age_decile,
-                {@visit_group_concept_ids != 0} ? {vo.visit_source_concept_id} : {0} AS visit_group_concept_id
+                {@visit_group_concept_ids != 0} ? {COALESCE(vmap.visit_group_concept_id, vo.visit_source_concept_id)} : {0} AS visit_group_concept_id
         FROM
                 @cdmDatabaseSchema.person p
         JOIN 
@@ -37,11 +40,11 @@ FROM (
         AND 
                 t.@date_field <= op.observation_period_end_date
 {@visit_group_concept_ids != 0}?{
-        JOIN 
+        LEFT JOIN 
                 @cdmDatabaseSchema.visit_occurrence vo
         ON 
                 t.visit_occurrence_id = vo.visit_occurrence_id
-        JOIN (
+        LEFT JOIN (
                 SELECT 
                         ca.ancestor_concept_id AS visit_group_concept_id,
                         ca.descendant_concept_id AS visit_source_concept_id
