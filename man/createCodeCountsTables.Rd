@@ -7,7 +7,8 @@
 createCodeCountsTables(
   CDMdbHandler,
   domains = NULL,
-  codeCountsTable = "code_counts"
+  codeCountsTable = "code_counts",
+  visitSourceGroupConceptIds = 0
 )
 }
 \arguments{
@@ -16,6 +17,8 @@ createCodeCountsTables(
 \item{domains}{Optional vector of domains to process. If NULL, processes all standard domains}
 
 \item{codeCountsTable}{Name of the table to create. Defaults to "code_counts"}
+
+\item{visitSourceGroupConceptIds}{Optional vector of visit source group concept IDs to filter by. Defaults to 0}
 }
 \value{
 Nothing. Creates a table called 'code_counts' in the results schema with columns:

@@ -8,6 +8,7 @@
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
 #' @param domains Optional data frame defining domains to process. If NULL, uses standard OMOP domains
 #' @param stratifiedCodeCountsTable Name of the stratified counts table to create. Defaults to "stratified_code_counts"
+#' @param visitSourceGroupConceptIds Optional vector of visit source group concept IDs to filter by. Defaults to 0
 #'
 #' @return Nothing. Creates a table called 'stratified_code_counts' in the results schema with columns:
 #' \itemize{
