@@ -48,11 +48,16 @@ if (testingDatabase |> stringr::str_starts("Eunomia")) {
   pathToGiBleedEunomiaSqlite <- Eunomia::getDatabaseFile("GiBleed", overwrite = FALSE)
   pathToMIMICEunomiaSqlite <- Eunomia::getDatabaseFile("MIMIC", overwrite = FALSE)
 
+  pathToFinnGenEunomiaSqlite <- ""
+  if (testingDatabase |> stringr::str_ends("FinnGen")) {
+    pathToFinnGenEunomiaSqlite <- helper_FinnGen_getDatabaseFile()
+  }
+
   test_databasesConfig <- HadesExtras_readAndParseYaml(
     pathToYalmFile = system.file("testdata", "config", "databasesConfig.yml", package = "ROMOPAPI"),
     pathToGiBleedEunomiaSqlite = pathToGiBleedEunomiaSqlite,
     pathToMIMICEunomiaSqlite = pathToMIMICEunomiaSqlite,
-    pathToFinnGenEunomiaSqlite = helper_FinnGen_getDatabaseFile()
+    pathToFinnGenEunomiaSqlite = pathToFinnGenEunomiaSqlite
   )
 
   if (testingDatabase |> stringr::str_ends("GiBleed")) {
