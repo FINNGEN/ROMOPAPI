@@ -35,6 +35,7 @@ runApiServer <- function(
     host = "127.0.0.1",
     port = 8564,
     buildCountsTable = FALSE,
+    visitSourceGroupConceptIds = 0,
     ...) {
     #
     # VALIDATE
@@ -62,7 +63,7 @@ runApiServer <- function(
 
     if (buildCountsTable == TRUE) {
         ParallelLogger::logInfo("Building code counts tables")
-        createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts")
+        createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts", visitSourceGroupConceptIds = visitSourceGroupConceptIds)
     }
 
     # Call getConceptsWithCodeCounts, to populate the cache
