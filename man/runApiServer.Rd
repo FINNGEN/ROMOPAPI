@@ -9,6 +9,7 @@ runApiServer(
   host = "127.0.0.1",
   port = 8564,
   buildCountsTable = FALSE,
+  visitSourceGroupConceptIds = 0,
   ...
 )
 }
@@ -21,6 +22,8 @@ If NULL, uses test Eunomia database}
 \item{port}{Port number to run the API server on. Defaults to 8564}
 
 \item{buildCountsTable}{Logical indicating whether to build code counts tables. Defaults to FALSE}
+
+\item{visitSourceGroupConceptIds}{Numeric vector of source concept IDs used to define visit source groups when \code{buildCountsTable = TRUE}. Defaults to \code{0}.}
 
 \item{...}{Additional arguments passed to plumber::pr_run()}
 }

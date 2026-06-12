@@ -10,6 +10,7 @@
 #' @param host Host address to run the API server on. Defaults to "127.0.0.1"
 #' @param port Port number to run the API server on. Defaults to 8564
 #' @param buildCountsTable Logical indicating whether to build code counts tables. Defaults to FALSE
+#' @param visitSourceGroupConceptIds Numeric vector of source concept IDs used to define visit source groups when `buildCountsTable = TRUE`. Defaults to `0`.
 #' @param ... Additional arguments passed to plumber::pr_run()
 #'
 #' @importFrom plumber pr pr_run pr_set_docs pr_set_api_spec
@@ -35,6 +36,7 @@ runApiServer <- function(
     host = "127.0.0.1",
     port = 8564,
     buildCountsTable = FALSE,
+    visitSourceGroupConceptIds = 0,
     ...) {
     #
     # VALIDATE
@@ -62,7 +64,7 @@ runApiServer <- function(
 
     if (buildCountsTable == TRUE) {
         ParallelLogger::logInfo("Building code counts tables")
-        createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts")
+        createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts", visitSourceGroupConceptIds = visitSourceGroupConceptIds)
     }
 
     # Call getConceptsWithCodeCounts, to populate the cache
