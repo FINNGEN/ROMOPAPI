@@ -24,12 +24,15 @@ RUN apt-get update && apt-get install -y openjdk-8-jdk liblzma-dev libbz2-dev li
 ARG ROMOPAPI_BRANCH=main
 ARG BUILD_CACHE_BUSTER=5
 
+COPY . /opt/ROMOPAPI
+
 # Install renv and restore packages
 RUN --mount=type=secret,id=build_github_pat \
     cp /usr/local/lib/R/etc/Renviron /tmp/Renviron \
     && echo "GITHUB_PAT=$(cat /run/secrets/build_github_pat)" >> /usr/local/lib/R/etc/Renviron \
     && Rscript -e 'install.packages("remotes")' \
-    && Rscript -e 'remotes::install_github("FINNGEN/ROMOPAPI@'$ROMOPAPI_BRANCH'")' \
+    && Rscript -e "remotes::install_local('/opt/ROMOPAPI', upgrade = 'never', dependencies = TRUE)" \
+    && Rscript -e "if (!requireNamespace('ROMOPAPI', quietly = TRUE)) stop('ROMOPAPI installation failed')" \
     && cp /tmp/Renviron /usr/local/lib/R/etc/Renviron;
 
 # Expose the port that the API will run on

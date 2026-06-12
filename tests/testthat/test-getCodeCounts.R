@@ -63,11 +63,11 @@ test_that("getCodeCounts works", {
   # Check column names 
   stratified_code_counts |>
     colnames() |>
-    expect_equal(c("concept_id", "calendar_year", "gender_concept_id", "age_decile", "node_record_counts", "node_descendant_record_counts"))
+    expect_equal(c("concept_id", "visit_group_concept_id", "calendar_year", "gender_concept_id", "age_decile", "node_record_counts", "node_descendant_record_counts"))
 
   # columns not empty
   stratified_code_counts |>
-    dplyr::filter(is.na(concept_id) | is.na(calendar_year) | is.na(gender_concept_id) | is.na(age_decile) | is.na(node_record_counts) | is.na(node_descendant_record_counts)) |>
+    dplyr::filter(is.na(concept_id) | is.na(visit_group_concept_id) | is.na(calendar_year) | is.na(gender_concept_id) | is.na(age_decile) | is.na(node_record_counts) | is.na(node_descendant_record_counts)) |>
     nrow() |>
     expect_equal(0)
 

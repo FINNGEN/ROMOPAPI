@@ -47,11 +47,11 @@ runApiServer <- function(
         ParallelLogger::logInfo("No path to database config provided. Using the test counts only database.")
         # if not provided, use the test counts only database
         test_databasesConfig <- HadesExtras_readAndParseYaml(
-            pathToYalmFile = system.file("testdata", "config", "onlyCounts_databasesConfig.yml", package = "ROMOPAPI"),
+            pathToYalmFile = system.file("testdata", "config", "databasesConfig.yml", package = "ROMOPAPI"),
             pathToFinnGenCountsSqlite = helper_FinnGen_getDatabaseFileCounts()
         )
        
-        cohortTableHandlerConfig <- test_databasesConfig[[1]]$cohortTableHandler
+        cohortTableHandlerConfig <- test_databasesConfig$FC$cohortTableHandler
 
         # Create CDMdbHandler
         CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
