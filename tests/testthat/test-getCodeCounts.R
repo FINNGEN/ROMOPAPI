@@ -5,10 +5,39 @@ test_that("getCodeCounts works", {
     gc()
   })
 
+  codeCountsTable <- "code_counts_test_getcc"
+  stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
+  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+
+  withr::defer({
+    try(CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable
+    )), silent = TRUE)
+    try(CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ", resultsDatabaseSchema, ".", codeCountsTable
+    )), silent = TRUE)
+  })
+
+  # build a fresh Condition-only counts table so the schema reflects current code
+  domain <- tibble::tribble(
+    ~domain_id  , ~table_name            , ~concept_id_field      , ~date_field            , ~maps_to_concept_id_field     ,
+    "Condition" , "condition_occurrence" , "condition_concept_id" , "condition_start_date" , "condition_source_concept_id"
+  )
+  suppressWarnings(createCodeCountsTables(
+    CDMdbHandler,
+    domains = domain,
+    codeCountsTable = codeCountsTable
+  ))
+
+  # memoise cache is keyed without CDMdbHandler — drop entries that may exist from earlier runs
+  memoise::forget(getConceptsWithCodeCounts_memoise)
+  memoise::forget(getCodeCounts_memoise)
+
   suppressWarnings(
     result <- getCodeCounts(
       CDMdbHandler,
-      conceptId = c(317009)
+      conceptId = c(317009),
+      codeCountsTable = codeCountsTable
     )
   )
 
@@ -60,10 +89,19 @@ test_that("getCodeCounts works", {
   # stratified_code_counts
   #
 
-  # Check column names 
+  # Check column names
+  isBigQuery <- testingDatabase |> startsWith("AtlasDevelopment")
+  expectedStratifiedCols <- c(
+    "concept_id", "visit_group_concept_id", "calendar_year",
+    "gender_concept_id", "age_decile",
+    "node_record_counts", "node_descendant_record_counts"
+  )
+  if (isBigQuery) {
+    expectedStratifiedCols <- c(expectedStratifiedCols, "node_hll_person_counts")
+  }
   stratified_code_counts |>
     colnames() |>
-    expect_equal(c("concept_id", "visit_group_concept_id", "calendar_year", "gender_concept_id", "age_decile", "node_record_counts", "node_descendant_record_counts"))
+    expect_setequal(expectedStratifiedCols)
 
   # columns not empty
   stratified_code_counts |>

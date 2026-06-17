@@ -20,3 +20,5 @@ GITHUBPAT.txt
 inst/doc
 /doc/
 /Meta/
+
+node_modules

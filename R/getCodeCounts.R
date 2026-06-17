@@ -193,10 +193,10 @@ getCodeCounts <- function(
         codeCounts |> 
             dplyr::select(-concept_id) |> 
             dplyr::rename(concept_id = maps_to_concept_id) |> 
-            dplyr::distinct(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile, record_counts),
+            dplyr::distinct(concept_id, calendar_year, gender_concept_id, age_decile, record_counts),
         # standard concepts, agregate counts
         codeCounts |> dplyr::select(-maps_to_concept_id) |> 
-            dplyr::group_by(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile) |>
+            dplyr::group_by(concept_id, calendar_year, gender_concept_id, age_decile) |>
             dplyr::summarise(record_counts = sum(record_counts), .groups = "drop")
     )  |> 
     # If concept maps to itself, bcs concept in concept and source concept columns, dont take it
@@ -221,14 +221,14 @@ getCodeCounts <- function(
 
     nodeDescendantRecordCounts <- ancestorTableOfDescendant |>
         dplyr::inner_join(codeCountsPerId, by = c("descendant_concept_id" = "concept_id")) |>
-        dplyr::group_by(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile) |>
+        dplyr::group_by(concept_id, calendar_year, gender_concept_id, age_decile) |>
         dplyr::summarise(
             descendant_record_counts = sum(record_counts),
             .groups = "drop"
         )
 
     stratifiedCodeCounts <- codeCountsPerId |>
-        dplyr::full_join(nodeDescendantRecordCounts, by = c("concept_id", "visit_group_concept_id", "calendar_year", "gender_concept_id", "age_decile")) |> 
+        dplyr::full_join(nodeDescendantRecordCounts, by = c("concept_id", "calendar_year", "gender_concept_id", "age_decile")) |> 
         dplyr::mutate(
             descendant_record_counts = dplyr::if_else(is.na(descendant_record_counts), record_counts, descendant_record_counts),
             record_counts = dplyr::if_else(is.na(record_counts), 0, record_counts)
