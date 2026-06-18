@@ -62,7 +62,8 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
       "calendar_year",
       "gender_concept_id",
       "age_decile",
-      "record_counts"
+      "record_counts",
+      "persons_hll_counts"
     ))
   
   stratifiedCodeCounts |> 
@@ -162,7 +163,8 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
       "calendar_year",
       "gender_concept_id",
       "age_decile",
-      "record_counts"
+      "record_counts",
+      "persons_hll_counts"
     ))
   
   
@@ -270,7 +272,8 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
       "calendar_year",
       "gender_concept_id",
       "age_decile",
-      "record_counts"
+      "record_counts",
+      "persons_hll_counts"
     ))
   
   

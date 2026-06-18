@@ -89,16 +89,16 @@ test_that("getCodeCounts works", {
   # stratified_code_counts
   #
 
-  # Check column names
+  # Check column names. node_hll_person_counts present on all dbms:
+  # BQ carries real HLL_COUNT.MERGE_PARTIAL bytes (base64), non-BQ a 0
+  # placeholder. Test just asserts schema parity.
   isBigQuery <- testingDatabase |> startsWith("AtlasDevelopment")
   expectedStratifiedCols <- c(
     "concept_id", "visit_group_concept_id", "calendar_year",
     "gender_concept_id", "age_decile",
-    "node_record_counts", "node_descendant_record_counts"
+    "node_record_counts", "node_descendant_record_counts",
+    "node_hll_person_counts"
   )
-  if (isBigQuery) {
-    expectedStratifiedCols <- c(expectedStratifiedCols, "node_hll_person_counts")
-  }
   stratified_code_counts |>
     colnames() |>
     expect_setequal(expectedStratifiedCols)

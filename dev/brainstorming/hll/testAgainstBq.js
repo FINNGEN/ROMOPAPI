@@ -20,12 +20,7 @@
 // Exit code 0 = pass, 1 = fail.
 
 import { BigQuery } from '@google-cloud/bigquery';
-import {
-  loadProto,
-  mergeHllSketches,
-  estimate,
-  toBase64,
-} from './mergeHll.js';
+import { loadProto, HLL_COUNT, toBase64 } from './mergeHll.js';
 
 const PROJECT = process.env.BQ_PROJECT || process.argv[2];
 if (!PROJECT) {
@@ -98,9 +93,9 @@ async function runCase(label, a, b, expectedDistinct) {
   const bqMerged = await bqMerge(sketchA, sketchB);
   const bqMergedCard = await bqExtract(bqMerged);
 
-  const jsMerged = mergeHllSketches(sketchA, sketchB);
+  const jsMerged = HLL_COUNT.MERGE_PARTIAL([sketchA, sketchB]);
   const jsMergedCard = await bqExtract(Buffer.from(jsMerged));
-  const jsLocalEst = estimate(jsMerged);
+  const jsLocalEst = HLL_COUNT.MERGE([sketchA, sketchB]);
 
   console.log(`  bq_merged_card     = ${bqMergedCard}`);
   console.log(`  js_merged_card(bq) = ${jsMergedCard}`);

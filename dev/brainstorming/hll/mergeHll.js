@@ -20,6 +20,13 @@
 import protobuf from 'protobufjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import {
+  MIN_PRECISION as BIAS_MIN_PRECISION,
+  MAX_PRECISION as BIAS_MAX_PRECISION,
+  linearCountingThreshold as LINEAR_COUNTING_THRESHOLD,
+  meanData as BIAS_MEAN_DATA,
+  biasData as BIAS_BIAS_DATA,
+} from './biasData.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROTO_PATH = join(__dirname, 'zetasketch.proto');
@@ -177,7 +184,7 @@ function longToBigInt(v) {
   return BigInt(v.toString());
 }
 
-export function mergeHllSketches(a, b) {
+function mergePair(a, b) {
   if (!Agg) throw new Error('call loadProto() first');
   const aggA = decodeBlob(a);
   const aggB = decodeBlob(b);
@@ -244,8 +251,45 @@ export function mergeHllSketches(a, b) {
   return Agg.encode(aggMsg).finish();
 }
 
-// HLL raw cardinality estimate (NO empirical bias correction).
-export function estimate(input) {
+// kNN bias correction over the empirical (mean, bias) tables from ZetaSketch.
+// 6 nearest neighbors, weighted by 1/distance where distance is (mean - est)^2.
+function estimateBias(rawEst, p) {
+  if (p < BIAS_MIN_PRECISION || p > BIAS_MAX_PRECISION) return 0;
+  const means = BIAS_MEAN_DATA[p - BIAS_MIN_PRECISION];
+  const biases = BIAS_BIAS_DATA[p - BIAS_MIN_PRECISION];
+  if (rawEst < means[0] || rawEst > means[means.length - 1]) return 0;
+
+  // Binary search for insertion point.
+  let lo = 0, hi = means.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (means[mid] < rawEst) lo = mid + 1;
+    else hi = mid;
+  }
+  const K = 6;
+  const bottom = Math.max(0, lo - K);
+  const top = Math.min(means.length, lo + K);
+  const window = [];
+  for (let i = bottom; i < top; i++) {
+    const d = (means[i] - rawEst) ** 2;
+    window.push([d, biases[i]]);
+  }
+  window.sort((a, b) => a[0] - b[0]);
+  if (window[0][0] === 0) return window[0][1]; // exact match
+
+  let sum = 0, totalWeight = 0;
+  for (let i = 0; i < K; i++) {
+    const [d, bias] = window[i];
+    const w = 1 / d;
+    totalWeight += w;
+    sum += bias * w;
+  }
+  return sum / totalWeight;
+}
+
+// HLL++ cardinality estimate with empirical bias correction.
+// Mirrors ZetaSketch NormalRepresentation.estimate() (Apache 2.0).
+function extract(input) {
   if (!Agg) throw new Error('call loadProto() first');
   const agg = decodeBlob(input);
   const st = unwrap(agg);
@@ -256,6 +300,7 @@ export function estimate(input) {
     : p === 5 ? 0.697
     : p === 6 ? 0.709
     : 0.7213 / (1 + 1.079 / m);
+
   let sum = 0;
   let zeros = 0;
   for (let i = 0; i < m; i++) {
@@ -263,13 +308,56 @@ export function estimate(input) {
     sum += Math.pow(2, -r);
     if (r === 0) zeros++;
   }
-  let est = (alpha * m * m) / sum;
-  if (est <= 2.5 * m && zeros > 0) {
-    est = m * Math.log(m / zeros);
+
+  // Linear counting on small cardinalities, per ZetaSketch threshold table.
+  if (zeros > 0) {
+    const h = m * Math.log(m / zeros);
+    const lcIdx = p - BIAS_MIN_PRECISION;
+    const lcThreshold =
+      lcIdx >= 0 && lcIdx < LINEAR_COUNTING_THRESHOLD.length
+        ? LINEAR_COUNTING_THRESHOLD[lcIdx]
+        : (5 * m) / 2;
+    if (h <= lcThreshold) return Math.round(h);
   }
-  return Math.round(est);
+
+  const raw = (alpha * m * m) / sum;
+  return Math.round(raw - estimateBias(raw, p));
 }
 
 export function toBase64(bytes) {
   return Buffer.from(bytes).toString('base64');
 }
+
+// Normalize input: accept a single sketch (string/Buffer/Uint8Array) or an
+// array thereof; return an array of decoded byte buffers.
+function normalizeSketches(input) {
+  const arr = Array.isArray(input) ? input : [input];
+  return arr
+    .filter((x) => x != null && (typeof x !== 'string' || x.length > 0))
+    .map((x) => {
+      if (typeof x === 'string') return Buffer.from(x, 'base64');
+      if (x instanceof Uint8Array || Buffer.isBuffer(x)) return x;
+      throw new Error('sketch must be base64 string, Buffer, or Uint8Array');
+    });
+}
+
+// BigQuery-shaped facade: HLL_COUNT.{MERGE_PARTIAL, EXTRACT, MERGE}.
+// - MERGE_PARTIAL(sketches): array → merged sketch (Uint8Array).
+// - EXTRACT(sketch):         one sketch → cardinality (Number).
+// - MERGE(sketches):         array → cardinality. Equivalent to EXTRACT(MERGE_PARTIAL(sketches)).
+export const HLL_COUNT = {
+  MERGE_PARTIAL(sketches) {
+    const list = normalizeSketches(sketches);
+    if (list.length === 0) return null;
+    if (list.length === 1) return list[0];
+    return list.reduce((acc, b) => mergePair(acc, b));
+  },
+  EXTRACT(sketch) {
+    return extract(sketch);
+  },
+  MERGE(sketches) {
+    const merged = this.MERGE_PARTIAL(sketches);
+    if (merged == null) return 0;
+    return extract(merged);
+  },
+};

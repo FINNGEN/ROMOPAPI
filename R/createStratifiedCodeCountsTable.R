@@ -90,8 +90,8 @@ createStratifiedCodeCountsTable <- function(
         calendar_year INTEGER,
         gender_concept_id INTEGER,
         age_decile INTEGER,
-        record_counts INTEGER
-        {@isBigQuery == 1} ? {, persons_hll_counts BYTES}
+        record_counts INTEGER,
+        {@isBigQuery == 1} ? {persons_hll_counts BYTES} : {persons_hll_counts INTEGER}
     )"
     sql <- SqlRender::render(sql,
         resultsDatabaseSchema = resultsDatabaseSchema,

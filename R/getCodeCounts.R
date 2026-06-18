@@ -157,11 +157,15 @@ getCodeCounts <- function(
 
 
     # - Get counts and derive 'Maps to' and 'Mapped from' from that.
-    #   On BigQuery, fetch persons_hll_counts as base64 so it can be merged
-    #   downstream with sumHLL() (the R-side path) — but the per-concept HLL
-    #   aggregation itself is done server-side via HLL_COUNT.MERGE_PARTIAL
-    #   in a separate query below (cheaper than R-side merge across many rows).
-    hllSelect <- if (isBq) ", TO_BASE64(persons_hll_counts) AS node_hll_person_counts" else ""
+    #   persons_hll_counts column always exists (BYTES on BQ, INTEGER 0 placeholder
+    #   on sql_server/sqlite). BQ fetches as base64 string; non-BQ as raw integer.
+    #   Per-concept HLL aggregation: BQ uses native HLL_COUNT.MERGE_PARTIAL in a
+    #   separate query below; non-BQ just passes the placeholder through.
+    hllSelect <- if (isBq) {
+        ", TO_BASE64(persons_hll_counts) AS node_hll_person_counts"
+    } else {
+        ", persons_hll_counts AS node_hll_person_counts"
+    }
     sql <- paste0(
         "SELECT concept_id, maps_to_concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile, record_counts",
         hllSelect,
@@ -200,8 +204,8 @@ getCodeCounts <- function(
 
     # Standard-concept aggregation across maps_to_concept_id.
     # BQ: server-side HLL_COUNT.MERGE_PARTIAL in a dedicated query.
-    # else: R-side sumHLL() inside summarise() (only if HLL col present in
-    # the fetched data; currently non-BQ has none).
+    # non-BQ with base64 HLL data (future): R-side HLL_COUNT.MERGE_PARTIAL() inside summarise().
+    # non-BQ with placeholder (integer 0): sum() carries the placeholder through.
     codeCountsStandard <- if (isBq) {
         hllSql <- "
             SELECT
@@ -224,18 +228,22 @@ getCodeCounts <- function(
             stratifiedCodeCountsTable = stratifiedCodeCountsTable
         ) |>
             tibble::as_tibble()
-    } else if ("node_hll_person_counts" %in% colnames(codeCounts)) {
+    } else if (is.character(codeCounts$node_hll_person_counts)) {
         codeCounts |> dplyr::select(-maps_to_concept_id) |>
             dplyr::group_by(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile) |>
             dplyr::summarise(
                 record_counts = sum(record_counts),
-                node_hll_person_counts = sumHLL(node_hll_person_counts),
+                node_hll_person_counts = HLL_COUNT.MERGE_PARTIAL(node_hll_person_counts),
                 .groups = "drop"
             )
     } else {
         codeCounts |> dplyr::select(-maps_to_concept_id) |>
             dplyr::group_by(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile) |>
-            dplyr::summarise(record_counts = sum(record_counts), .groups = "drop")
+            dplyr::summarise(
+                record_counts = sum(record_counts),
+                node_hll_person_counts = sum(node_hll_person_counts),
+                .groups = "drop"
+            )
     }
 
     # - Get counts table only for descendats and mapped from.

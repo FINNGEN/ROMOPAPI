@@ -253,11 +253,12 @@
 
 `%||%` <- function(a, b) if (is.null(a) || is.na(a)) b else a
 
-#' Aggregate (merge) HyperLogLog++ sketches.
+#' HLL_COUNT.MERGE_PARTIAL — aggregate HyperLogLog++ sketches.
 #'
 #' Pure-R port of BigQuery `HLL_COUNT.MERGE_PARTIAL`. Drop-in for `sum()`
 #' inside `dplyr::summarise()` on a column of HLL sketches produced by
-#' `HLL_COUNT.INIT` (precision 10–18, encoding_version 2).
+#' `HLL_COUNT.INIT` (precision 10–18, encoding_version 2). Returns the
+#' merged sketch (not a cardinality — see `HLL_COUNT.EXTRACT` for that).
 #'
 #' @param sketches base64 character vector, OR list of raw vectors, OR a
 #'   single raw vector. NA / NULL / empty entries are dropped.
@@ -265,7 +266,7 @@
 #'   If input was raw / list of raws: raw vector. `NA` if no usable sketches
 #'   remain after filtering.
 #' @export
-sumHLL <- function(sketches) {
+HLL_COUNT.MERGE_PARTIAL <- function(sketches) {
   if (is.raw(sketches)) sketches <- list(sketches)
   if (length(sketches) == 0L) return(NA)
 
