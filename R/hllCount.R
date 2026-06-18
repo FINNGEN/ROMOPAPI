@@ -146,12 +146,26 @@
 
 # ---- sparse -> dense -----------------------------------------------------
 
+.RHOW_BITS <- 6L
+
+# ZetaSketch sparse value -> (denseIdx, denseRho). Two encodings, distinguished
+# by the rhoEncodedFlag bit (= 1 << max(p', p + RHOW_BITS)):
+#   - flag clear: value == sparseIndex; normal rho derived from low (p'-p) bits.
+#   - flag set:   value == flag | (normalIndex << RHOW_BITS) | sparseRhoW;
+#                 normal rho = sparseRhoW + (p' - p).
+# Mirrors ZetaSketch Encoding.Sparse.decode* (Apache 2.0).
 .sparseEntryToDense <- function(packed, p, pPrime) {
-  idxPrime <- bitwShiftR(packed, 1L)
   midWidth <- pPrime - p
+  rhoEncodedFlag <- bitwShiftL(1L, max(pPrime, p + .RHOW_BITS))
+  if (bitwAnd(packed, rhoEncodedFlag) != 0L) {
+    rhoMask <- bitwShiftL(1L, .RHOW_BITS) - 1L
+    denseIdx <- bitwShiftR(bitwXor(packed, rhoEncodedFlag), .RHOW_BITS)
+    denseRho <- bitwAnd(packed, rhoMask) + midWidth
+    return(c(denseIdx, denseRho))
+  }
   midMask <- bitwShiftL(1L, midWidth) - 1L
-  denseIdx <- bitwShiftR(idxPrime, midWidth)
-  mid <- bitwAnd(idxPrime, midMask)
+  denseIdx <- bitwShiftR(packed, midWidth)
+  mid <- bitwAnd(packed, midMask)
   if (mid != 0L) {
     bitLen <- 0L
     m <- mid

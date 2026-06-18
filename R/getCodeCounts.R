@@ -181,6 +181,20 @@ getCodeCounts <- function(
     ) |>
         tibble::as_tibble()
 
+    # Normalize node_hll_person_counts to scalar-per-row: BQ already returns
+    # base64 character via TO_BASE64; sqlite returns a blob/list-of-raws which
+    # dplyr::summarise would flatten into a single raw vector. Convert raws
+    # to base64 strings so downstream agg yields one string per group.
+    if (inherits(codeCounts$node_hll_person_counts, "blob") ||
+        (is.list(codeCounts$node_hll_person_counts) &&
+         all(vapply(codeCounts$node_hll_person_counts, is.raw, logical(1))))) {
+        codeCounts$node_hll_person_counts <- vapply(
+            codeCounts$node_hll_person_counts,
+            function(r) if (length(r) == 0L) NA_character_ else base64enc::base64encode(r),
+            character(1)
+        )
+    }
+
     # - Derive 'Maps to' and 'Mapped from'
     mappings <- dplyr::bind_rows(
         codeCounts |>
@@ -228,7 +242,9 @@ getCodeCounts <- function(
             stratifiedCodeCountsTable = stratifiedCodeCountsTable
         ) |>
             tibble::as_tibble()
-    } else if (is.character(codeCounts$node_hll_person_counts)) {
+    } else if (!is.numeric(codeCounts$node_hll_person_counts)) {
+        # HLL data present (base64 string or blob/list of raws) — use R-side
+        # HLL_COUNT.MERGE_PARTIAL which accepts both.
         codeCounts |> dplyr::select(-maps_to_concept_id) |>
             dplyr::group_by(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile) |>
             dplyr::summarise(

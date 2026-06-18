@@ -5,29 +5,34 @@ test_that("getCodeCounts works", {
     gc()
   })
 
-  codeCountsTable <- "code_counts_test_getcc"
-  stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
-  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+  # OnlyCounts-FinnGen ships a pre-built counts SQLite (no raw CDM tables);
+  # everything else builds a fresh Condition-only counts table from raw data.
+  if (testingDatabase == "OnlyCounts-FinnGen") {
+    codeCountsTable <- "code_counts"
+  } else {
+    codeCountsTable <- "code_counts_test_getcc"
+    stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
+    resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
 
-  withr::defer({
-    try(CDMdbHandler$connectionHandler$executeSql(paste0(
-      "DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable
-    )), silent = TRUE)
-    try(CDMdbHandler$connectionHandler$executeSql(paste0(
-      "DROP TABLE ", resultsDatabaseSchema, ".", codeCountsTable
-    )), silent = TRUE)
-  })
+    withr::defer({
+      try(CDMdbHandler$connectionHandler$executeSql(paste0(
+        "DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable
+      )), silent = TRUE)
+      try(CDMdbHandler$connectionHandler$executeSql(paste0(
+        "DROP TABLE ", resultsDatabaseSchema, ".", codeCountsTable
+      )), silent = TRUE)
+    })
 
-  # build a fresh Condition-only counts table so the schema reflects current code
-  domain <- tibble::tribble(
-    ~domain_id  , ~table_name            , ~concept_id_field      , ~date_field            , ~maps_to_concept_id_field     ,
-    "Condition" , "condition_occurrence" , "condition_concept_id" , "condition_start_date" , "condition_source_concept_id"
-  )
-  suppressWarnings(createCodeCountsTables(
-    CDMdbHandler,
-    domains = domain,
-    codeCountsTable = codeCountsTable
-  ))
+    domain <- tibble::tribble(
+      ~domain_id  , ~table_name            , ~concept_id_field      , ~date_field            , ~maps_to_concept_id_field     ,
+      "Condition" , "condition_occurrence" , "condition_concept_id" , "condition_start_date" , "condition_source_concept_id"
+    )
+    suppressWarnings(createCodeCountsTables(
+      CDMdbHandler,
+      domains = domain,
+      codeCountsTable = codeCountsTable
+    ))
+  }
 
   # memoise cache is keyed without CDMdbHandler — drop entries that may exist from earlier runs
   memoise::forget(getConceptsWithCodeCounts_memoise)
@@ -89,10 +94,11 @@ test_that("getCodeCounts works", {
   # stratified_code_counts
   #
 
-  # Check column names. node_hll_person_counts present on all dbms:
-  # BQ carries real HLL_COUNT.MERGE_PARTIAL bytes (base64), non-BQ a 0
-  # placeholder. Test just asserts schema parity.
+  # Check column names. node_hll_person_counts present on all dbms.
+  # BQ + OnlyCounts-FinnGen carry real HLL data (base64 string from BQ,
+  # blob/list-of-raws from SQLite). Other envs carry 0 placeholder (numeric).
   isBigQuery <- testingDatabase |> startsWith("AtlasDevelopment")
+  hasRealHll <- isBigQuery || testingDatabase == "OnlyCounts-FinnGen"
   expectedStratifiedCols <- c(
     "concept_id", "visit_group_concept_id", "calendar_year",
     "gender_concept_id", "age_decile",
@@ -102,6 +108,15 @@ test_that("getCodeCounts works", {
   stratified_code_counts |>
     colnames() |>
     expect_setequal(expectedStratifiedCols)
+
+  if (hasRealHll) {
+    # Real HLL data normalized to base64 string (one per row) for both BQ
+    # and sqlite paths. Each entry is a non-empty base64-encoded HLL sketch.
+    expect_type(stratified_code_counts$node_hll_person_counts, "character")
+    expect_true(all(nzchar(stratified_code_counts$node_hll_person_counts)))
+  } else {
+    expect_true(is.numeric(stratified_code_counts$node_hll_person_counts))
+  }
 
   # columns not empty
   stratified_code_counts |>
