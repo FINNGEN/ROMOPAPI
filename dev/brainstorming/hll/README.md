@@ -3,6 +3,84 @@
 JS port of ZetaSketch HLL++ merge. Lets us combine BigQuery `HLL_COUNT.INIT`
 sketches client-side without round-tripping to BQ.
 
+## How HyperLogLog works (one paragraph)
+
+HLL estimates the number of **distinct** items in a set without storing the
+items. Each item is hashed to a 64-bit number; the hash is split into two
+parts: a *bucket index* (top `p` bits, where `m = 2^p` buckets) and a *tail*
+(the remaining bits). For each bucket we keep only the position of the
+leading 1-bit (`ρ`) of the tail across all items routed to that bucket — that
+is, "the longest run of leading zeros I've seen + 1". Long zero-runs are rare,
+so a long observed run implies many distinct items hashed into that bucket.
+A harmonic mean across all `m` buckets, with empirical bias correction, gives
+the cardinality estimate. Standard error ≈ `1.04 / √m`.
+
+**HLL++ addition.** HyperLogLog**++** adds three things on top of plain HLL
+(Heule, Nunkesser, Hall — *HyperLogLog in Practice*, 2013):
+
+1. **64-bit hash** (vs HLL's 32-bit) — eliminates the >1 G cardinality
+   correction.
+2. **Sparse representation** at low cardinalities: instead of `m` registers
+   most of which are 0, store only the non-zero `(bucketIdx, ρ)` pairs at
+   higher *sparse* precision `p'` (typically `p + 5`). Saves space AND gives
+   exact set-union on merge until promotion to dense kicks in.
+3. **Empirical bias-correction table** — pre-computed per-precision tables of
+   `(rawEstimate, observedBias)` learned from simulation. Subtracted from the
+   raw estimate to cancel the small-cardinality bias of the alpha-corrected
+   harmonic-mean formula. Plus a precision-specific threshold below which
+   *linear counting* (`m · ln(m / zeros)`) is used instead.
+
+Merging two HLL++ sketches is **lossless** in the sparse-only regime
+(true set union of `(bucketIdx, ρ)` entries) and a register-wise `max` in
+the dense regime — both commute and are associative, so order doesn't matter.
+
+## Worked example: two patient groups
+
+Suppose `cohort_A = {p1, p2, p3, p4, p5}` and `cohort_B = {p4, p5, p6, p7}`.
+True distinct patients across both = 7 (p4 and p5 overlap).
+
+```sql
+-- 1. Build one sketch per cohort (server-side, BigQuery).
+WITH a AS (SELECT HLL_COUNT.INIT(person_id, 10) AS s FROM cohort_A_table),
+     b AS (SELECT HLL_COUNT.INIT(person_id, 10) AS s FROM cohort_B_table)
+
+-- 2a. Combine + count in one step: returns 7.
+SELECT HLL_COUNT.MERGE(s) AS distinct_patients
+FROM (SELECT s FROM a UNION ALL SELECT s FROM b);
+
+-- 2b. Or: combine into a re-usable sketch, count later.
+SELECT HLL_COUNT.MERGE_PARTIAL(s) AS merged_sketch   -- BYTES, can be stored
+FROM (SELECT s FROM a UNION ALL SELECT s FROM b);
+
+SELECT HLL_COUNT.EXTRACT(merged_sketch);             -- returns 7
+```
+
+Client-side (this repo) does the same merge without going back to BigQuery:
+
+```js
+import { HLL_COUNT } from './mergeHll.js';
+
+const sketchA = /* bytes from HLL_COUNT.INIT on cohort A */;
+const sketchB = /* bytes from HLL_COUNT.INIT on cohort B */;
+
+const merged = HLL_COUNT.MERGE_PARTIAL([sketchA, sketchB]); // Uint8Array
+const distinctPatients = HLL_COUNT.EXTRACT(merged);          // 7
+// or one shot:
+const distinctPatients2 = HLL_COUNT.MERGE([sketchA, sketchB]); // 7
+```
+
+In R (`R/hllCount.R`):
+
+```r
+merged_b64 <- HLL_COUNT.MERGE_PARTIAL(c(sketchA_b64, sketchB_b64))
+# Drop-in inside dplyr::summarise(node_hll_person_counts = HLL_COUNT.MERGE_PARTIAL(...))
+```
+
+`MERGE_PARTIAL` returns a sketch (mergeable further), `MERGE` returns the
+final cardinality. Both are associative and commutative — fan-in order
+doesn't matter. The same sketch can be merged into a third group later
+without re-reading the underlying patient rows.
+
 ## Files
 
 - `zetasketch.proto` — minimal proto schema (outer `AggregatorStateProto` +
