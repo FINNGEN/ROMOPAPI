@@ -159,7 +159,17 @@ function unwrap(agg) {
   if (!agg.hllExt || agg.hllExt.length === 0) {
     throw new Error('missing HLL++ extension field (112)');
   }
-  return Hll.decode(agg.hllExt);
+  
+  // Strip trailing null bytes from the nested HLL extension field too.
+  // The hllExt bytes field may also contain trailing 0x00 padding.
+  let ext = agg.hllExt;
+  let end = ext.length;
+  while (end > 0 && ext[end - 1] === 0) {
+    end--;
+  }
+  const cleanedExt = ext.slice(0, end);
+  
+  return Hll.decode(cleanedExt);
 }
 
 function decodeBlob(input) {
@@ -173,7 +183,35 @@ function decodeBlob(input) {
   } else {
     throw new Error('input must be base64 string, Buffer, or Uint8Array');
   }
-  return Agg.decode(bytes);
+  
+  // Try to decode as-is first
+  try {
+    return Agg.decode(bytes);
+  } catch (error) {
+    // If decode fails with "index out of range" or mentions illegal tag/field 0,
+    // it's likely trailing null-byte padding. Strip trailing zeros and retry.
+    const errorMsg = error.message || '';
+    const isLikelyPadding = 
+      errorMsg.includes('index out of range') ||
+      errorMsg.includes('illegal tag') ||
+      errorMsg.includes('field number 0');
+    
+    if (isLikelyPadding && bytes.length > 0) {
+      let end = bytes.length;
+      while (end > 0 && bytes[end - 1] === 0) {
+        end--;
+      }
+      
+      if (end < bytes.length) {
+        // We found and stripped trailing zeros, try decoding again
+        const cleaned = bytes.slice(0, end);
+        return Agg.decode(cleaned);
+      }
+    }
+    
+    // Not a trailing-zero issue, or no zeros to strip - rethrow original error
+    throw error;
+  }
 }
 
 // protobufjs returns int64 as Long; convert via String to BigInt safely.
@@ -361,3 +399,4 @@ export const HLL_COUNT = {
     return extract(merged);
   },
 };
+
