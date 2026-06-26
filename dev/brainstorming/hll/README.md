@@ -34,52 +34,152 @@ Merging two HLL++ sketches is **lossless** in the sparse-only regime
 (true set union of `(bucketIdx, ρ)` entries) and a register-wise `max` in
 the dense regime — both commute and are associative, so order doesn't matter.
 
-## Worked example: two patient groups
+## Conceptual walk-through: two patient cohorts
 
-Suppose `cohort_A = {p1, p2, p3, p4, p5}` and `cohort_B = {p4, p5, p6, p7}`.
-True distinct patients across both = 7 (p4 and p5 overlap).
+Use `m = 4` buckets (i.e. `p = 2`, top 2 bits = bucket index, remaining bits =
+the *tail* used to derive `ρ`). Toy hashes so the math fits on a page.
 
-```sql
--- 1. Build one sketch per cohort (server-side, BigQuery).
-WITH a AS (SELECT HLL_COUNT.INIT(person_id, 10) AS s FROM cohort_A_table),
-     b AS (SELECT HLL_COUNT.INIT(person_id, 10) AS s FROM cohort_B_table)
+**Cohort A = {p1, p2, p3, p4, p5}.** Each patient id is hashed; the hash
+splits into `(bucket, tail)`; `ρ` is `(# leading zeros in tail) + 1`.
 
--- 2a. Combine + count in one step: returns 7.
-SELECT HLL_COUNT.MERGE(s) AS distinct_patients
-FROM (SELECT s FROM a UNION ALL SELECT s FROM b);
+| patient | hash (binary) | bucket | tail      | ρ |
+|---------|---------------|--------|-----------|---|
+| p1      | `01 011010`   | 1      | `011010`  | 2 |
+| p2      | `11 000110`   | 3      | `000110`  | 4 |
+| p3      | `00 100000`   | 0      | `100000`  | 1 |
+| p4      | `10 001100`   | 2      | `001100`  | 3 |
+| p5      | `01 110000`   | 1      | `110000`  | 1 |
 
--- 2b. Or: combine into a re-usable sketch, count later.
-SELECT HLL_COUNT.MERGE_PARTIAL(s) AS merged_sketch   -- BYTES, can be stored
-FROM (SELECT s FROM a UNION ALL SELECT s FROM b);
+**`HLL_COUNT.INIT(cohort_A)`** — per bucket, keep `max(ρ)` across all
+patients routed to that bucket. Result is the *register array* (the sketch):
 
-SELECT HLL_COUNT.EXTRACT(merged_sketch);             -- returns 7
+```
+              b0          b1            b2       b3
+patients →    p3 (ρ=1)    p1 (ρ=2)      p4 (ρ=3) p2 (ρ=4)
+                          p5 (ρ=1)
+              ─────────   ─────────     ───────  ───────
+max ρ      =  1           max(2,1)=2    3        4
+
+sketch_A   = [ 1   ,      2          ,  3     ,  4 ]
 ```
 
-Client-side (this repo) does the same merge without going back to BigQuery:
+Buckets b0, b2, b3 each saw exactly one patient. Bucket b1 saw two (p1, p5),
+so the register stores `max(2, 1) = 2`. p3 with `ρ = 1` is the only patient
+in b0; p4 in b2; p2 in b3.
 
-```js
-import { HLL_COUNT } from './mergeHll.js';
+**Cohort B = {p4, p5, p6, p7}.** p4 and p5 reuse the hashes above; p6 hashes
+to `10 000010` (bucket 2, ρ=5); p7 hashes to `00 000011` (bucket 0, ρ=6).
 
-const sketchA = /* bytes from HLL_COUNT.INIT on cohort A */;
-const sketchB = /* bytes from HLL_COUNT.INIT on cohort B */;
+| patient | hash (binary) | bucket | tail      | ρ |
+|---------|---------------|--------|-----------|---|
+| p4      | `10 001100`   | 2      | `001100`  | 3 |
+| p5      | `01 110000`   | 1      | `110000`  | 1 |
+| p6      | `10 000010`   | 2      | `000010`  | 5 |
+| p7      | `00 000011`   | 0      | `000011`  | 6 |
 
-const merged = HLL_COUNT.MERGE_PARTIAL([sketchA, sketchB]); // Uint8Array
-const distinctPatients = HLL_COUNT.EXTRACT(merged);          // 7
-// or one shot:
-const distinctPatients2 = HLL_COUNT.MERGE([sketchA, sketchB]); // 7
+```
+              b0          b1          b2            b3
+patients →    p7 (ρ=6)    p5 (ρ=1)    p4 (ρ=3)      (none)
+                                      p6 (ρ=5)
+              ─────────   ─────────   ───────────   ───────
+max ρ      =  6           1           max(3,5)=5    0
+
+sketch_B   = [ 6   ,      1       ,   5         ,   0 ]
 ```
 
-In R (`R/hllCount.R`):
+Bucket b3 received no patient, so its register stays `0` (initial value).
 
-```r
-merged_b64 <- HLL_COUNT.MERGE_PARTIAL(c(sketchA_b64, sketchB_b64))
-# Drop-in inside dplyr::summarise(node_hll_person_counts = HLL_COUNT.MERGE_PARTIAL(...))
+**`HLL_COUNT.MERGE_PARTIAL([sketch_A, sketch_B])`** — element-wise
+`max` of the two register arrays. That's it:
+
+```
+sketch_A    = [ 1 , 2 , 3 , 4 ]
+sketch_B    = [ 6 , 1 , 5 , 0 ]
+                ↓   ↓   ↓   ↓
+merged      = [ 6 , 2 , 5 , 4 ]   ← register-wise max
 ```
 
-`MERGE_PARTIAL` returns a sketch (mergeable further), `MERGE` returns the
-final cardinality. Both are associative and commutative — fan-in order
-doesn't matter. The same sketch can be merged into a third group later
-without re-reading the underlying patient rows.
+Crucially, `merged` is **bit-identical** to what `HLL_COUNT.INIT` would have
+produced if you had run it directly on the union `{p1..p7}`. Max is
+associative + commutative → order of merges doesn't matter, duplicates
+(p4, p5 seen twice) contribute nothing extra.
+
+**`HLL_COUNT.EXTRACT(merged)`** — recover the cardinality estimate from the
+register array via:
+
+```
+                α_m · m²
+estimate  ≈  ────────────────
+              Σ_i  2^(−ρ_i)
+```
+
+where `α_m` is a precision-dependent normalization constant (`≈ 0.7213 /
+(1 + 1.079/m)` for large `m`; tabulated for small `m`).
+
+**Why this formula works (intuition).**
+
+A random hash tail starting with `ρ` zeros is rare: probability `1/2^ρ`.
+E.g. tail `000000` has only a `1/64` chance. So if a bucket's register
+shows ρ = 6, you most likely had to draw `~2^6 = 64` hashes into it
+before one happened to land on a tail that long. **The register value
+tells you, in log scale, roughly how many items went through that bucket.**
+
+For a *single* bucket, that's a noisy estimate — random variation could
+push ρ up or down by a couple of bits. But the same lucky deviation
+showing up in **all `m` buckets simultaneously** is exponentially
+unlikely. Combining the `m` independent probes (one harmonic-mean fusion
+across buckets) cancels the per-bucket noise and the global estimate
+converges to the true distinct count.
+
+Mechanically: each of the `m` buckets sees ≈ `n / m` items, so its
+register reads `2^ρ ≈ n / m`. Globalize → `estimate ≈ m · 2^ρ̄`. Because
+`ρ` is a max (heavy-tailed), use the **harmonic mean** of `2^ρ_i` over
+buckets — robust to a single lucky long run:
+
+```
+HMean(2^ρ_i)  =  m / Σ_i 2^(−ρ_i)
+```
+
+Plug in → `estimate ≈ m · HMean = m² / Σ 2^(−ρ_i)`. `α_m` out front is a
+small empirical correction for residual bias.
+
+Variance shrinks as `1/√m` (each bucket = an independent probe), so the
+standard error of the estimate is `1.04 / √m` — that's why more buckets
+(higher precision `p`) gives tighter estimates.
+
+**Apply to `merged = [6, 2, 5, 4]` (m = 4):**
+
+```
+Σ 2^(−ρ_i) = 2^−6 + 2^−2 + 2^−5 + 2^−4
+           = 1/64  + 1/4  + 1/32 + 1/16
+           = 0.015625 + 0.25 + 0.03125 + 0.0625
+           = 0.359375
+
+α_m  ≈ 0.7213 / (1 + 1.079/4)
+     ≈ 0.568
+
+estimate ≈ (0.568 · 4²) / 0.359375
+         ≈ 9.088     / 0.359375
+         ≈ 25
+```
+
+Truth was 7. The toy `m = 4` is below the HLL++ supported range (real use is
+`m ≥ 16`, i.e. `p ≥ 4`), and at this scale the raw formula is severely
+biased upward. That's exactly why HLL++ adds two corrections on top:
+
+- **Linear counting** when many registers are 0 (here all 4 are non-zero, so
+  it doesn't apply). Formula: `m · ln(m / #zeros)`.
+- **Empirical bias subtraction**: lookup `(rawEstimate → bias)` in a
+  per-precision table (6-nearest-neighbour interpolation), then return
+  `round(rawEstimate − bias)`.
+
+With real `m = 1024` (p = 10) and the bias table applied, the same kind of
+merge converges to the true distinct count within the standard error
+`1.04 / √m ≈ 3.25 %`.
+
+`HLL_COUNT.MERGE(...)` is just `EXTRACT(MERGE_PARTIAL(...))` rolled into one
+step — use `MERGE_PARTIAL` when you want to keep the sketch around for
+further aggregation, `MERGE` when you only need the final count.
 
 ## Files
 
