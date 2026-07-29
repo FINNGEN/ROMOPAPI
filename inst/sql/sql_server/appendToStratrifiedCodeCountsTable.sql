@@ -58,7 +58,9 @@ FROM (
                 vo.visit_source_concept_id = vmap.visit_source_concept_id
 }
         WHERE
-                t.@concept_id_field != 0
+                -- keep events even when the standard concept is unmapped (concept_id = 0)
+                -- as long as the source concept is known (e.g. NOMESCO procedure codes)
+                t.@concept_id_field != 0 OR t.@maps_to_concept_id_field != 0
 ) ccm
 GROUP BY
         ccm.concept_id,

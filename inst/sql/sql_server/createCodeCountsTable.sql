@@ -33,6 +33,8 @@ temp_concept_ancestor AS (
          concept_id AS concept_id, 
          SUM(record_counts) AS record_counts
      FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable
+     -- skip unmapped events, which are counted under their source concept in the branch below
+     WHERE concept_id != 0
      GROUP BY
          concept_id
 
