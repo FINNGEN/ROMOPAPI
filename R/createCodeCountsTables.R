@@ -69,9 +69,10 @@ createCodeCountsTables <- function(
     )
 
     # - Create code counts table
+    sqlDialectFolder <- if (connection@dbms == "bigquery") "bigquery" else "sql_server"
     sqlPath <- system.file(
         "sql",
-        "sql_server",
+        sqlDialectFolder,
         "createCodeCountsTable.sql",
         package = "ROMOPAPI"
     )

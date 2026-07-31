@@ -49,6 +49,7 @@ getCodeCounts <- function(
     connection <- CDMdbHandler$connectionHandler$getConnection()
     vocabularyDatabaseSchema <- CDMdbHandler$vocabularyDatabaseSchema
     resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+    isBq <- identical(connection@dbms, "bigquery")
 
     #
     # FUNCTION
@@ -155,8 +156,22 @@ getCodeCounts <- function(
         unique()
 
 
-    # - Get counts and derive 'Maps to' and 'Mapped from' from that
-    sql <- "SELECT * FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable WHERE concept_id IN (@conceptIds) OR maps_to_concept_id IN (@conceptIds);"
+    # - Get counts and derive 'Maps to' and 'Mapped from' from that.
+    #   persons_hll_counts column always exists (BYTES on BQ, INTEGER 0 placeholder
+    #   on sql_server/sqlite). BQ fetches as base64 string; non-BQ as raw integer.
+    #   Per-concept HLL aggregation: BQ uses native HLL_COUNT.MERGE_PARTIAL in a
+    #   separate query below; non-BQ just passes the placeholder through.
+    hllSelect <- if (isBq) {
+        ", TO_BASE64(persons_hll_counts) AS node_hll_person_counts"
+    } else {
+        ", persons_hll_counts AS node_hll_person_counts"
+    }
+    sql <- paste0(
+        "SELECT concept_id, maps_to_concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile, record_counts",
+        hllSelect,
+        " FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable",
+        " WHERE concept_id IN (@conceptIds) OR maps_to_concept_id IN (@conceptIds);"
+    )
     codeCounts <- DatabaseConnector::renderTranslateQuerySql(
         connection = connection,
         sql = sql,
@@ -165,6 +180,20 @@ getCodeCounts <- function(
         stratifiedCodeCountsTable = stratifiedCodeCountsTable
     ) |>
         tibble::as_tibble()
+
+    # Normalize node_hll_person_counts to scalar-per-row: BQ already returns
+    # base64 character via TO_BASE64; sqlite returns a blob/list-of-raws which
+    # dplyr::summarise would flatten into a single raw vector. Convert raws
+    # to base64 strings so downstream agg yields one string per group.
+    if (inherits(codeCounts$node_hll_person_counts, "blob") ||
+        (is.list(codeCounts$node_hll_person_counts) &&
+         all(vapply(codeCounts$node_hll_person_counts, is.raw, logical(1))))) {
+        codeCounts$node_hll_person_counts <- vapply(
+            codeCounts$node_hll_person_counts,
+            function(r) if (length(r) == 0L) NA_character_ else base64enc::base64encode(r),
+            character(1)
+        )
+    }
 
     # - Derive 'Maps to' and 'Mapped from'
     mappings <- dplyr::bind_rows(
@@ -187,20 +216,65 @@ getCodeCounts <- function(
             dplyr::rename(parent_concept_id = child_concept_id, child_concept_id = maps_to_concept_id)
     )
 
-    # - Get counts table only for descendats and mapped from
-    codeCountsPerId <- dplyr::bind_rows(
-        # source concepts, remove duplicates
-        codeCounts |> 
-            dplyr::select(-concept_id) |> 
-            dplyr::rename(concept_id = maps_to_concept_id) |> 
-            dplyr::distinct(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile, record_counts),
-        # standard concepts, agregate counts
-        codeCounts |> dplyr::select(-maps_to_concept_id) |> 
+    # Standard-concept aggregation across maps_to_concept_id.
+    # BQ: server-side HLL_COUNT.MERGE_PARTIAL in a dedicated query.
+    # non-BQ with base64 HLL data (future): R-side HLL_COUNT.MERGE_PARTIAL() inside summarise().
+    # non-BQ with placeholder (integer 0): sum() carries the placeholder through.
+    codeCountsStandard <- if (isBq) {
+        hllSql <- "
+            SELECT
+                CAST(concept_id AS BIGINT) AS concept_id,
+                CAST(visit_group_concept_id AS BIGINT) AS visit_group_concept_id,
+                CAST(calendar_year AS BIGINT) AS calendar_year,
+                CAST(gender_concept_id AS BIGINT) AS gender_concept_id,
+                CAST(age_decile AS BIGINT) AS age_decile,
+                SUM(record_counts) AS record_counts,
+                TO_BASE64(HLL_COUNT.MERGE_PARTIAL(persons_hll_counts)) AS node_hll_person_counts
+            FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable
+            WHERE concept_id IN (@conceptIds) OR maps_to_concept_id IN (@conceptIds)
+            GROUP BY concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile
+        "
+        DatabaseConnector::renderTranslateQuerySql(
+            connection = connection,
+            sql = hllSql,
+            resultsDatabaseSchema = resultsDatabaseSchema,
+            conceptIds = paste(conceptIdsToGetCounts, collapse = ","),
+            stratifiedCodeCountsTable = stratifiedCodeCountsTable
+        ) |>
+            tibble::as_tibble()
+    } else if (!is.numeric(codeCounts$node_hll_person_counts)) {
+        # HLL data present (base64 string or blob/list of raws) — use R-side
+        # HLL_COUNT.MERGE_PARTIAL which accepts both.
+        codeCounts |> dplyr::select(-maps_to_concept_id) |>
             dplyr::group_by(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile) |>
-            dplyr::summarise(record_counts = sum(record_counts), .groups = "drop")
-    )  |> 
+            dplyr::summarise(
+                record_counts = sum(record_counts),
+                node_hll_person_counts = HLL_COUNT.MERGE_PARTIAL(node_hll_person_counts),
+                .groups = "drop"
+            )
+    } else {
+        codeCounts |> dplyr::select(-maps_to_concept_id) |>
+            dplyr::group_by(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile) |>
+            dplyr::summarise(
+                record_counts = sum(record_counts),
+                node_hll_person_counts = sum(node_hll_person_counts),
+                .groups = "drop"
+            )
+    }
+
+    # - Get counts table only for descendats and mapped from.
+    #   Standard rows go first so concept-maps-to-itself duplicates resolve
+    #   to the standard row (which carries node_hll_person_counts when set).
+    codeCountsPerId <- dplyr::bind_rows(
+        codeCountsStandard,
+        # source concepts, remove duplicates
+        codeCounts |>
+            dplyr::select(-concept_id) |>
+            dplyr::rename(concept_id = maps_to_concept_id) |>
+            dplyr::distinct(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile, record_counts)
+    )  |>
     # If concept maps to itself, bcs concept in concept and source concept columns, dont take it
-    dplyr::distinct()
+    dplyr::distinct(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile, record_counts, .keep_all = TRUE)
 
     familyTreeDescendants <- familyTreeWithMappings |>
         dplyr::filter(!levels %in% c("Mapped from", "Maps to", "-1", "0")) |>
@@ -228,7 +302,7 @@ getCodeCounts <- function(
         )
 
     stratifiedCodeCounts <- codeCountsPerId |>
-        dplyr::full_join(nodeDescendantRecordCounts, by = c("concept_id", "visit_group_concept_id", "calendar_year", "gender_concept_id", "age_decile")) |> 
+        dplyr::full_join(nodeDescendantRecordCounts, by = c("concept_id", "visit_group_concept_id", "calendar_year", "gender_concept_id", "age_decile")) |>
         dplyr::mutate(
             descendant_record_counts = dplyr::if_else(is.na(descendant_record_counts), record_counts, descendant_record_counts),
             record_counts = dplyr::if_else(is.na(record_counts), 0, record_counts)
