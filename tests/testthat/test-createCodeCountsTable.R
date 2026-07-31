@@ -627,7 +627,8 @@ test_that("stratified table keeps source concepts with no standard concept (conc
        calendar_year INTEGER,
        gender_concept_id INTEGER,
        age_decile INTEGER,
-       record_counts INTEGER
+       record_counts INTEGER,
+       persons_hll_counts INTEGER
      )",
     resultsDatabaseSchema = resultsDatabaseSchema,
     stratifiedCodeCountsTable = stratifiedCodeCountsTable
