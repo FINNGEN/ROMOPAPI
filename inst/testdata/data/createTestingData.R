@@ -98,11 +98,15 @@ dplyr::tbl(connection, "cdm_source") |>
 
 # visit_group_concept_id
 dplyr::tbl(connection, "stratified_code_counts") |>
-    count(visit_group_concept_id) |> 
-    left_join(dplyr::tbl(connection, "concept"), by=c("visit_group_concept_id"="concept_id")) |> 
+    dplyr::count(visit_group_concept_id) |> 
+    dplyr::left_join(dplyr::tbl(connection, "concept"), by=c("visit_group_concept_id"="concept_id")) |> 
     print(n =2122)
 
 dplyr::tbl(connection, "stratified_code_counts") |>
     dplyr::distinct(visit_group_concept_id) |> 
     dplyr::pull(visit_group_concept_id) |>
     (\(x) expect_false(all(x %in% visitSourceGroupConceptIds)))()
+
+
+dplyr::tbl(connection, "stratified_code_counts") |> 
+  head()
