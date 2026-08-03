@@ -37,7 +37,7 @@ databases. Read this before making changes.
 ## Style
 
 Full rules below.
-/@STYLE.md
+@STYLE.md
 
 ## Planning before implementing
 
