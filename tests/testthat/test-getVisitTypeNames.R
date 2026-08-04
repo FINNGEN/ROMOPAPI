@@ -1,4 +1,7 @@
 test_that("getVisitTypeNames works", {
+  # post-counts test: needs the FinnGen visit groups in the counts tables
+  skip_if_not(testingDatabase %in% postCountsDatabases)
+
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
     test_cohortTableHandlerConfig,
     loadConnectionChecksLevel = "basicChecks"
@@ -40,6 +43,9 @@ test_that("getVisitTypeNames works", {
 })
 
 test_that("getVisitTypeNames_memoise works", {
+  # post-counts test: needs the FinnGen visit groups in the counts tables
+  skip_if_not(testingDatabase %in% postCountsDatabases)
+
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
     test_cohortTableHandlerConfig,
     loadConnectionChecksLevel = "basicChecks"

@@ -1,7 +1,8 @@
 # create test for getCDMSource
 
 test_that("getAPIInfo works", {
-  # only works in a full CDM databas
+  # post-counts test: reads cdm_source from a serving database
+  skip_if_not(testingDatabase %in% postCountsDatabases)
 
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
   withr::defer({

@@ -1,4 +1,7 @@
 test_that("getConceptsWithCodeCounts works", {
+  # post-counts test: reads the pre-built code_counts table
+  skip_if_not(testingDatabase %in% postCountsDatabases)
+
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
   withr::defer({
     CDMdbHandler <- NULL

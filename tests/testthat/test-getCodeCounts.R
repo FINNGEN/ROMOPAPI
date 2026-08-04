@@ -1,38 +1,15 @@
 test_that("getCodeCounts works", {
+  # post-counts test: reads the pre-built code_counts table
+  skip_if_not(testingDatabase %in% postCountsDatabases)
+
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
   withr::defer({
     CDMdbHandler <- NULL
     gc()
   })
 
-  # OnlyCounts-FinnGen ships a pre-built counts SQLite (no raw CDM tables);
-  # everything else builds a fresh Condition-only counts table from raw data.
-  if (testingDatabase == "OnlyCounts-FinnGen") {
-    codeCountsTable <- "code_counts"
-  } else {
-    codeCountsTable <- "code_counts_test_getcc"
-    stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
-    resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
-
-    withr::defer({
-      try(CDMdbHandler$connectionHandler$executeSql(paste0(
-        "DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable
-      )), silent = TRUE)
-      try(CDMdbHandler$connectionHandler$executeSql(paste0(
-        "DROP TABLE ", resultsDatabaseSchema, ".", codeCountsTable
-      )), silent = TRUE)
-    })
-
-    domain <- tibble::tribble(
-      ~domain_id  , ~table_name            , ~concept_id_field      , ~date_field            , ~maps_to_concept_id_field     ,
-      "Condition" , "condition_occurrence" , "condition_concept_id" , "condition_start_date" , "condition_source_concept_id"
-    )
-    suppressWarnings(createCodeCountsTables(
-      CDMdbHandler,
-      domains = domain,
-      codeCountsTable = codeCountsTable
-    ))
-  }
+  # OnlyCounts-FinnGen ships it; AtlasDevelopment-5k has it built by setup.R.
+  codeCountsTable <- "code_counts"
 
   # memoise cache is keyed without CDMdbHandler — drop entries that may exist from earlier runs
   memoise::forget(getConceptsWithCodeCounts_memoise)
@@ -94,11 +71,9 @@ test_that("getCodeCounts works", {
   # stratified_code_counts
   #
 
-  # Check column names. node_hll_person_counts present on all dbms.
-  # BQ + OnlyCounts-FinnGen carry real HLL data (base64 string from BQ,
-  # blob/list-of-raws from SQLite). Other envs carry 0 placeholder (numeric).
-  isBigQuery <- testingDatabase |> startsWith("AtlasDevelopment")
-  hasRealHll <- isBigQuery || testingDatabase == "OnlyCounts-FinnGen"
+  # Check column names. Both post-counts databases carry real HLL data
+  # (base64 string from BQ, blob/list-of-raws from SQLite), normalized to a
+  # non-empty base64 string per row.
   expectedStratifiedCols <- c(
     "concept_id", "visit_group_concept_id", "calendar_year",
     "gender_concept_id", "age_decile",
@@ -109,14 +84,8 @@ test_that("getCodeCounts works", {
     colnames() |>
     expect_setequal(expectedStratifiedCols)
 
-  if (hasRealHll) {
-    # Real HLL data normalized to base64 string (one per row) for both BQ
-    # and sqlite paths. Each entry is a non-empty base64-encoded HLL sketch.
-    expect_type(stratified_code_counts$node_hll_person_counts, "character")
-    expect_true(all(nzchar(stratified_code_counts$node_hll_person_counts)))
-  } else {
-    expect_true(is.numeric(stratified_code_counts$node_hll_person_counts))
-  }
+  expect_type(stratified_code_counts$node_hll_person_counts, "character")
+  expect_true(all(nzchar(stratified_code_counts$node_hll_person_counts)))
 
   # columns not empty
   stratified_code_counts |>
@@ -140,12 +109,10 @@ test_that("getCodeCounts works", {
     expect_equal(c("concept_id", "concept_name", "domain_id", "vocabulary_id", "concept_class_id", "standard_concept", "concept_code", "record_counts", "descendant_record_counts"))
 
   # columns not empty
-  if (testingDatabase != "Eunomia-GiBleed") {
-    concepts |>
-      dplyr::filter(is.na(concept_id) | is.na(concept_name) | is.na(domain_id) | is.na(vocabulary_id) | is.na(standard_concept) | is.na(concept_code) | is.na(record_counts) | is.na(descendant_record_counts)) |>
-        nrow() |>
-        expect_equal(0)
-  }
+  concepts |>
+    dplyr::filter(is.na(concept_id) | is.na(concept_name) | is.na(domain_id) | is.na(vocabulary_id) | is.na(standard_concept) | is.na(concept_code) | is.na(record_counts) | is.na(descendant_record_counts)) |>
+      nrow() |>
+      expect_equal(0)
 
   # check that the record_counts and descendant_record_counts are the same as the aggregated_counts
   aggregated_counts <- stratified_code_counts |>
@@ -159,6 +126,9 @@ test_that("getCodeCounts works", {
 })
 
 test_that("getCodeCounts returns error if conceptId is not found", {
+  # post-counts test: reads the pre-built code_counts table
+  skip_if_not(testingDatabase %in% postCountsDatabases)
+
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
   withr::defer({
     CDMdbHandler <- NULL
