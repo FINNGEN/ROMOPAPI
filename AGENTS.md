@@ -9,6 +9,11 @@ The database is an OMOP Common Data Model; SQL is written for OHDSI/HADES toolin
 and run through `SqlRender` (use OMOP CDM tables/columns in queries). It supports
 local SQLite (Eunomia) and remote connections (BigQuery) via DBI.
 
+The API serves **precomputed counts**, so work happens in two phases: first the
+counts tables are *built* from the OMOP CDM (a one-off, repeated whenever the data
+or counts logic changes), then the API *serves* queries against those tables. See
+Deploy instructions.
+
 ## Layout
 
 Standard R package structure:
@@ -71,10 +76,7 @@ Full rules are in **STYLE.md** — read it before writing code.
   `README.md` for the full config example.
 - After changing exported functions or their roxygen, run `devtools::document()`
   so `man/` and `NAMESPACE` stay in sync.
-- For larger or riskier issues (DB connection code, many files, or anything under
-  Security instructions), use the `my-plan` skill first: post a plan as an issue
-  comment and wait for human approval before writing code. Small, well-scoped
-  issues can go straight to implementation.
+
 
 ## Git strategy
 
@@ -90,10 +92,36 @@ Full rules are in **STYLE.md** — read it before writing code.
 ## Testing instructions
 
 - Run tests with `devtools::test()` (testthat edition 3) before opening a PR.
-- Tests live in `tests/testthat/`; scripts in `tests/testmanual/` are manual and
+  Tests live in `tests/testthat/`; scripts in `tests/testmanual/` are manual and
   are not run in CI — don't rely on them for coverage.
-- Tests use the bundled Eunomia/test data (`inst/testdata/`); they must not
-  require a live remote database.
+- The target database is chosen via the `HADESEXTAS_TESTING_ENVIRONMENT` env var
+  (see `tests/testthat/setup.R`); `tests/testthat.R` sets which databases a full
+  run exercises.
+
+Each testing database has **one job**. A test must run only against the databases
+meant for its stage and skip otherwise (`skip_if(testingDatabase != ...)`):
+
+| Database | dbms | Use it for — and *only* this |
+|----------|------|------------------------------|
+| **Eunomia-GiBleed** | sqlite | Testing counts-table **creation** from a raw OMOP CDM. |
+| **OnlyCounts-FinnGen** | sqlite | Testing functions that run **after** the counts tables exist (ships them precomputed in `inst/testdata/data/FinnGenR13_countsOnly.sqlite`). |
+| **AtlasDevelopment-5k** | BigQuery | **Both**, on BigQuery: counts **creation** into a throwaway temp table (e.g. `tmp_counts`, dropped after the test), and **post-counts** functions against a counts table created before the test. A small subset of AtlasDevelopment-full. |
+| **AtlasDevelopment-full** | BigQuery | Regenerating the OnlyCounts-FinnGen fixture only (`inst/testdata/data/createTestingData.R`). Not part of regular test runs. |
+
+- Rules of thumb: creation tests → Eunomia-GiBleed + AtlasDevelopment-5k;
+  post-counts tests → OnlyCounts-FinnGen + AtlasDevelopment-5k. Nothing else.
+- Eunomia needs `EUNOMIA_DATA_FOLDER`; AtlasDevelopment needs `GCP_SERVICE_KEY`
+  (BigQuery), so those tests skip when credentials are absent (e.g. GitHub CI).
+
+### Database-dependent settings
+
+- `visitSourceGroupConceptIds` (the FinnGen visit-source-group concept IDs) is
+  **database-dependent** — it must not be hardcoded in function bodies or tests.
+  It belongs in `databasesConfig.yml` per database: the FinnGen list for the
+  FinnGen/BigQuery databases, empty/`0` for Eunomia.
+- The default `0` disables the grouping: the SQL is guarded with SqlRender's
+  `{@visit_group_concept_ids != 0} ? {…} : {0}`, so the setting can be present in
+  every config and is simply not used when empty.
 
 ## Building instructions
 
@@ -104,6 +132,21 @@ Full rules are in **STYLE.md** — read it before writing code.
   `docker build --secret id=build_github_pat,src=GITHUBPAT.txt -t romopapi .`
   The image installs the package via `renv` and runs `runApiServer()` on 8564.
   See `README.md` for build args (`ROMOPAPI_BRANCH`, `BUILD_CACHE_BUSTER`).
+
+## Deploy instructions
+
+The API serves precomputed counts, so a deployment has two steps — build the
+counts tables, then serve.
+
+- **First run / new database** — start with
+  `runApiServer(..., buildCountsTable = TRUE)` to create the counts tables in the
+  results schema from the OMOP CDM before serving. (Under the hood this calls
+  `createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts")`.)
+- **Updating** — re-run with `buildCountsTable = TRUE` whenever the underlying CDM
+  changes or the counts logic/SQL is updated, to regenerate the tables.
+- **Normal serving** — once the counts tables exist, run with
+  `buildCountsTable = FALSE` (the default); the API reads the existing tables and
+  does not rebuild them.
 
 ## Security instructions
 
