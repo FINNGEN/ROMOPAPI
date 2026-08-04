@@ -49,3 +49,10 @@
   can't produce correct SQL for that platform. Keep it a minimal override of the
   `sql_server` version, not a divergent rewrite.
 - Reference OMOP CDM tables and columns by their standard names.
+- Column names and aliases in SQL are **snake_case** — never camelCase aliases
+  (e.g. `AS visit_group_concept_id`, not `AS visitGroupConceptId`). Some backends
+  (BigQuery) fold identifiers to lowercase, so a camelCase alias comes back
+  mangled and differs by dialect; snake_case is already lowercase and survives
+  unchanged. Returned data frames therefore stay snake_case. If a function ever
+  needs camelCase in R, convert the returned names with
+  `SqlRender::snakeCaseToCamelCase()` — do not alias in the SQL.

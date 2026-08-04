@@ -51,6 +51,9 @@ BQ5K:
     cohortTable:
         cohortDatabaseSchema: atlas-development-270609.sandbox
         cohortTableName: hadesextras_test_cohort_table_<timestamp>
+  # &finngenVisitGroups defines a YAML anchor: it names this list so it can be
+  # reused below without copy-pasting. BQfull references it with the matching
+  # alias (*finngenVisitGroups), keeping the two BigQuery databases in sync.
   visitSourceGroupConceptIds: &finngenVisitGroups
     # longitudinal
     - 2002330246 # INPAT
@@ -97,9 +100,13 @@ BQfull:
     cohortTable:
         cohortDatabaseSchema: atlas-development-270609.sandbox
         cohortTableName: hadesextras_test_cohort_table_<timestamp>
+  # *finngenVisitGroups is the alias: it expands to the exact list anchored as
+  # &finngenVisitGroups on BQ5K above, so both share one definition.
   visitSourceGroupConceptIds: *finngenVisitGroups
 # OnlyCounts-FinnGen — sqlite subset shipped with counts precomputed.
-# Post-counts tests only; never rebuilt (visitSourceGroupConceptIds unused).
+# Post-counts tests only; never rebuilt. Its counts were built with the FinnGen
+# visit groups, so it carries the same list (via the *finngenVisitGroups alias)
+# for the post-counts visit-group tests to check against.
 FC:
   cohortTableHandler:
     database:
@@ -117,4 +124,5 @@ FC:
     cohortTable:
         cohortDatabaseSchema: main
         cohortTableName: test_cohort_table_<timestamp>
-  visitSourceGroupConceptIds: 0
+  # alias again: the shipped counts were built with this same FinnGen list.
+  visitSourceGroupConceptIds: *finngenVisitGroups

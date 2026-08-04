@@ -160,6 +160,47 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
 })
 
 
+test_that("served stratified_code_counts is grouped by visit_source_group_concept_ids", {
+  # post-counts test: the served counts were built with the FinnGen visit groups.
+  # Runs on both AtlasDevelopment-5k (built in setup) and the OnlyCounts-FinnGen
+  # sqlite fixture (shipped precomputed).
+  skip_if_not(testingDatabase %in% postCountsDatabases)
+
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
+  withr::defer({
+    CDMdbHandler <- NULL
+    gc()
+  })
+
+  # database-dependent, from databasesConfig.yml (see setup.R)
+  visitSourceGroupConceptIds <- test_visitSourceGroupConceptIds
+
+  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    CDMdbHandler$resultsDatabaseSchema,
+    ".stratified_code_counts"
+  )))
+
+  servedVisitGroups <- stratifiedCodeCounts |>
+    dplyr::distinct(visit_group_concept_id) |>
+    dplyr::pull(visit_group_concept_id)
+
+  # grouping was applied: nothing left ungrouped (visit_group_concept_id == 0)
+  servedVisitGroups |>
+    (\(x) expect_false(0 %in% x))()
+
+  # more than one visit group is present
+  servedVisitGroups |>
+    length() |>
+    expect_gt(1)
+
+  # the grouping used the configured FinnGen visit-source-group concept IDs
+  servedVisitGroups |>
+    (\(x) expect_true(any(x %in% visitSourceGroupConceptIds)))()
+})
+
 test_that("createStratifiedCodeCountsTable works with visit_source_group_concept_ids if one missing takes childern", {
   # visit-source-group logic needs the FinnGen visit concepts (BigQuery only)
   skip_if(testingDatabase != "AtlasDevelopment-5k")

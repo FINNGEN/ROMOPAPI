@@ -76,6 +76,11 @@ Full rules are in **STYLE.md** — read it before writing code.
   `README.md` for the full config example.
 - After changing exported functions or their roxygen, run `devtools::document()`
   so `man/` and `NAMESPACE` stay in sync.
+- Running the tests against real databases needs `EUNOMIA_DATA_FOLDER` (path
+  where the Eunomia SQLite files live) and `GCP_SERVICE_KEY` (path to the
+  BigQuery service-account JSON). Set these in your `~/.Renviron` so R loads them
+  automatically at startup. Without them set, the Eunomia and BigQuery tests skip
+  (which is expected on CI).
 
 
 ## Git strategy
@@ -156,4 +161,7 @@ Do not touch the following without a human explicitly asking:
   `GCP_SERVICE_KEY`, anything under `bigrquery::bq_auth`).
 - Docker secret handling in the `Dockerfile` (`GITHUBPAT`,
   `--mount=type=secret`). `GITHUBPAT.txt` is gitignored — keep it that way.
+- Credentials live outside the repo in `~/.Renviron` (`EUNOMIA_DATA_FOLDER`,
+  `GCP_SERVICE_KEY`) — never read, print, or copy their values into any file,
+  log, or commit.
 - Never write credentials, tokens, or keys into any file, log, or commit.

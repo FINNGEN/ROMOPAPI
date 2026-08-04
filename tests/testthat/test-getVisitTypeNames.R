@@ -21,23 +21,23 @@ test_that("getVisitTypeNames works", {
   # Check column names
   visitTypeNames |>
     colnames() |>
-    expect_equal(c("visitGroupConceptId", "conceptCode", "conceptName"))
+    expect_equal(c("visit_group_concept_id", "concept_code", "concept_name"))
 
   # Check that columns are not empty
   visitTypeNames |>
-    dplyr::filter(is.na(visitGroupConceptId) | is.na(conceptCode) | is.na(conceptName)) |>
+    dplyr::filter(is.na(visit_group_concept_id) | is.na(concept_code) | is.na(concept_name)) |>
     nrow() |>
     expect_equal(0)
 
-  # Check that visitGroupConceptId is not 0
+  # Check that visit_group_concept_id is not 0
   visitTypeNames |>
-    dplyr::filter(visitGroupConceptId == 0) |>
+    dplyr::filter(visit_group_concept_id == 0) |>
     nrow() |>
     expect_equal(0)
 
-  # Check that visitGroupConceptId values are unique
+  # Check that visit_group_concept_id values are unique
   visitTypeNames |>
-    dplyr::distinct(visitGroupConceptId) |>
+    dplyr::distinct(visit_group_concept_id) |>
     nrow() |>
     expect_equal(nrow(visitTypeNames))
 })

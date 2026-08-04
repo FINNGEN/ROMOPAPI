@@ -43,6 +43,7 @@ if (testingDatabase == "OnlyCounts-FinnGen") {
     pathToFinnGenCountsSqlite = helper_FinnGen_getDatabaseFileCounts()
   )
   test_cohortTableHandlerConfig <- test_databasesConfig$FC$cohortTableHandler
+  test_visitSourceGroupConceptIds <- test_databasesConfig$FC$visitSourceGroupConceptIds
 
   # ships precomputed counts, never rebuild
   buildCountsTable <- "FALSE"
