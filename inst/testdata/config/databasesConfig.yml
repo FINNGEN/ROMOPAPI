@@ -1,4 +1,11 @@
-# Eunomia-GiBleed
+# Testing databases. Each database has one job — see AGENTS.md "Testing".
+#
+# visitSourceGroupConceptIds is database-dependent (FinnGen visit source groups).
+# It is 0 (disabled) for Eunomia, and the FinnGen list for the FinnGen/BigQuery
+# databases. The default 0 disables the grouping in SQL
+# ({@visit_group_concept_ids != 0} guard), so it is harmless where unused.
+
+# Eunomia-GiBleed — raw OMOP CDM (sqlite). Counts-creation tests only.
 E1:
   cohortTableHandler:
     database:
@@ -20,73 +27,9 @@ E1:
     webapiurl: https://api.ohdsi.org/WebAPI
     sourcekey:
     resultsshchema:
-# Eunomia-MIMIC
-E2:
-  cohortTableHandler:
-    database:
-      databaseId: E2
-      databaseName: MIMIC
-      databaseDescription: Eunomia database MIMIC
-    connection:
-      connectionDetailsSettings:
-          dbms: sqlite
-          server: <pathToMIMICEunomiaSqlite>
-    cdm:
-        cdmDatabaseSchema: main
-        vocabularyDatabaseSchema: main
-        resultsDatabaseSchema: main
-    cohortTable:
-        cohortDatabaseSchema: main
-        cohortTableName: test_cohort_table_<timestamp>
-  atlasConfig:
-    webapiurl: https://api.ohdsi.org/WebAPI
-    sourcekey:
-    resultsshchema:
-# Eunomia-MIMICwrong
-E3:
-  cohortTableHandler:
-    database:
-      databaseId: E3
-      databaseName: MIMICwrong
-      databaseDescription: Eunomia database MIMIC wrong atlas
-    connection:
-      connectionDetailsSettings:
-          dbms: sqlite
-          server: <pathToMIMICEunomiaSqlite>
-    cdm:
-        cdmDatabaseSchema: main
-        vocabularyDatabaseSchema: main
-        resultsDatabaseSchema: main
-    cohortTable:
-        cohortDatabaseSchema: main
-        cohortTableName: test_cohort_table_<timestamp>
-  atlasConfig:
-    webapiurl: https://api.ohdsi.org/wrong
-    sourcekey:
-    resultsshchema:
-# Eunomia-FinnGen
-E4:
-  cohortTableHandler:
-    database:
-      databaseId: E4
-      databaseName: FinnGen
-      databaseDescription: Eunomia database FinnGen
-    connection:
-      connectionDetailsSettings:
-          dbms: sqlite
-          server: <pathToFinnGenEunomiaSqlite>
-    cdm:
-        cdmDatabaseSchema: main
-        vocabularyDatabaseSchema: main
-        resultsDatabaseSchema: main
-    cohortTable:
-        cohortDatabaseSchema: main
-        cohortTableName: test_cohort_table_<timestamp>
-  atlasConfig:
-    webapiurl: https://api.ohdsi.org/wrong
-    sourcekey:
-    resultsshchema:
-# AtlasDevelopment-5k
+  visitSourceGroupConceptIds: 0
+# AtlasDevelopment-5k — BigQuery, small subset of AtlasDevelopment-full.
+# Both counts-creation and post-counts tests.
 BQ5K:
   cohortTableHandler:
     database:
@@ -108,7 +51,31 @@ BQ5K:
     cohortTable:
         cohortDatabaseSchema: atlas-development-270609.sandbox
         cohortTableName: hadesextras_test_cohort_table_<timestamp>
-# AtlasDevelopment-full
+  visitSourceGroupConceptIds: &finngenVisitGroups
+    # longitudinal
+    - 2002330246 # INPAT
+    - 2002330247 # OPER_IN
+    - 2002330248 # OPER_OUT
+    - 2002330249 # OUTPAT
+    - 2002330250 # PRIM_OUT
+    - 2002330102 # REIM
+    - 2002330104 # DEATH
+    - 2002330101 # PURCH
+    - 2002330103 # CANC
+    # registers
+    - 2002330245 # KANTA
+    - 2002330106 # BIOBANK
+    - 2002330186 # KIDNEY
+    - 2002330119 # VISION
+    - 2002330105 # BIRTH_MOTHER
+    # drugs
+    - 2002330251 # PRESCRIPTION
+    - 2002330252 # DELIVERY
+    - 2002330253 # PRESCRIPTION_DELIVERY
+    - 2002330254 # DELIVERY_KELA
+    - 2002330255 # PRESCRIPTION_DELIVERY_KELA
+# AtlasDevelopment-full — BigQuery, full CDM. Used only to regenerate the
+# OnlyCounts-FinnGen fixture (inst/testdata/data/createTestingData.R).
 BQfull:
   cohortTableHandler:
     database:
@@ -130,7 +97,9 @@ BQfull:
     cohortTable:
         cohortDatabaseSchema: atlas-development-270609.sandbox
         cohortTableName: hadesextras_test_cohort_table_<timestamp>
-# FinnGenCounts
+  visitSourceGroupConceptIds: *finngenVisitGroups
+# OnlyCounts-FinnGen — sqlite subset shipped with counts precomputed.
+# Post-counts tests only; never rebuilt (visitSourceGroupConceptIds unused).
 FC:
   cohortTableHandler:
     database:
@@ -148,3 +117,4 @@ FC:
     cohortTable:
         cohortDatabaseSchema: main
         cohortTableName: test_cohort_table_<timestamp>
+  visitSourceGroupConceptIds: 0
