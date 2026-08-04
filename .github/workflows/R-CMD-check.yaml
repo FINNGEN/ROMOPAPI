@@ -3,8 +3,21 @@
 on:
   push:
     branches: [main, master]
+    paths: &r-package-paths
+      - 'R/**'
+      - 'man/**'
+      - 'tests/**'
+      - 'inst/**'
+      - 'vignettes/**'
+      - 'DESCRIPTION'
+      - 'NAMESPACE'
+      - 'renv.lock'
+      - '.Rbuildignore'
+      - '.Rprofile'
+      - '.github/workflows/R-CMD-check.yaml'
   pull_request:
     branches: [main, master, development]
+    paths: *r-package-paths
   schedule:
     - cron: '0 5 * * 0' # every Sunday at 5am UTC
 
