@@ -1,0 +1,39 @@
+# Build the Docker image and push it to Docker Hub on merge to development.
+# A push to `development` is what a merged PR produces, so this runs once the PR lands.
+on:
+  push:
+    branches: [development]
+
+name: docker-publish-dev.yaml
+
+permissions:
+  contents: read
+
+jobs:
+  docker-publish-dev:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # The Dockerfile installs the DatabaseConnector fork from GitHub, so it
+      # needs a PAT passed as the `build_github_pat` build secret. The default
+      # GITHUB_TOKEN is enough for these public installs.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: javiergrata/romopapi:dev
+          secrets: |
+            build_github_pat=${{ secrets.GITHUB_TOKEN }}
