@@ -37,3 +37,15 @@
 - Pipes (`|>`) should be at the end of the line.
 - Limit lines to 100 characters.
 - Comments explain *why*, not *what*; use `#` with a space.
+
+## SQL (SqlRender)
+
+- Write SQL in the OHDSI **SQL Server** dialect — this is SqlRender's source
+  dialect — and let `SqlRender::translate()` convert it to the target dbms at
+  runtime. The canonical templates live in `inst/sql/sql_server/`.
+- Parameterise with `@name` placeholders and render with `SqlRender::render()`;
+  never paste values straight into a query string.
+- Add a dialect-specific file (e.g. `inst/sql/bigquery/`) only when translation
+  can't produce correct SQL for that platform. Keep it a minimal override of the
+  `sql_server` version, not a divergent rewrite.
+- Reference OMOP CDM tables and columns by their standard names.
