@@ -17,9 +17,9 @@ getVisitTypeNames_memoise(
 \value{
 A tibble with columns:
 \itemize{
-\item \code{visitGroupConceptId} - The visit group concept ID
-\item \code{conceptCode} - The OMOP concept code
-\item \code{conceptName} - The human-readable concept name
+\item \code{visit_group_concept_id} - The visit group concept ID
+\item \code{concept_code} - The OMOP concept code
+\item \code{concept_name} - The human-readable concept name
 }
 }
 \description{

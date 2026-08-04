@@ -1,6 +1,6 @@
 test_that("createStratifiedCodeCountsTable works with duplicated counts", {
-  # only works in a full CDM database
-  skip_if(testingDatabase != "AtlasDevelopment-5k")
+  # counts-creation test: needs a raw OMOP CDM
+  skip_if_not(testingDatabase %in% creationDatabases)
 
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
     test_cohortTableHandlerConfig,
@@ -74,7 +74,7 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
 })
 
 test_that("createStratifiedCodeCountsTable works with visit_source_group_concept_ids", {
-  # only works in a full CDM database
+  # visit-source-group logic needs the FinnGen visit concepts (BigQuery only)
   skip_if(testingDatabase != "AtlasDevelopment-5k")
 
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
@@ -103,30 +103,8 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
     "Condition" , "condition_occurrence" , "condition_concept_id" , "condition_start_date" , "condition_source_concept_id"
   )
 
-  visitSourceGroupConceptIds = c(
-    # longitudinal
-    2002330246, # INPAT
-    2002330247, # OPER_IN
-    2002330248, # OPER_OUT
-    2002330249, # OUTPAT
-    2002330250, # PRIM_OUT
-    2002330102, # REIM
-    2002330104, # DEATH
-    2002330101, # PURCH
-    2002330103, # CANC
-    # registers
-    2002330245, # KANTA
-    2002330106, # BIOBANK
-    2002330186, # KIDNEY
-    2002330119, # VISION
-    2002330105, # BIRTH_MOTHER
-    # Drugs
-    2002330251, # PRESCRIPTION
-    2002330252, # DELIVERY
-    2002330253, # PRESCRIPTION_DELIVERY
-    2002330254, # DELIVERY_KELA
-    2002330255 # PRESCRIPTION_DELIVERY_KELA
-  )
+  # database-dependent, from databasesConfig.yml (see setup.R)
+  visitSourceGroupConceptIds <- test_visitSourceGroupConceptIds
 
   # codeAtomicCountsWithDuplicatedCounts
   suppressWarnings(
@@ -182,8 +160,49 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
 })
 
 
+test_that("served stratified_code_counts is grouped by visit_source_group_concept_ids", {
+  # post-counts test: the served counts were built with the FinnGen visit groups.
+  # Runs on both AtlasDevelopment-5k (built in setup) and the OnlyCounts-FinnGen
+  # sqlite fixture (shipped precomputed).
+  skip_if_not(testingDatabase %in% postCountsDatabases)
+
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
+  withr::defer({
+    CDMdbHandler <- NULL
+    gc()
+  })
+
+  # database-dependent, from databasesConfig.yml (see setup.R)
+  visitSourceGroupConceptIds <- test_visitSourceGroupConceptIds
+
+  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    CDMdbHandler$resultsDatabaseSchema,
+    ".stratified_code_counts"
+  )))
+
+  servedVisitGroups <- stratifiedCodeCounts |>
+    dplyr::distinct(visit_group_concept_id) |>
+    dplyr::pull(visit_group_concept_id)
+
+  # grouping was applied: nothing left ungrouped (visit_group_concept_id == 0)
+  servedVisitGroups |>
+    (\(x) expect_false(0 %in% x))()
+
+  # more than one visit group is present
+  servedVisitGroups |>
+    length() |>
+    expect_gt(1)
+
+  # the grouping used the configured FinnGen visit-source-group concept IDs
+  servedVisitGroups |>
+    (\(x) expect_true(any(x %in% visitSourceGroupConceptIds)))()
+})
+
 test_that("createStratifiedCodeCountsTable works with visit_source_group_concept_ids if one missing takes childern", {
-  # only works in a full CDM database
+  # visit-source-group logic needs the FinnGen visit concepts (BigQuery only)
   skip_if(testingDatabase != "AtlasDevelopment-5k")
 
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
@@ -212,30 +231,8 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
     "Condition" , "condition_occurrence" , "condition_concept_id" , "condition_start_date" , "condition_source_concept_id"
   )
 
-  visitSourceGroupConceptIds = c(
-    # longitudinal
-    2002330246, # INPAT
-    2002330247, # OPER_IN
-    2002330248, # OPER_OUT
-    #2002330249, # OUTPAT
-    2002330250, # PRIM_OUT
-    2002330102, # REIM
-    2002330104, # DEATH
-    2002330101, # PURCH
-    2002330103, # CANC
-    # registers
-    2002330245, # KANTA
-    2002330106, # BIOBANK
-    2002330186, # KIDNEY
-    2002330119, # VISION
-    2002330105, # BIRTH_MOTHER
-    # Drugs
-    2002330251, # PRESCRIPTION
-    2002330252, # DELIVERY
-    2002330253, # PRESCRIPTION_DELIVERY
-    2002330254, # DELIVERY_KELA
-    2002330255 # PRESCRIPTION_DELIVERY_KELA
-  )
+  # drop OUTPAT (2002330249) so its children must be grouped in instead
+  visitSourceGroupConceptIds <- setdiff(test_visitSourceGroupConceptIds, 2002330249)
 
   # codeAtomicCountsWithDuplicatedCounts
   suppressWarnings(
@@ -319,8 +316,8 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
 # })
 
 test_that("createCodeCountsTables works", {
-  # only works in a full CDM database
-  skip_if(testingDatabase != "AtlasDevelopment-5k")
+  # counts-creation test: needs a raw OMOP CDM
+  skip_if_not(testingDatabase %in% creationDatabases)
 
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
     test_cohortTableHandlerConfig,
@@ -417,7 +414,7 @@ test_that("createCodeCountsTables works", {
 
 
 test_that("createCodeCountsTables works stratified by visit_group_concept_id", {
-  # only works in a full CDM database
+  # visit-source-group logic needs the FinnGen visit concepts (BigQuery only)
   skip_if(testingDatabase != "AtlasDevelopment-5k")
 
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
@@ -447,35 +444,13 @@ test_that("createCodeCountsTables works stratified by visit_group_concept_id", {
   })
 
 
-  visitSourceGroupConceptIds = c(
-    # longitudinal
-    2002330246, # INPAT
-    2002330247, # OPER_IN
-    2002330248, # OPER_OUT
-    #2002330249, # OUTPAT
-    2002330250, # PRIM_OUT
-    2002330102, # REIM
-    2002330104, # DEATH
-    2002330101, # PURCH
-    2002330103, # CANC
-    # registers
-    2002330245, # KANTA
-    2002330106, # BIOBANK
-    2002330186, # KIDNEY
-    2002330119, # VISION
-    2002330105, # BIRTH_MOTHER
-    # Drugs
-    2002330251, # PRESCRIPTION
-    2002330252, # DELIVERY
-    2002330253, # PRESCRIPTION_DELIVERY
-    2002330254, # DELIVERY_KELA
-    2002330255 # PRESCRIPTION_DELIVERY_KELA
-  )
+  # database-dependent, from databasesConfig.yml (see setup.R)
+  visitSourceGroupConceptIds <- test_visitSourceGroupConceptIds
 
 
   createCodeCountsTables(
     CDMdbHandler,
-     codeCountsTable = codeCountsTable, 
+     codeCountsTable = codeCountsTable,
      visitSourceGroupConceptIds = visitSourceGroupConceptIds
   )
 

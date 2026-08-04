@@ -9,9 +9,9 @@
 #'
 #' @return A tibble with columns:
 #' \itemize{
-#'   \item `visitGroupConceptId` - The visit group concept ID
-#'   \item `conceptCode` - The OMOP concept code
-#'   \item `conceptName` - The human-readable concept name
+#'   \item `visit_group_concept_id` - The visit group concept ID
+#'   \item `concept_code` - The OMOP concept code
+#'   \item `concept_name` - The human-readable concept name
 #' }
 #'
 #' @importFrom checkmate assertClass
@@ -43,10 +43,10 @@ getVisitTypeNames <- function(
     # FUNCTION
     #
     sql <- "
-    SELECT DISTINCT 
-        scc.visit_group_concept_id AS visitGroupConceptId,
-        c.concept_code AS conceptCode,
-        c.concept_name AS conceptName
+    SELECT DISTINCT
+        scc.visit_group_concept_id AS visit_group_concept_id,
+        c.concept_code AS concept_code,
+        c.concept_name AS concept_name
     FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable scc
     INNER JOIN @vocabularyDatabaseSchema.concept c
         ON scc.visit_group_concept_id = c.concept_id
@@ -79,9 +79,9 @@ getVisitTypeNames <- function(
 #' 
 #' @return A tibble with columns:
 #' \itemize{
-#'   \item `visitGroupConceptId` - The visit group concept ID
-#'   \item `conceptCode` - The OMOP concept code
-#'   \item `conceptName` - The human-readable concept name
+#'   \item `visit_group_concept_id` - The visit group concept ID
+#'   \item `concept_code` - The OMOP concept code
+#'   \item `concept_name` - The human-readable concept name
 #' }
 #'
 #' @export

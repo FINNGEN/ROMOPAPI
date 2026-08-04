@@ -5,6 +5,8 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master, development]
+  schedule:
+    - cron: '0 5 * * 0' # every Sunday at 5am UTC
 
 name: R-CMD-check.yaml
 
@@ -30,9 +32,19 @@ jobs:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
       EUNOMIA_DATA_FOLDER: ${{ github.workspace }}/eunomia_data
+      GCP_SERVICE_KEY_JSON: ${{ secrets.GCP_SERVICE_KEY_JSON }}
+      GCP_SERVICE_KEY: /tmp/gcp-credentials.json
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cache Eunomia data
+        uses: actions/cache@v3
+        with:
+          path: ${{ github.workspace }}/eunomia_data
+          key: eunomia-data-${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+          restore-keys: |
+            eunomia-data-${{ runner.os }}-
 
       - uses: r-lib/actions/setup-pandoc@v2
 
@@ -46,6 +58,9 @@ jobs:
         with:
           extra-packages: any::rcmdcheck
           needs: check
+
+      - name: Create GCP service key
+        run: echo "$GCP_SERVICE_KEY_JSON" > /tmp/gcp-credentials.json
 
       - uses: r-lib/actions/check-r-package@v2
         with:

@@ -1,18 +1,21 @@
 #
-# SELECT DATABASE and CO2 CONFIGURATION
+# SELECT DATABASE AND BUILD CONFIGURATION
 #
+# Each testing database has one job (see AGENTS.md "Testing instructions"):
+#   - Eunomia-GiBleed      sqlite,   counts-table creation only
+#   - OnlyCounts-FinnGen   sqlite,   post-counts functions only (ships counts)
+#   - AtlasDevelopment-5k  BigQuery, both (small subset of -full)
+#   - AtlasDevelopment-full BigQuery, regenerate the OnlyCounts-FinnGen fixture
 
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-GiBleed")
-# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-MIMIC")
-# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-FinnGen")
+# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "OnlyCounts-FinnGen")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-5k")
 # Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-full")
-# Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "OnlyCounts-FinnGen")
 testingDatabase <- Sys.getenv("HADESEXTAS_TESTING_ENVIRONMENT")
 buildCountsTable <- Sys.getenv("BUILD_COUNTS_TABLE")
 
 # check correct settings
-possibleDatabases <- c("Eunomia-GiBleed", "Eunomia-MIMIC", "Eunomia-FinnGen", "AtlasDevelopment-5k", "AtlasDevelopment-full", "OnlyCounts-FinnGen")
+possibleDatabases <- c("Eunomia-GiBleed", "OnlyCounts-FinnGen", "AtlasDevelopment-5k", "AtlasDevelopment-full")
 if (!(testingDatabase %in% possibleDatabases)) {
   message("Please set a valid testing environment in envar HADESEXTAS_TESTING_ENVIRONMENT, from: ", paste(possibleDatabases, collapse = ", "))
   stop()
@@ -23,60 +26,50 @@ if (! buildCountsTable %in% c("TRUE", "FALSE")) {
   buildCountsTable <- "FALSE"
 }
 
+# Which databases each test stage runs against (used by skip_if_not in tests).
+creationDatabases <- c("Eunomia-GiBleed", "AtlasDevelopment-5k")
+postCountsDatabases <- c("OnlyCounts-FinnGen", "AtlasDevelopment-5k")
+
+# visitSourceGroupConceptIds is database-dependent and lives in the config;
+# default to 0 (grouping disabled) when a database does not set it.
+test_visitSourceGroupConceptIds <- 0
+
 #
-# Package testing database with only the needed tables
+# OnlyCounts-FinnGen — sqlite shipped with counts precomputed
 #
-if (testingDatabase |> stringr::str_starts("OnlyCounts-FinnGen")) {
+if (testingDatabase == "OnlyCounts-FinnGen") {
   test_databasesConfig <- HadesExtras_readAndParseYaml(
-    pathToYalmFile = system.file("testdata", "config", "databasesConfig.yml", package = "ROMOPAPI"), 
+    pathToYalmFile = system.file("testdata", "config", "databasesConfig.yml", package = "ROMOPAPI"),
     pathToFinnGenCountsSqlite = helper_FinnGen_getDatabaseFileCounts()
   )
   test_cohortTableHandlerConfig <- test_databasesConfig$FC$cohortTableHandler
+  test_visitSourceGroupConceptIds <- test_databasesConfig$FC$visitSourceGroupConceptIds
 
+  # ships precomputed counts, never rebuild
   buildCountsTable <- "FALSE"
 }
 
 #
-# Eunomia Databases
+# Eunomia-GiBleed — raw OMOP CDM (sqlite)
 #
-if (testingDatabase |> stringr::str_starts("Eunomia")) {
+if (testingDatabase == "Eunomia-GiBleed") {
   if (Sys.getenv("EUNOMIA_DATA_FOLDER") == "") {
     message("EUNOMIA_DATA_FOLDER not set. Please set this environment variable to the path of the Eunomia data folder.")
     stop()
   }
 
   pathToGiBleedEunomiaSqlite <- Eunomia::getDatabaseFile("GiBleed", overwrite = FALSE)
-  pathToMIMICEunomiaSqlite <- Eunomia::getDatabaseFile("MIMIC", overwrite = FALSE)
-
-  pathToFinnGenEunomiaSqlite <- ""
-  if (testingDatabase |> stringr::str_ends("FinnGen")) {
-    pathToFinnGenEunomiaSqlite <- helper_FinnGen_getDatabaseFile()
-  }
 
   test_databasesConfig <- HadesExtras_readAndParseYaml(
     pathToYalmFile = system.file("testdata", "config", "databasesConfig.yml", package = "ROMOPAPI"),
-    pathToGiBleedEunomiaSqlite = pathToGiBleedEunomiaSqlite,
-    pathToMIMICEunomiaSqlite = pathToMIMICEunomiaSqlite,
-    pathToFinnGenEunomiaSqlite = pathToFinnGenEunomiaSqlite
+    pathToGiBleedEunomiaSqlite = pathToGiBleedEunomiaSqlite
   )
-
-  if (testingDatabase |> stringr::str_ends("GiBleed")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig$E1$cohortTableHandler
-  }
-  if (testingDatabase |> stringr::str_ends("MIMIC")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig$E2$cohortTableHandler
-  }
-  if (testingDatabase |> stringr::str_ends("FinnGen")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig$E3$cohortTableHandler
-  }
-  if (testingDatabase |> stringr::str_ends("FinnGen")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig$E4$cohortTableHandler
-  }
+  test_cohortTableHandlerConfig <- test_databasesConfig$E1$cohortTableHandler
+  test_visitSourceGroupConceptIds <- test_databasesConfig$E1$visitSourceGroupConceptIds
 }
 
-
 #
-# AtlasDevelopmet-DBI Database
+# AtlasDevelopment — BigQuery (5k subset or full)
 #
 if (testingDatabase |> stringr::str_starts("AtlasDevelopment")) {
   if (Sys.getenv("GCP_SERVICE_KEY") == "") {
@@ -90,14 +83,19 @@ if (testingDatabase |> stringr::str_starts("AtlasDevelopment")) {
     pathToYalmFile = system.file("testdata", "config", "databasesConfig.yml", package = "ROMOPAPI")
   )
 
-  if (testingDatabase |> stringr::str_ends("5k")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig$BQ5K$cohortTableHandler
+  databaseEntry <- if (testingDatabase |> stringr::str_ends("5k")) {
+    test_databasesConfig$BQ5K
+  } else {
+    test_databasesConfig$BQfull
   }
-  if (testingDatabase |> stringr::str_ends("full")) {
-    test_cohortTableHandlerConfig <- test_databasesConfig$BQfull$cohortTableHandler
-  }
+  test_cohortTableHandlerConfig <- databaseEntry$cohortTableHandler
+  test_visitSourceGroupConceptIds <- databaseEntry$visitSourceGroupConceptIds
 }
 
+# guard against a missing config value
+if (is.null(test_visitSourceGroupConceptIds)) {
+  test_visitSourceGroupConceptIds <- 0
+}
 
 #
 # INFORM USER
@@ -108,9 +106,11 @@ message("Database: ", testingDatabase)
 if (buildCountsTable == "TRUE") {
   message("************* Building counts table")
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
-  createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts")
-}else{
+  createCodeCountsTables(
+    CDMdbHandler,
+    codeCountsTable = "code_counts",
+    visitSourceGroupConceptIds = test_visitSourceGroupConceptIds
+  )
+} else {
   message("************* Not building counts table")
 }
-
-
