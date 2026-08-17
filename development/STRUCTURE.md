@@ -75,6 +75,8 @@ A few things depart from the standard layout:
     files; too big for git and reproducible on demand.
   - `errorReportSql.txt` — SqlRender's error dump, regenerated on each failure.
   - `renv/`, `renv.lock`, `.Rprofile` — local renv environment state.
+  - `.scratchpad/` — a personal scratch space for tmp ideas, throwaway tests
+    and working notes; never part of the package.
 
 ---
 
