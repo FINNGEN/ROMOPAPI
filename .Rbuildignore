@@ -10,6 +10,8 @@
 ^\.git/
 ^\.Rcheck/
 ^GITHUBPAT\.txt$
+^\.scratchpad/
+^development/
 
 ^doc$
 ^Meta$
