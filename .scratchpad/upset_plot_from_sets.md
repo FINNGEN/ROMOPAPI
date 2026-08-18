@@ -1,201 +1,211 @@
-# Building UpSet buckets from HLL sketches
+# UpSet buckets from per-set HLL sketches
 
-**Goal.** We have one **HLL sketch per set** (for any number of sets `N`). From
-those we want the **UpSet buckets** — the count of elements in *exactly* each
-combination of sets ("A only", "A and B but nothing else", …).
-
-It's a 3-step pipeline, and every step is exact arithmetic:
+**Premise.** We hold **one HLL sketch per set**, for any number of sets `N`.
+From those sketches we can build an UpSet plot — the exclusive buckets ("A only",
+"A ∩ B but nothing else", …) — in two steps:
 
 ```
-HLL sketches ──merge──▶ union size of ANY subset ──┐
-                                                   │ inclusion–exclusion
-                        intersection of any subset ◀┘
-                                                   │ Möbius
-                        exclusive UpSet buckets   ◀┘
+ HLL sketches ──①──► every subset UNION ──②──► every UpSet BUCKET
+   (N of them)         (2ᴺ − 1 of them)          (2ᴺ − 1 of them)
 ```
 
-- **Step 1 — sketches → unions.** Merging the sketches of any subset `S` and
-  reading its cardinality gives `U(S) = |⋃_{i∈S} Aᵢ|`. With `N` sketches you can
-  produce the union of *every* subset — no extra storage.
-- **Step 2 — unions → intersections.** Inclusion–exclusion.
-- **Step 3 — intersections → buckets.** Möbius inversion.
-
-Notation used throughout:
-
-| Symbol | Meaning |
-|---|---|
-| `U(S)` | size of the **union** of the sets in `S` (measured by merging sketches) |
-| `I(S)` | size of the **intersection** of the sets in `S` |
-| `E(S)` | **UpSet bucket**: elements in *exactly* the sets in `S`, none outside |
+Both steps are exact in arithmetic; the only real cost is compute and HLL
+approximation error (see §5).
 
 ---
 
-## The whole method in two formulas
+## The two steps
 
-**Step 2 — intersection from unions** (self-inverse of inclusion–exclusion):
+### ① Sketches → unions (merge)
 
-```
-I(S) = Σ_{∅ ≠ T ⊆ S} (−1)^{|T|+1} · U(T)
-```
-
-**Step 3 — bucket from intersections** (Möbius; `F` = the full set of all `N`):
+An HLL sketch **merges to a union**. For any subset `S` of sets:
 
 ```
-E(S) = Σ_{S ⊆ T ⊆ F} (−1)^{|T|−|S|} · I(T)
+U(S) = |⋃_{i∈S} Aᵢ| = cardinality( merge of the sketches for i ∈ S )
 ```
 
-That's it. Everything below is just these two formulas on concrete numbers.
+No extra storage — just the `N` base sketches, merged on demand. This gives us
+the count of **every** subset union.
+
+### ② Unions → buckets (inclusion–exclusion)
+
+Two sub-steps. First recover each **intersection** from the unions (the
+union↔intersection transform is self-inverse):
+
+```
+I(S) = |⋂_{i∈S} Aᵢ| = Σ_{∅ ≠ T ⊆ S} (−1)^{|T|+1} · U(T)
+```
+
+Then turn intersections into **exclusive buckets** — elements in exactly the
+sets of `S` and none of the others (this is what an UpSet bar is) — by Möbius
+inversion over the supersets of `S`:
+
+```
+E(S) = Σ_{T ⊇ S} (−1)^{|T|−|S|} · I(T)
+```
+
+That's the whole method. The examples below just expand these two formulas for
+`N = 2, 3, 4`.
 
 ---
 
 ## Example · N = 2
 
-**Sketches → unions** (Step 1):
+**Unions measured** (from the sketches):
 
 ```
-U(A) = 100   U(B) = 90   U(A,B) = 160
+U(A) = 100    U(B) = 70    U(AB) = 150
 ```
 
-**Unions → intersection** (Step 2):
+**Intersection:**
 
 ```
-I(A,B) = U(A) + U(B) − U(A,B) = 100 + 90 − 160 = 30
+I(AB) = U(A) + U(B) − U(AB) = 100 + 70 − 150 = 20
 ```
 
-**Intersection → buckets** (Step 3):
+**Buckets:**
 
-| Bucket | Formula | Value |
-|---|---|---|
-| A only | `I(A) − I(A,B)` | 100 − 30 = **70** |
-| B only | `I(B) − I(A,B)` | 90 − 30 = **60** |
-| A ∩ B | `I(A,B)` | **30** |
+```
+E(A)  = I(A) − I(AB) = 100 − 20 = 80     (A only)
+E(B)  = I(B) − I(AB) =  70 − 20 = 50     (B only)
+E(AB) = I(AB)        =            20     (A ∩ B)
+```
 
-Check: `70 + 60 + 30 = 160 = U(A,B)` ✓
+Check: `80 + 50 + 20 = 150 = U(AB)` ✓
 
 ---
 
 ## Example · N = 3
 
-**Sketches → unions** (Step 1) — all 7 subset unions:
+**Unions measured:**
 
 ```
 U(A)=100  U(B)=90  U(C)=80
-U(A,B)=160  U(A,C)=150  U(B,C)=150
-U(A,B,C)=195
+U(AB)=160  U(AC)=150  U(BC)=150
+U(ABC)=195
 ```
 
-**Unions → intersections** (Step 2):
+**Intersections** (transform ①→I):
 
 ```
-I(A,B) = 100 + 90 − 160 = 30
-I(A,C) = 100 + 80 − 150 = 30
-I(B,C) =  90 + 80 − 150 = 20
-I(A,B,C) = U(A)+U(B)+U(C) − U(A,B)−U(A,C)−U(B,C) + U(A,B,C)
-         = 270 − 460 + 195 = 5
+I(AB) = 100+90−160 = 30
+I(AC) = 100+80−150 = 30
+I(BC) =  90+80−150 = 20
+I(ABC)= U(A)+U(B)+U(C) − U(AB)−U(AC)−U(BC) + U(ABC)
+      = 270 − 460 + 195 = 5
 ```
 
-**Intersections → buckets** (Step 3):
+**Buckets** (Möbius):
 
 | Bucket | Formula | Value |
 |---|---|---|
-| A only | `I(A) − I(A,B) − I(A,C) + I(A,B,C)` | 100 − 30 − 30 + 5 = **45** |
-| B only | `I(B) − I(A,B) − I(B,C) + I(A,B,C)` | 90 − 30 − 20 + 5 = **45** |
-| C only | `I(C) − I(A,C) − I(B,C) + I(A,B,C)` | 80 − 30 − 20 + 5 = **35** |
-| A ∩ B only | `I(A,B) − I(A,B,C)` | 30 − 5 = **25** |
-| A ∩ C only | `I(A,C) − I(A,B,C)` | 30 − 5 = **25** |
-| B ∩ C only | `I(B,C) − I(A,B,C)` | 20 − 5 = **15** |
-| A ∩ B ∩ C | `I(A,B,C)` | **5** |
+| A only | `I(A) − I(AB) − I(AC) + I(ABC)` = 100−30−30+5 | **45** |
+| B only | `I(B) − I(AB) − I(BC) + I(ABC)` =  90−30−20+5 | **45** |
+| C only | `I(C) − I(AC) − I(BC) + I(ABC)` =  80−30−20+5 | **35** |
+| A ∩ B only | `I(AB) − I(ABC)` = 30−5 | **25** |
+| A ∩ C only | `I(AC) − I(ABC)` = 30−5 | **25** |
+| B ∩ C only | `I(BC) − I(ABC)` = 20−5 | **15** |
+| A ∩ B ∩ C | `I(ABC)` | **5** |
 
-Check: `45+45+35+25+25+15+5 = 195 = U(A,B,C)` ✓, and for A:
-`45+25+25+5 = 100 = U(A)` ✓
+Check: `45+45+35+25+25+15+5 = 195 = U(ABC)` ✓
 
 ---
 
 ## Example · N = 4
 
-Sets A, B, C, D. (Numbers chosen symmetric just so the tables stay readable —
-the method doesn't need symmetry.)
+To keep the arithmetic readable, use a **symmetric** dataset where a region's
+size depends only on its order (how many sets it belongs to): every
+single-only = 10, every pair-only = 4, every triple-only = 2, all-four = 1. By
+symmetry all subsets of the same order share one union value, so we only compute
+four distinct numbers.
 
-**Sketches → unions** (Step 1) — the 15 subset unions:
-
-```
-singles:  U(each) = 32
-pairs:    U(each pair) = 54          (6 of them: AB AC AD BC BD CD)
-triples:  U(each triple) = 69        (4 of them: ABC ABD ACD BCD)
-quad:     U(A,B,C,D) = 79
-```
-
-**Unions → intersections** (Step 2):
+**Unions measured** (all 15 subsets, grouped by order):
 
 ```
-pair:    I(A,B)   = 32 + 32 − 54 = 10
-triple:  I(A,B,C) = 32·3 − 54·3 + 69 = 96 − 162 + 69 = 3
-quad:    I(A,B,C,D) = 32·4 − 54·6 + 69·4 − 79
-                    = 128 − 324 + 276 − 79 = 1
+4 singles  : U = 29    (e.g. |A|)
+6 pairs    : U = 49    (e.g. |A∪B|)
+4 triples  : U = 63    (e.g. |A∪B∪C|)
+1 quad     : U = 73    (|A∪B∪C∪D| = the total)
 ```
 
-**Intersections → buckets** (Step 3):
+**Intersections** (transform ①→I — signs `+ − + −` by term order):
 
-| Bucket | Formula | Value |
-|---|---|---|
-| A only | `I(A) − ΣI(pair with A) + ΣI(triple with A) − I(quad)` = `32 − 3·10 + 3·3 − 1` | **10** |
-| A ∩ B only | `I(A,B) − I(A,B,C) − I(A,B,D) + I(A,B,C,D)` = `10 − 3 − 3 + 1` | **5** |
-| A ∩ B ∩ C only | `I(A,B,C) − I(A,B,C,D)` = `3 − 1` | **2** |
-| A ∩ B ∩ C ∩ D | `I(A,B,C,D)` | **1** |
+```
+I(AB)   = 2·29 − 49                       = 9        (all 6 pairs)
+I(ABC)  = 3·29 − 3·49 + 63                = 3        (all 4 triples)
+I(ABCD) = 4·29 − 6·49 + 4·63 − 73         = 1
+```
 
-Every other bucket follows by symmetry (4 singles @ 10, 6 pairs @ 5, 4 triples
-@ 2, 1 quad @ 1).
+**Buckets** (Möbius — a 4-set bucket sums over supersets up to order 4):
 
-Check: `4·10 + 6·5 + 4·2 + 1·1 = 40+30+8+1 = 79 = U(A,B,C,D)` ✓
+```
+E(ABCD) = I(ABCD)                                  = 1
+E(ABC)  = I(ABC) − I(ABCD)             = 3 − 1      = 2   (triple, not the 4th)
+E(AB)   = I(AB) − I(ABC) − I(ABD) + I(ABCD)
+        = 9 − 3 − 3 + 1                             = 4   (pair only)
+E(A)    = I(A) − [I(AB)+I(AC)+I(AD)]
+              + [I(ABC)+I(ABD)+I(ACD)] − I(ABCD)
+        = 29 − 3·9 + 3·3 − 1                        = 10  (A only)
+```
+
+Each recovers its ground-truth region (10, 4, 2, 1). All 15 buckets sum to
+`4·10 + 6·4 + 4·2 + 1 = 73 = U(ABCD)` ✓ (verified by script).
+
+Notice the **sign pattern** of `E(S)`: alternating by how many extra sets a
+superset adds — `+` for `S` itself, `−` for one extra set, `+` for two, `−` for
+three, … This is the general rule, next.
 
 ---
 
-## General N
+## General `N`
 
-For `N` sets there are `2ᴺ − 1` non-empty subsets, and:
+For any `N`, with `S` a subset of the `N` sets:
 
-- **Merges available:** `2ᴺ − 1` — the union of every subset (Step 1), straight
-  from the `N` sketches.
-- **Buckets to fill:** `2ᴺ − 1` — the whole point.
-
-Since Step 1 supplies *every* union, Steps 2–3 reconstruct *every* bucket
-exactly:
+**① Union of a subset** — measured directly by merging that subset's sketches:
 
 ```
-I(S) = Σ_{∅ ≠ T ⊆ S} (−1)^{|T|+1} · U(T)                 (unions → intersections)
-
-E(S) = Σ_{S ⊆ T ⊆ F} (−1)^{|T|−|S|} · I(T)               (intersections → buckets)
+U(S) = |⋃_{i∈S} Aᵢ| = card( merge sketches i ∈ S )
 ```
 
-Both maps are invertible linear transforms, so the `2ᴺ − 1` subset unions carry
-exactly the information of the `2ᴺ − 1` buckets — nothing missing, nothing
-redundant. **This is why per-set sketches are enough for any `N`:** you never
-have to precompute or store the combinations, you merge them on demand.
+**② Intersection of a subset** — from the unions of its own subsets:
 
-| `N` | subset unions = buckets `2ᴺ − 1` |
-|---:|---:|
-| 2 | 3 |
-| 3 | 7 |
-| 4 | 15 |
-| 5 | 31 |
-| 6 | 63 |
-| 10 | 1023 |
+```
+I(S) = Σ_{∅ ≠ T ⊆ S} (−1)^{|T|+1} · U(T)
+```
+
+**③ Exclusive bucket for a subset** — from the intersections of its supersets:
+
+```
+E(S) = Σ_{S ⊆ T ⊆ {1..N}} (−1)^{|T|−|S|} · I(T)
+```
+
+`E(S)` is the UpSet bar "exactly the sets in `S`". Composing ② and ③ maps the
+`2ᴺ − 1` subset unions to the `2ᴺ − 1` buckets by an invertible linear
+transform — so the information is always exactly sufficient, for **any `N`**.
+
+Sanity properties that always hold:
+
+- Buckets are non-negative and sum to the grand union `U({1..N})`.
+- The buckets touching set `i` sum back to `|Aᵢ|`.
 
 ---
 
-## Two practical limits
+## §5 · Cost and accuracy
 
-Exact in principle; two costs in practice.
+Two practical limits — the reconstruction is exact only in exact arithmetic:
 
-1. **Compute is exponential.** `2ᴺ − 1` merges, and the order-`k` sums have
-   `2ᵏ − 1` terms. Fine to `N ≈ 5`; heavy beyond. In practice only evaluate the
-   combinations that actually occur, or the top-k bars the plot will show.
+1. **Exponential work.** There are `2ᴺ − 1` subset unions and the same number of
+   buckets; an order-`k` intersection sums `2ᵏ − 1` union terms. Comfortable to
+   `N ≈ 5`, heavy by `N ≈ 20`. In practice you evaluate only the combinations
+   that actually occur, or the top-k bars UpSet will draw — not the full power
+   set.
 
-2. **HLL is approximate, and inclusion–exclusion amplifies error.** Each sketch
-   cardinality has relative error ≈ `1.04 / √(2^precision)` (precision 10 → ~3%;
-   precision 15 → ~0.6%). A small bucket computed as a signed sum of large unions
-   inherits an *absolute* error scaled to those large operands — so deep/small
-   buckets get noisy and can even come out **negative**. Mitigate with the
-   highest precision you can afford, clamp negatives to 0, and — for any bucket
-   that must be exact — build a sketch for that intersection directly instead of
+2. **HLL is approximate, and inclusion–exclusion amplifies the error.** Each
+   cardinality carries a relative standard error ≈ `1.04 / √(2^precision)`
+   (precision 10 → ~3%; precision 15 → ~0.6%). A small bucket obtained as a
+   signed sum of large unions inherits an *absolute* error scaled to those large
+   operands — so small / high-order buckets get noisy and can even come out
+   **negative**. Mitigations: use the highest sketch precision you can afford,
+   clamp negatives to 0, treat deep buckets as noise-dominated, and where a
+   bucket must be exact, build a sketch for that intersection directly instead of
    reconstructing it by subtraction.
