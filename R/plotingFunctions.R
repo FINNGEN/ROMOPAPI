@@ -82,14 +82,14 @@ createMermaidGraphFromResults <- function(
     dplyr::filter(concept_id %in% concept_ids) |>
     dplyr::mutate(line = paste0(
       concept_id, "[\"",
-      .cleanConceptNameForMermaid(concept_name), "\"<br>",
+      .cleanConceptNameForMermaid(concept_name), "<br>",
       concept_code, "<br>",
       vocabulary_id, "<br>",
-      "RC:", record_counts, " (shown ", node_record_counts, ")<br>",
-      "DRC:", descendant_record_counts, " (shown ", node_descendant_record_counts, ")<br>",
+      "RC:", record_counts, " shown:", node_record_counts, "<br>",
+      "DRC:", descendant_record_counts, " shown:", node_descendant_record_counts, "<br>",
       "PC:", person_counts, " DPC:", descendant_person_counts, "<br>",
       concept_class_id,
-      "]"
+      "\"]"
     )) |>
     dplyr::pull(line) |>
     unique() |>
