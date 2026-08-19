@@ -54,8 +54,34 @@ createCodeCountsTableFromResults(results)
 Plot
 ```{r}
 createPlotFromResults(results, showsMappings = showsMappings, width = 1000, height = 1000)
-``` 
+```
 
+## Person Counts
+
+```{r}
+personCounts <- getPersonCounts_memoise(CDMdbHandler, conceptId = conceptId)
+visitTypeNames <- getVisitTypeNames_memoise(CDMdbHandler)
+```
+
+Sex
+```{r}
+createSexPieChartFromPersonCounts(personCounts$filter_person_counts)
+```
+
+Age
+```{r}
+createAgeHistogramFromPersonCounts(personCounts$filter_person_counts)
+```
+
+Visit type
+```{r}
+createVisitBarplotFromPersonCounts(personCounts$filter_person_counts, visitTypeNames)
+```
+
+Set overlap (UpSet)
+```{r}
+createUpsetPlotFromPersonCounts(personCounts$upset_person_counts, results$concepts)
+```
 
 <!-- Load mermaid.js -->
 <script src="mermaid.min.js"></script>

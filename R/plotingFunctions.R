@@ -85,8 +85,9 @@ createMermaidGraphFromResults <- function(
       .cleanConceptNameForMermaid(concept_name), "\"<br>",
       concept_code, "<br>",
       vocabulary_id, "<br>",
-      record_counts, "-", node_record_counts, "<br>",
-      descendant_record_counts, "-", node_descendant_record_counts, "<br>",
+      "RC:", record_counts, " (shown ", node_record_counts, ")<br>",
+      "DRC:", descendant_record_counts, " (shown ", node_descendant_record_counts, ")<br>",
+      "PC:", person_counts, " DPC:", descendant_person_counts, "<br>",
       concept_class_id,
       "]"
     )) |>
@@ -185,6 +186,8 @@ createCodeCountsTableFromResults <- function(results) {
       node_record_counts,
       descendant_record_counts,
       node_descendant_record_counts,
+      person_counts,
+      descendant_person_counts,
       data
     )
 
@@ -194,10 +197,12 @@ createCodeCountsTableFromResults <- function(results) {
     concept_name = reactable::colDef(name = "Concept Name"),
     concept_code = reactable::colDef(name = "Concept Code"),
     vocabulary_id = reactable::colDef(name = "Vocabulary ID"),
-    record_counts = reactable::colDef(name = "Event Counts"),
-    node_record_counts = reactable::colDef(name = "Node Event Counts"),
-    descendant_record_counts = reactable::colDef(name = "Descendant Event Counts"),
-    node_descendant_record_counts = reactable::colDef(name = "Node Descendant Event Counts"),
+    record_counts = reactable::colDef(name = "RC - Record Counts"),
+    node_record_counts = reactable::colDef(name = "RC (shown) - Node Record Counts"),
+    descendant_record_counts = reactable::colDef(name = "DRC - Descendant Record Counts"),
+    node_descendant_record_counts = reactable::colDef(name = "DRC (shown) - Node Descendant Record Counts"),
+    person_counts = reactable::colDef(name = "PC - Person Counts"),
+    descendant_person_counts = reactable::colDef(name = "DPC - Descendant Person Counts"),
     data = reactable::colDef(name = "Data", show = FALSE)
   )
 
@@ -354,6 +359,178 @@ createPlotFromResults <- function(results, showsMappings = FALSE, ...) {
 }
 
 
+
+#' Convert a gender concept ID to a display label
+#' @param genderConceptId Integer OMOP gender concept ID (8507 male, 8532 female)
+#' @return Character label
+#' @importFrom dplyr case_when
+#' @keywords internal
+#'
+.genderConceptIdToLabel <- function(genderConceptId) {
+  dplyr::case_when(
+    genderConceptId == 8507 ~ "Male",
+    genderConceptId == 8532 ~ "Female",
+    TRUE ~ paste0("Unknown (", genderConceptId, ")")
+  )
+}
+
+#' Create a pie chart of person counts by sex
+#'
+#' @param filterPersonCounts The `filter_person_counts` tibble from \code{\link{getPersonCounts}}
+#'
+#' @return A plotly object
+#' @importFrom dplyr filter mutate
+#' @importFrom plotly plot_ly layout
+#' @export
+#'
+createSexPieChartFromPersonCounts <- function(filterPersonCounts) {
+  data <- filterPersonCounts |>
+    dplyr::filter(filter == "sex") |>
+    dplyr::mutate(label = .genderConceptIdToLabel(stratum))
+
+  plotly::plot_ly(data, labels = ~label, values = ~person_counts, type = "pie") |>
+    plotly::layout(title = "Persons by sex")
+}
+
+#' Create a bar chart of person counts by age decile
+#'
+#' @param filterPersonCounts The `filter_person_counts` tibble from \code{\link{getPersonCounts}}
+#'
+#' @return A plotly object
+#' @importFrom dplyr filter arrange mutate
+#' @importFrom ggplot2 ggplot aes geom_col theme_minimal labs
+#' @importFrom plotly ggplotly
+#' @export
+#'
+createAgeHistogramFromPersonCounts <- function(filterPersonCounts) {
+  data <- filterPersonCounts |>
+    dplyr::filter(filter == "age") |>
+    dplyr::arrange(stratum) |>
+    dplyr::mutate(label = paste0(stratum * 10, "-", stratum * 10 + 9))
+
+  plot <- ggplot2::ggplot(data, ggplot2::aes(x = factor(label, levels = label), y = person_counts)) +
+    ggplot2::geom_col(fill = "#4477AA") +
+    ggplot2::theme_minimal() +
+    ggplot2::labs(x = "Age decile", y = "Persons", title = "Persons by age")
+
+  plotly::ggplotly(plot)
+}
+
+#' Create a bar chart of person counts by visit-source group
+#'
+#' @param filterPersonCounts The `filter_person_counts` tibble from \code{\link{getPersonCounts}}
+#' @param visitTypeNames Optional tibble from \code{\link{getVisitTypeNames}} (columns
+#'   `visit_group_concept_id`, `concept_name`) used to label the groups. NULL (default)
+#'   labels by the raw `visit_group_concept_id`.
+#'
+#' @return A plotly object
+#' @importFrom dplyr filter rename left_join mutate coalesce
+#' @importFrom ggplot2 ggplot aes geom_col theme_minimal theme element_text labs
+#' @importFrom plotly ggplotly
+#' @export
+#'
+createVisitBarplotFromPersonCounts <- function(filterPersonCounts, visitTypeNames = NULL) {
+  data <- filterPersonCounts |>
+    dplyr::filter(filter == "visit") |>
+    dplyr::rename(visit_group_concept_id = stratum)
+
+  if (!is.null(visitTypeNames)) {
+    data <- data |>
+      dplyr::left_join(visitTypeNames, by = "visit_group_concept_id") |>
+      dplyr::mutate(label = dplyr::coalesce(concept_name, paste0("Visit group ", visit_group_concept_id)))
+  } else {
+    data <- data |>
+      dplyr::mutate(label = paste0("Visit group ", visit_group_concept_id))
+  }
+
+  plot <- ggplot2::ggplot(data, ggplot2::aes(x = label, y = person_counts)) +
+    ggplot2::geom_col(fill = "#CC6677") +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)) +
+    ggplot2::labs(x = "Visit source group", y = "Persons", title = "Persons by visit source group")
+
+  plotly::ggplotly(plot)
+}
+
+#' Create an UpSet-style plot of exact set-overlap regions
+#'
+#' @description
+#' Renders the exact exclusive-region person counts from
+#' \code{\link{getPersonCounts}}'s `upset_person_counts` as a bar chart of region sizes
+#' (top) stacked on a set-membership matrix (bottom), sharing the region ordering on the
+#' x-axis — the standard UpSet plot layout.
+#'
+#' @param upsetPersonCounts The `upset_person_counts` tibble from \code{\link{getPersonCounts}}
+#'   (columns `group`, `person_counts`)
+#' @param concepts Optional tibble with `concept_id`/`concept_name` (e.g.
+#'   \code{\link{getCodeCounts}}'s `concepts`) used to label the sets. NULL (default)
+#'   labels by the raw concept ID.
+#'
+#' @return A plotly object
+#' @importFrom dplyr arrange desc mutate group_by summarise pull filter left_join select coalesce
+#' @importFrom tidyr unnest
+#' @importFrom plotly plot_ly add_markers add_segments subplot layout
+#' @export
+#'
+createUpsetPlotFromPersonCounts <- function(upsetPersonCounts, concepts = NULL) {
+  regions <- upsetPersonCounts |>
+    dplyr::arrange(dplyr::desc(person_counts)) |>
+    dplyr::mutate(region = factor(group, levels = group))
+
+  membership <- regions |>
+    dplyr::mutate(concept_id = strsplit(group, "-")) |>
+    tidyr::unnest(concept_id) |>
+    dplyr::mutate(concept_id = as.integer(concept_id))
+
+  if (!is.null(concepts)) {
+    membership <- membership |>
+      dplyr::left_join(dplyr::select(concepts, concept_id, concept_name), by = "concept_id") |>
+      dplyr::mutate(set_label = dplyr::coalesce(concept_name, paste0("Concept ", concept_id)))
+  } else {
+    membership <- membership |>
+      dplyr::mutate(set_label = paste0("Concept ", concept_id))
+  }
+
+  setLevels <- membership |>
+    dplyr::group_by(set_label) |>
+    dplyr::summarise(total = sum(person_counts), .groups = "drop") |>
+    dplyr::arrange(total) |>
+    dplyr::pull(set_label)
+
+  membership <- membership |>
+    dplyr::mutate(set_pos = match(set_label, setLevels))
+
+  segments <- membership |>
+    dplyr::group_by(region) |>
+    dplyr::summarise(y0 = min(set_pos), y1 = max(set_pos), .groups = "drop") |>
+    dplyr::filter(y0 != y1)
+
+  barPlot <- plotly::plot_ly(regions, x = ~region, y = ~person_counts, type = "bar", marker = list(color = "#4477AA")) |>
+    plotly::layout(yaxis = list(title = "Persons (exclusive)"))
+
+  matrixPlot <- plotly::plot_ly()
+  if (nrow(segments) > 0) {
+    matrixPlot <- matrixPlot |>
+      plotly::add_segments(
+        data = segments, x = ~region, xend = ~region, y = ~y0, yend = ~y1,
+        line = list(color = "#333333"), showlegend = FALSE
+      )
+  }
+  matrixPlot <- matrixPlot |>
+    plotly::add_markers(
+      data = membership, x = ~region, y = ~set_pos,
+      marker = list(color = "#333333", size = 10), showlegend = FALSE
+    ) |>
+    plotly::layout(
+      yaxis = list(
+        title = "", tickvals = seq_along(setLevels), ticktext = setLevels,
+        range = c(0.5, length(setLevels) + 0.5)
+      ),
+      xaxis = list(title = "Region")
+    )
+
+  plotly::subplot(barPlot, matrixPlot, nrows = 2, shareX = TRUE, heights = c(0.6, 0.4))
+}
 
 #' Prune levels from results
 #'
