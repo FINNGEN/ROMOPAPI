@@ -35,8 +35,7 @@ Imports:
     ResultModelManager,
     yaml,
     stringr,
-    ParallelLogger,
-    base64enc
+    ParallelLogger
 Remotes:
     javier-gracia-tabuenca-tuni/DatabaseConnector@bigquery-DBI-2
 Suggests: 
