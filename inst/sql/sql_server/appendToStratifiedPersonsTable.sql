@@ -1,23 +1,22 @@
--- Insert into code_stratified_counts table
-INSERT INTO @resultsDatabaseSchema.@stratifiedCodeCountsTable
+-- Insert into stratified_persons table
+INSERT INTO @resultsDatabaseSchema.@stratifiedPersonsTable
 
--- calculate counts per each group of concept_id, calendar_year, gender_concept_id, age_decil, visit_group_concept_id
-SELECT 
+-- one row per distinct person within each concept_id/stratum bucket
+SELECT DISTINCT
+        CAST(ccm.person_id AS BIGINT) AS person_id,
         CAST(ccm.concept_id AS BIGINT) AS concept_id,
         CAST(ccm.maps_to_concept_id AS BIGINT) AS maps_to_concept_id,
         CAST(ccm.visit_group_concept_id AS BIGINT) AS visit_group_concept_id,
         CAST(ccm.calendar_year AS BIGINT) AS calendar_year,
         CAST(ccm.gender_concept_id AS BIGINT) AS gender_concept_id,
-        CAST(ccm.age_decile AS BIGINT) AS age_decile,
-        COUNT_BIG(*) AS record_counts
+        CAST(ccm.age_decile AS BIGINT) AS age_decile
 FROM (
         -- get all person_ids with the concept_id with in a valid observation period
         -- calculate the calendar year, gender_concept_id, age_decile
-        -- calculate the min_calendar_year, used to find the first event in history  per code and person 
-        -- if visit_source_group_concept_ids are provided, calculate the visit_group_concept_id based on the given groups, 
+        -- if visit_source_group_concept_ids are provided, calculate the visit_group_concept_id based on the given groups,
         --   if not on a given visit_group_concept_id keep the original visit_source_concept_id as visit_group_concept_id
         --   if not event has a visit_occurrence_id or visit_source_concept_id, assign 0 as visit_group_concept_id
-        SELECT 
+        SELECT
                 p.person_id AS person_id,
                 t.@concept_id_field AS concept_id,
                 t.@maps_to_concept_id_field AS maps_to_concept_id,
@@ -27,25 +26,25 @@ FROM (
                 {@visit_group_concept_ids != 0} ? {COALESCE(vmap.visit_group_concept_id, vo.visit_source_concept_id)} : {0} AS visit_group_concept_id
         FROM
                 @cdmDatabaseSchema.person p
-        JOIN 
+        JOIN
                 @cdmDatabaseSchema.@table_name t
-        ON 
+        ON
                 p.person_id = t.person_id
-        JOIN 
-                @cdmDatabaseSchema.observation_period op 
-        ON 
+        JOIN
+                @cdmDatabaseSchema.observation_period op
+        ON
                 t.person_id = op.person_id
-        AND 
+        AND
                 t.@date_field >= op.observation_period_start_date
-        AND 
+        AND
                 t.@date_field <= op.observation_period_end_date
 {@visit_group_concept_ids != 0}?{
-        LEFT JOIN 
+        LEFT JOIN
                 @cdmDatabaseSchema.visit_occurrence vo
-        ON 
+        ON
                 t.visit_occurrence_id = vo.visit_occurrence_id
         LEFT JOIN (
-                SELECT 
+                SELECT
                         ca.ancestor_concept_id AS visit_group_concept_id,
                         ca.descendant_concept_id AS visit_source_concept_id
                 FROM
@@ -58,12 +57,7 @@ FROM (
                 vo.visit_source_concept_id = vmap.visit_source_concept_id
 }
         WHERE
-                t.@concept_id_field != 0
-) ccm
-GROUP BY
-        ccm.concept_id,
-        ccm.maps_to_concept_id,
-        ccm.calendar_year,
-        ccm.gender_concept_id,
-        ccm.age_decile,
-        ccm.visit_group_concept_id;
+                -- keep events even when the standard concept is unmapped (concept_id = 0)
+                -- as long as the source concept is known (e.g. NOMESCO procedure codes)
+                t.@concept_id_field != 0 OR t.@maps_to_concept_id_field != 0
+) ccm;

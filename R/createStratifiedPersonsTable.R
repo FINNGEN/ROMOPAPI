@@ -1,23 +1,26 @@
-#' Create stratified code counts table
+#' Create stratified persons table
 #'
 #' @description
-#' Creates a table containing event-level counts of codes by concept, year, gender and age decile.
-#' This function processes each domain separately and creates a comprehensive table with event counts
-#' for individual concepts before aggregation.
+#' Creates a person-level bridge table — one row per distinct
+#' `concept_id x stratum x person_id` — used to compute exact distinct-person
+#' counts (and, at request time, exact set overlaps) without sketches. This
+#' function processes each domain separately, mirroring
+#' `createStratifiedCodeCountsTable()`.
 #'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
 #' @param domains Optional data frame defining domains to process. If NULL, uses standard OMOP domains
-#' @param stratifiedCodeCountsTable Name of the stratified counts table to create. Defaults to "stratified_code_counts"
+#' @param stratifiedPersonsTable Name of the stratified persons table to create. Defaults to "stratified_persons"
 #' @param visitSourceGroupConceptIds Optional vector of visit source group concept IDs to filter by. Defaults to 0
 #'
-#' @return Nothing. Creates a table called 'stratified_code_counts' in the results schema with columns:
+#' @return Nothing. Creates a table called 'stratified_persons' in the results schema with columns:
 #' \itemize{
+#'   \item `person_id` - The OMOP person ID
 #'   \item `concept_id` - The OMOP concept ID
 #'   \item `maps_to_concept_id` - The mapped concept ID
+#'   \item `visit_group_concept_id` - The FinnGen visit-source group concept ID
 #'   \item `calendar_year` - The year of the events
 #'   \item `gender_concept_id` - The gender concept ID
 #'   \item `age_decile` - The age decile (0-9, 10-19, etc.)
-#'   \item `record_counts` - Number of events for this code
 #' }
 #'
 #' @importFrom checkmate assertClass assertDataFrame assertSubset
@@ -26,23 +29,10 @@
 #' @importFrom tibble tribble
 #'
 #' @export
-#'
-#' @examples
-#' \dontrun{
-#' # Create stratified code counts table for all domains
-#' createStratifiedCodeCountsTable(CDMdbHandler)
-#' 
-#' # Create stratified code counts table with custom domain configuration
-#' custom_domains <- tibble::tribble(
-#'   ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
-#'   "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date", "condition_concept_id"
-#' )
-#' createStratifiedCodeCountsTable(CDMdbHandler, domains = custom_domains)
-#' }
-createStratifiedCodeCountsTable <- function(
+createStratifiedPersonsTable <- function(
     CDMdbHandler,
-    domains = NULL, 
-    stratifiedCodeCountsTable = "stratified_code_counts", 
+    domains = NULL,
+    stratifiedPersonsTable = "stratified_persons",
     visitSourceGroupConceptIds = 0
     ) {
     #
@@ -76,24 +66,24 @@ createStratifiedCodeCountsTable <- function(
     # FUNCTION
     #
 
-    # - Create code counts table for each domain
+    # - Create stratified persons table for each domain
     sqlDialectFolder <- if (connection@dbms == "bigquery") "bigquery" else "sql_server"
-    sqlPath <- system.file("sql", sqlDialectFolder, "appendToStratrifiedCodeCountsTable.sql", package = "ROMOPAPI")
+    sqlPath <- system.file("sql", sqlDialectFolder, "appendToStratifiedPersonsTable.sql", package = "ROMOPAPI")
     baseSql <- SqlRender::readSql(sqlPath)
 
-    sql <- "DROP TABLE IF EXISTS @resultsDatabaseSchema.@stratifiedCodeCountsTable;
-    CREATE TABLE @resultsDatabaseSchema.@stratifiedCodeCountsTable (
+    sql <- "DROP TABLE IF EXISTS @resultsDatabaseSchema.@stratifiedPersonsTable;
+    CREATE TABLE @resultsDatabaseSchema.@stratifiedPersonsTable (
+        person_id INTEGER,
         concept_id INTEGER,
         maps_to_concept_id INTEGER,
         visit_group_concept_id INTEGER,
         calendar_year INTEGER,
         gender_concept_id INTEGER,
-        age_decile INTEGER,
-        record_counts INTEGER
+        age_decile INTEGER
     )"
     sql <- SqlRender::render(sql,
         resultsDatabaseSchema = resultsDatabaseSchema,
-        stratifiedCodeCountsTable = stratifiedCodeCountsTable
+        stratifiedPersonsTable = stratifiedPersonsTable
     )
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     DatabaseConnector::executeSql(connection, sql)
@@ -102,13 +92,13 @@ createStratifiedCodeCountsTable <- function(
         domain <- domains[i, ]
         message(sprintf("Processing domain: %s", domain$table_name))
         sql <- SqlRender::render(baseSql,
-            stratifiedCodeCountsTable = stratifiedCodeCountsTable,
+            stratifiedPersonsTable = stratifiedPersonsTable,
             cdmDatabaseSchema = cdmDatabaseSchema,
             resultsDatabaseSchema = resultsDatabaseSchema,
             table_name = domain$table_name,
             concept_id_field = domain$concept_id_field,
             date_field = domain$date_field,
-            maps_to_concept_id_field = domain$maps_to_concept_id_field, 
+            maps_to_concept_id_field = domain$maps_to_concept_id_field,
             visit_group_concept_ids = paste0(visitSourceGroupConceptIds, collapse = ", ")
         )
 

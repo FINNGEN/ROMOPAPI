@@ -13,8 +13,16 @@
 #' \itemize{
 #'   \item `concept_id` - The OMOP concept ID
 #'   \item `concept_name` - The human-readable concept name
+#'   \item `domain_id` - The domain identifier (e.g., Condition, Procedure, Drug, etc.)
 #'   \item `vocabulary_id` - The vocabulary identifier (e.g., SNOMED, ICD10)
+#'   \item `concept_class_id` - The concept class
 #'   \item `standard_concept` - Logical indicating if this is a standard concept
+#'   \item `concept_code` - The concept code
+#'   \item `record_counts` - Number of events for this code
+#'   \item `descendant_record_counts` - Number of events including descendant concepts
+#'   \item `number_of_descendants` - Number of descendant concepts (including itself)
+#'   \item `person_counts` - Number of distinct persons with this code
+#'   \item `descendant_person_counts` - Number of distinct persons including descendant concepts
 #' }
 #'
 #' @importFrom checkmate assertClass
@@ -24,7 +32,7 @@
 #' @importFrom dplyr mutate if_else
 #'
 #' @export
-#' 
+#'
 getConceptsWithCodeCounts <- function(
     CDMdbHandler,
     codeCountsTable = "code_counts") {
@@ -44,10 +52,11 @@ getConceptsWithCodeCounts <- function(
     #
     # Get concept_id, concept_name, vocabulary_id, standard_concept for all concept_ids present in code_counts in one SQL call
     sql <- "
-    SELECT DISTINCT 
-        c.concept_id, 
+    SELECT DISTINCT
+        c.concept_id,
         c.concept_name, c.domain_id, c.vocabulary_id, c.concept_class_id, c.standard_concept, c.concept_code,
-        cc.record_counts, cc.descendant_record_counts, cc.number_of_descendants
+        cc.record_counts, cc.descendant_record_counts, cc.number_of_descendants,
+        cc.person_counts, cc.descendant_person_counts
        FROM @vocabularyDatabaseSchema.concept c
        INNER JOIN @resultsDatabaseSchema.@codeCountsTable cc
        ON c.concept_id = cc.concept_id;"
@@ -77,15 +86,7 @@ getConceptsWithCodeCounts <- function(
 #'
 #' @importFrom memoise memoise
 #' 
-#' @return A tibble with columns:
-#' \itemize{
-#'   \item `concept_id` - The OMOP concept ID
-#'   \item `concept_name` - The human-readable concept name
-#'   \item `concept_code` - The concept code
-#'   \item `domain_id` - The domain identifier (e.g., Condition, Procedure, Drug, etc.)
-#'   \item `vocabulary_id` - The vocabulary identifier (e.g., SNOMED, ICD10)
-#'   \item `standard_concept` - Logical indicating if this is a standard concept
-#' }
+#' @return Same columns as \code{\link{getConceptsWithCodeCounts}}.
 #'
 #' @export
 getConceptsWithCodeCounts_memoise <- memoise::memoise(

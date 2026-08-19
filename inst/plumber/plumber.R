@@ -45,6 +45,52 @@ function(res, conceptId=0L) {
 }
 
 
+#* Get person-count breakdowns and set overlaps for a concept
+#* @param conceptId The concept ID to get person counts for
+#* @param level Maximum tree depth to include in upset_person_counts. Omit for the full tree
+#* @param sexStratum Comma-separated gender_concept_id values to restrict upset_person_counts to
+#* @param ageStratum Comma-separated age_decile values to restrict upset_person_counts to
+#* @param yearStratum Comma-separated calendar_year values to restrict upset_person_counts to
+#* @param visitStratum Comma-separated visit_group_concept_id values to restrict upset_person_counts to
+#* @get /getPersonCounts
+function(res, conceptId = 0L, level = "", sexStratum = "", ageStratum = "", yearStratum = "", visitStratum = "") {
+
+  conceptId <- as.integer(conceptId)
+  if (is.na(conceptId)) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("conceptId must be an integer")))
+  }
+
+  parseIntCsv <- function(x) {
+    x <- trimws(x)
+    if (!nzchar(x)) {
+      return(NULL)
+    }
+    as.integer(strsplit(x, ",")[[1]])
+  }
+
+  level <- if (nzchar(trimws(level))) as.integer(level) else NULL
+  if (!is.null(level) && is.na(level)) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("level must be an integer")))
+  }
+
+  tryCatch({
+    getPersonCounts_memoise(
+      CDMdbHandler = CDMdbHandler,
+      conceptId = conceptId,
+      level = level,
+      sexStratum = parseIntCsv(sexStratum),
+      ageStratum = parseIntCsv(ageStratum),
+      yearStratum = parseIntCsv(yearStratum),
+      visitStratum = parseIntCsv(visitStratum)
+    )
+  }, error = function(e) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox(e$message)))
+  })
+}
+
 #* Get the API information
 #* @get /getAPIInfo
 function() {

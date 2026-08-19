@@ -16,11 +16,9 @@
 #'   \item `code_counts` - Tibble of code counts from the code_counts table
 #' }
 #'
-#' @importFrom checkmate assertClass assertIntegerish
-#' @importFrom SqlRender render translate
+#' @importFrom checkmate assertClass assertIntegerish assertString
 #' @importFrom DatabaseConnector renderTranslateQuerySql
-#' @importFrom tibble as_tibble
-#' @importFrom dplyr pull bind_rows
+#' @importFrom tibble as_tibble tibble
 #'
 #' @export
 #'
@@ -47,131 +45,22 @@ getCodeCounts <- function(
     stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
 
     connection <- CDMdbHandler$connectionHandler$getConnection()
-    vocabularyDatabaseSchema <- CDMdbHandler$vocabularyDatabaseSchema
     resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
-    isBq <- identical(connection@dbms, "bigquery")
 
     #
     # FUNCTION
     #
 
-    # - Get concept parents and all descendants, only if they have code counts
-    sql <- "
-    -- All descendants from the concept id
-    WITH concept_descendants AS (
-        SELECT DISTINCT
-            ca.ancestor_concept_id AS concept_id,
-            ca.descendant_concept_id AS descendant_concept_id
-        FROM @vocabularyDatabaseSchema.concept_ancestor ca
-        WHERE ca.ancestor_concept_id IN (@conceptId) AND (ca.min_levels_of_separation != 0 OR ca.ancestor_concept_id = ca.descendant_concept_id)
-    ),
-    -- Only  descendants from the concept id that have counts
-    concept_descendants_with_counts AS (
-        SELECT
-            cd.descendant_concept_id AS concept_id_with_counts
-        FROM
-            concept_descendants AS cd
-        INNER JOIN (
-            SELECT DISTINCT
-                    concept_id AS concept_id
-            FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable
-            UNION ALL
-            SELECT DISTINCT
-                    maps_to_concept_id AS concept_id
-            FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable
-        ) AS cca
-        ON cd.descendant_concept_id = cca.concept_id
-    ),
-    -- Descendants from the concept id that have code or children with code
-    concept_descendants_with_counts_or_descendance_counts AS (
-        SELECT
-            -- cd.concept_id AS concept_id
-            cd.descendant_concept_id AS descendant_concept_id
-        FROM concept_descendants AS cd
-        INNER JOIN @vocabularyDatabaseSchema.concept_ancestor ca
-        ON cd.descendant_concept_id = ca.ancestor_concept_id
-        INNER JOIN concept_descendants_with_counts AS cdc
-        ON ca.descendant_concept_id = cdc.concept_id_with_counts
-        WHERE ca.min_levels_of_separation != 0 OR ca.ancestor_concept_id = ca.descendant_concept_id
-    ),
-    temp_tree AS (
-    -- From all the descendant nodes with record counts or descendant record counts, take the parents
-     SELECT DISTINCT
-            ca.ancestor_concept_id as parent_concept_id,
-            cddrc.descendant_concept_id as child_concept_id
-        FROM concept_descendants_with_counts_or_descendance_counts AS cddrc
-    -- Append the parents to each descendant
-    LEFT JOIN @vocabularyDatabaseSchema.concept_ancestor ca
-    ON cddrc.descendant_concept_id = ca.descendant_concept_id
-    WHERE ca.min_levels_of_separation = 1
-    )
-    -- take only parents who are someones children, or are the parents  of the concept id
-    SELECT * FROM temp_tree tt
-    WHERE parent_concept_id IN (SELECT DISTINCT child_concept_id FROM temp_tree ) OR 
-      child_concept_id IN (@conceptId) OR
-      parent_concept_id IN (@conceptId) -- when concept is top in tree
-    "
-
-    # Gets tree of descendants and the code counts for each descendant
-    familyTree <- DatabaseConnector::renderTranslateQuerySql(
-        connection = connection,
-        sql = sql,
-        vocabularyDatabaseSchema = vocabularyDatabaseSchema,
-        conceptId = conceptId,
-        resultsDatabaseSchema = resultsDatabaseSchema,
-        stratifiedCodeCountsTable = stratifiedCodeCountsTable
-    ) |>
-    tibble::as_tibble()
-
-    if (nrow(familyTree) == 0) {
-        stop("No family tree found for conceptId: ", conceptId)
-    }
-
-    ancestorTable <- .familyTreeToAncestorTable(familyTree, conceptId)
-
-    familyTreeWithInfo <- familyTree |>
-        dplyr::left_join(ancestorTable, by = c("child_concept_id" = "descendant_concept_id"))
-
-    familyTreeWithInfo <- dplyr::bind_rows(
-        familyTreeWithInfo |> dplyr::filter(levels != "0-0"),
-        tibble::tibble(
-            parent_concept_id = familyTreeWithInfo |> dplyr::filter(levels == "0-0") |> pull(child_concept_id),
-            child_concept_id = familyTreeWithInfo |> dplyr::filter(levels == "0-0") |> pull(parent_concept_id),
-            levels = "-1",
-            paths = 1
-        ),
-        tibble::tibble(
-            parent_concept_id = conceptId,
-            child_concept_id = conceptId,
-            levels = "0",
-            paths = 0
-        )
-    ) |>
-        dplyr::arrange(levels)
-
-
-    conceptIdsToGetCounts <- familyTreeWithInfo |>
-        dplyr::filter(!levels %in% c("-1")) |>
-        dplyr::pull(child_concept_id) |>
-        unique()
-
+    conceptTree <- getConceptTree_memoise(CDMdbHandler, conceptId = conceptId, codeCountsTable = codeCountsTable)
+    familyTreeWithInfo <- conceptTree$family_tree
+    conceptIdsToGetCounts <- conceptTree$concept_ids
 
     # - Get counts and derive 'Maps to' and 'Mapped from' from that.
-    #   persons_hll_counts column always exists (BYTES on BQ, INTEGER 0 placeholder
-    #   on sql_server/sqlite). BQ fetches as base64 string; non-BQ as raw integer.
-    #   Per-concept HLL aggregation: BQ uses native HLL_COUNT.MERGE_PARTIAL in a
-    #   separate query below; non-BQ just passes the placeholder through.
-    hllSelect <- if (isBq) {
-        ", TO_BASE64(persons_hll_counts) AS node_hll_person_counts"
-    } else {
-        ", persons_hll_counts AS node_hll_person_counts"
-    }
-    sql <- paste0(
-        "SELECT concept_id, maps_to_concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile, record_counts",
-        hllSelect,
-        " FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable",
-        " WHERE concept_id IN (@conceptIds) OR maps_to_concept_id IN (@conceptIds);"
-    )
+    sql <- "
+        SELECT concept_id, maps_to_concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile, record_counts
+        FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable
+        WHERE concept_id IN (@conceptIds) OR maps_to_concept_id IN (@conceptIds);
+    "
     codeCounts <- DatabaseConnector::renderTranslateQuerySql(
         connection = connection,
         sql = sql,
@@ -180,20 +69,6 @@ getCodeCounts <- function(
         stratifiedCodeCountsTable = stratifiedCodeCountsTable
     ) |>
         tibble::as_tibble()
-
-    # Normalize node_hll_person_counts to scalar-per-row: BQ already returns
-    # base64 character via TO_BASE64; sqlite returns a blob/list-of-raws which
-    # dplyr::summarise would flatten into a single raw vector. Convert raws
-    # to base64 strings so downstream agg yields one string per group.
-    if (inherits(codeCounts$node_hll_person_counts, "blob") ||
-        (is.list(codeCounts$node_hll_person_counts) &&
-         all(vapply(codeCounts$node_hll_person_counts, is.raw, logical(1))))) {
-        codeCounts$node_hll_person_counts <- vapply(
-            codeCounts$node_hll_person_counts,
-            function(r) if (length(r) == 0L) NA_character_ else base64enc::base64encode(r),
-            character(1)
-        )
-    }
 
     # - Derive 'Maps to' and 'Mapped from'
     mappings <- dplyr::bind_rows(
@@ -217,54 +92,16 @@ getCodeCounts <- function(
     )
 
     # Standard-concept aggregation across maps_to_concept_id.
-    # BQ: server-side HLL_COUNT.MERGE_PARTIAL in a dedicated query.
-    # non-BQ with base64 HLL data (future): R-side HLL_COUNT.MERGE_PARTIAL() inside summarise().
-    # non-BQ with placeholder (integer 0): sum() carries the placeholder through.
-    codeCountsStandard <- if (isBq) {
-        hllSql <- "
-            SELECT
-                CAST(concept_id AS BIGINT) AS concept_id,
-                CAST(visit_group_concept_id AS BIGINT) AS visit_group_concept_id,
-                CAST(calendar_year AS BIGINT) AS calendar_year,
-                CAST(gender_concept_id AS BIGINT) AS gender_concept_id,
-                CAST(age_decile AS BIGINT) AS age_decile,
-                SUM(record_counts) AS record_counts,
-                TO_BASE64(HLL_COUNT.MERGE_PARTIAL(persons_hll_counts)) AS node_hll_person_counts
-            FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable
-            WHERE concept_id IN (@conceptIds) OR maps_to_concept_id IN (@conceptIds)
-            GROUP BY concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile
-        "
-        DatabaseConnector::renderTranslateQuerySql(
-            connection = connection,
-            sql = hllSql,
-            resultsDatabaseSchema = resultsDatabaseSchema,
-            conceptIds = paste(conceptIdsToGetCounts, collapse = ","),
-            stratifiedCodeCountsTable = stratifiedCodeCountsTable
-        ) |>
-            tibble::as_tibble()
-    } else if (!is.numeric(codeCounts$node_hll_person_counts)) {
-        # HLL data present (base64 string or blob/list of raws) — use R-side
-        # HLL_COUNT.MERGE_PARTIAL which accepts both.
-        codeCounts |> dplyr::select(-maps_to_concept_id) |>
-            dplyr::group_by(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile) |>
-            dplyr::summarise(
-                record_counts = sum(record_counts),
-                node_hll_person_counts = HLL_COUNT.MERGE_PARTIAL(node_hll_person_counts),
-                .groups = "drop"
-            )
-    } else {
-        codeCounts |> dplyr::select(-maps_to_concept_id) |>
-            dplyr::group_by(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile) |>
-            dplyr::summarise(
-                record_counts = sum(record_counts),
-                node_hll_person_counts = sum(node_hll_person_counts),
-                .groups = "drop"
-            )
-    }
+    codeCountsStandard <- codeCounts |>
+        dplyr::select(-maps_to_concept_id) |>
+        dplyr::group_by(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile) |>
+        dplyr::summarise(
+            record_counts = sum(record_counts),
+            .groups = "drop"
+        )
 
     # - Get counts table only for descendats and mapped from.
-    #   Standard rows go first so concept-maps-to-itself duplicates resolve
-    #   to the standard row (which carries node_hll_person_counts when set).
+    #   Standard rows go first so concept-maps-to-itself duplicates resolve to the standard row.
     codeCountsPerId <- dplyr::bind_rows(
         codeCountsStandard,
         # source concepts, remove duplicates
@@ -343,69 +180,6 @@ getCodeCounts <- function(
         concepts = concepts
     ))
 }
-
-#' Convert family tree to ancestor table
-#'
-#' @description
-#' Takes a family tree structure and a concept ID and generates an ancestor table showing
-#' descendant relationships and path information.
-#'
-#' @param familyTree A tibble containing parent-child concept relationships
-#' @param conceptId The concept ID to generate the ancestor table for
-#'
-#' @return A tibble containing:
-#' \itemize{
-#'   \item descendant_concept_id - The descendant concept IDs
-#'   \item levels - String showing min and max levels of the relationship
-#'   \item paths - Number of paths to reach the descendant
-#' }
-#'
-#' @importFrom tibble tibble
-#' @importFrom dplyr semi_join filter mutate select bind_rows group_by summarise arrange n
-#'
-.familyTreeToAncestorTable <- function(familyTree, conceptId) {
-    descendantTable <- tibble::tibble(
-        descendant_concept_id = conceptId,
-        level = 0,
-        paths = 0
-    )
-
-    level <- 0
-    while (TRUE) {
-        a <- familyTree |> dplyr::semi_join(
-            descendantTable |>
-                dplyr::filter(level == {{ level }}),
-            by = c("parent_concept_id" = "descendant_concept_id")
-        )
-
-        if (nrow(a) == 0) {
-            break
-        }
-
-        level <- level + 1
-
-        descendantTable <- dplyr::bind_rows(
-            descendantTable,
-            a |>
-                dplyr::select(descendant_concept_id = child_concept_id) |>
-                dplyr::mutate(level = {{ level }})
-        )
-    }
-
-    descendantTable <- descendantTable |>
-        dplyr::group_by(descendant_concept_id) |>
-        dplyr::summarise(
-            level = min(level),
-            levels = paste0(min(level), "-", max(level)),
-            paths = dplyr::n(),
-            .groups = "drop"
-        ) |>
-        dplyr::arrange(level) |>
-        dplyr::select(descendant_concept_id, levels, paths)
-
-    return(descendantTable)
-}
-
 
 #' Memoised version of getCodeCounts
 #'

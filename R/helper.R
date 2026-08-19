@@ -103,12 +103,21 @@ helper_FinnGen_getDatabaseFileCounts <- function() {
 #'
 #' @description
 #' Creates a new SQLite database by extracting specific concept data from a CDM database.
-#' The function extracts concept information, concept ancestors, code counts, and
-#' stratified code counts for the specified concept IDs and creates a new SQLite
-#' database with this subset of data.
+#' The function extracts concept information, concept ancestors, code counts, stratified
+#' code counts, and the stratified persons bridge table for the specified concept IDs and
+#' creates a new SQLite database with this subset of data.
 #'
 #' @param CDMdbHandler A CDMdbHandler object containing database connection details
 #' @param conceptIds Vector of concept IDs to extract. Defaults to c(317009, 21601855)
+#' @param personBridgeConceptIds Subset of `conceptIds` whose trees are extracted into the
+#'   `stratified_persons` bridge table. Defaults to `conceptIds` (all of them). A person-level
+#'   bridge fans out to one row per person per stratum, so a broad concept's tree can make the
+#'   extract far larger than the record-level tables — narrow this to keep the fixture small.
+#' @param maxPersonsPerConcept Maximum distinct persons kept per target concept (in
+#'   `personBridgeConceptIds`'s trees) in the `stratified_persons` extract — the lowest-`person_id`
+#'   ones, deterministically. All of a kept person's stratum rows for that concept are included, so
+#'   this bounds the person-level fan-out for common real-world codes without truncating any one
+#'   person's detail. Defaults to 1000.
 #' @param pathToSqliteDatabase Path where the new SQLite database should be created.
 #'   Defaults to a temporary file with .sqlite extension
 #' @param codeCountsTable Name of the code counts table in the source database.
@@ -125,6 +134,8 @@ helper_FinnGen_getDatabaseFileCounts <- function() {
 helper_createSqliteDatabaseFromDatabase <- function(
     CDMdbHandler,
     conceptIds = c(317009, 21601855),
+    personBridgeConceptIds = conceptIds,
+    maxPersonsPerConcept = 1000,
     pathToSqliteDatabase = tempfile(fileext = ".sqlite"),
     codeCountsTable = "code_counts") {
   CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
@@ -146,6 +157,7 @@ helper_createSqliteDatabaseFromDatabase <- function(
   targetResultsDatabaseSchema <- "main"
 
   conceptIdsToExtract <- c()
+  personConceptIdsToExtract <- c()
   for (conceptId in conceptIds) {
     results <- getCodeCounts(
       CDMdbHandler,
@@ -153,9 +165,13 @@ helper_createSqliteDatabaseFromDatabase <- function(
     )
 
     conceptIdsToExtract <- c(conceptIdsToExtract, results$concepts$concept_id)
+    if (conceptId %in% personBridgeConceptIds) {
+      personConceptIdsToExtract <- c(personConceptIdsToExtract, results$concepts$concept_id)
+    }
   }
 
   conceptIdsToExtract <- conceptIdsToExtract |> unique()
+  personConceptIdsToExtract <- personConceptIdsToExtract |> unique()
 
   # Get concept table
   sql <- "SELECT DISTINCT c.* FROM @vocabularyDatabaseSchema.concept c
@@ -244,7 +260,54 @@ helper_createSqliteDatabaseFromDatabase <- function(
     tempTable = FALSE,
   )
 
-  # get CDMsource 
+  # stratified persons bridge table — scoped to personBridgeConceptIds (which may be
+  # narrower than conceptIdsToExtract) and capped to maxPersonsPerConcept distinct
+  # persons per target concept, deterministically (lowest person_id first). A common
+  # real-world code can otherwise have hundreds of thousands of person rows; kept
+  # persons still bring all of their stratum rows for that concept, so per-person
+  # detail is never truncated, only the number of persons covered.
+  sql <- "
+    WITH target_pairs AS (
+        SELECT concept_id AS target_concept_id, person_id
+        FROM @resultsDatabaseSchema.stratified_persons
+        WHERE concept_id IN (@personConceptIdsToExtract)
+        UNION
+        SELECT maps_to_concept_id AS target_concept_id, person_id
+        FROM @resultsDatabaseSchema.stratified_persons
+        WHERE maps_to_concept_id IN (@personConceptIdsToExtract)
+    ),
+    ranked_pairs AS (
+        SELECT target_concept_id, person_id,
+               ROW_NUMBER() OVER (PARTITION BY target_concept_id ORDER BY person_id) AS rn
+        FROM target_pairs
+    ),
+    kept_pairs AS (
+        SELECT DISTINCT target_concept_id, person_id FROM ranked_pairs WHERE rn <= @maxPersonsPerConcept
+    )
+    SELECT DISTINCT sp.*
+    FROM @resultsDatabaseSchema.stratified_persons sp
+    INNER JOIN kept_pairs kp
+      ON kp.person_id = sp.person_id
+     AND (kp.target_concept_id = sp.concept_id OR kp.target_concept_id = sp.maps_to_concept_id)
+  "
+  stratifiedPersons <- DatabaseConnector::renderTranslateQuerySql(
+    connection = sourceConnection,
+    sql = sql,
+    resultsDatabaseSchema = sourceResultsDatabaseSchema,
+    personConceptIdsToExtract = paste(personConceptIdsToExtract, collapse = ","),
+    maxPersonsPerConcept = maxPersonsPerConcept
+  ) |>
+    tibble::as_tibble()
+
+  targetConnection |> DatabaseConnector::insertTable(
+    tableName = "stratified_persons",
+    data = stratifiedPersons,
+    dropTableIfExists = TRUE,
+    createTable = TRUE,
+    tempTable = FALSE,
+  )
+
+  # get CDMsource
   sql <- "SELECT DISTINCT c.* FROM @vocabularyDatabaseSchema.cdm_source c"
   cdmSource <- DatabaseConnector::renderTranslateQuerySql(
     connection = sourceConnection,
