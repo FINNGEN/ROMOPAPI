@@ -352,8 +352,19 @@ is disabled):
 self-contained HTML report for a concept: a Mermaid hierarchy diagram plus
 stratified tables and charts. It pulls its data through `getCodeCounts_memoise`
 and builds visuals with the helpers in `R/plotingFunctions.R` (ggplot2 / plotly
-/ reactable). `inst/reports/mermaid.min.js` is served locally so reports need no
-CDN.
+/ reactable). Each Mermaid node is labeled `RC`/`DRC` (record / descendant record
+counts, global) and `PC`/`DPC` (person / descendant person counts, global), with
+the in-tree "shown" subtree sum in parens next to RC/DRC when pruning narrows the
+displayed descendants. `inst/reports/mermaid.min.js` is served locally so reports
+need no CDN.
+
+A **Person Counts** section pulls `getPersonCounts_memoise` and
+`getVisitTypeNames_memoise` separately and renders: a pie chart of persons by sex
+(`createSexPieChartFromPersonCounts`), a bar chart by age decile
+(`createAgeHistogramFromPersonCounts`), a bar chart by visit-source group
+(`createVisitBarplotFromPersonCounts`), and an UpSet plot of the exact
+set-overlap regions (`createUpsetPlotFromPersonCounts`) — all in
+`R/plotingFunctions.R`.
 
 ---
 

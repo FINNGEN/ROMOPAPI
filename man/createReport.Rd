@@ -49,8 +49,13 @@ This function creates a comprehensive report by:
 The report template includes:
 \itemize{
 \item Dynamic title showing concept ID and parameters
-\item Interactive Mermaid graph visualization
+\item Interactive Mermaid graph visualization, with each node labeled with its
+record counts (RC), descendant record counts (DRC), person counts (PC) and
+descendant person counts (DPC)
 \item Comprehensive data tables
 \item Statistical plots and charts
+\item A person-counts section (from \code{getPersonCounts_memoise}): a pie chart of
+persons by sex, a bar chart by age decile, a bar chart by visit-source group, and
+an UpSet plot of exact set-overlap regions
 }
 }
