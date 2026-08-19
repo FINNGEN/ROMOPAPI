@@ -16,8 +16,16 @@ A tibble with columns:
 \itemize{
 \item \code{concept_id} - The OMOP concept ID
 \item \code{concept_name} - The human-readable concept name
+\item \code{domain_id} - The domain identifier (e.g., Condition, Procedure, Drug, etc.)
 \item \code{vocabulary_id} - The vocabulary identifier (e.g., SNOMED, ICD10)
+\item \code{concept_class_id} - The concept class
 \item \code{standard_concept} - Logical indicating if this is a standard concept
+\item \code{concept_code} - The concept code
+\item \code{record_counts} - Number of events for this code
+\item \code{descendant_record_counts} - Number of events including descendant concepts
+\item \code{number_of_descendants} - Number of descendant concepts (including itself)
+\item \code{person_counts} - Number of distinct persons with this code
+\item \code{descendant_person_counts} - Number of distinct persons including descendant concepts
 }
 }
 \description{

@@ -21,8 +21,10 @@ flowchart LR
 
     subgraph build [1 · BUILD  — precompute]
         S[stratified_code_counts]
+        P[stratified_persons]
         C[code_counts]
         S --> C
+        P --> C
     end
 
     subgraph serve [2 · SERVE  — plumber API]
@@ -34,6 +36,7 @@ flowchart LR
     CDM -->|createCodeCountsTables| build
     VOCAB -->|createCodeCountsTables| build
     build -->|read at request time| G
+    P -->|exact set overlaps<br/>at request time| G
     VOCAB -->|concept names, hierarchy,<br/>metadata at request time| G
     E -->|JSON / HTML report| Client[Client]
 ```
@@ -108,9 +111,9 @@ that owns the connection and knows where the tables live.
 
 ## 2 · Precompute: the counts tables
 
-The build phase produces **two** tables in the results schema, in order. The
-first is fine-grained and stratified; the second rolls it up along the concept
-hierarchy. Entry point: `createCodeCountsTables()`
+The build phase produces **three** tables in the results schema, in order. The
+first two are fine-grained (one stratified by event, one by person); the third
+rolls both up along the concept hierarchy. Entry point: `createCodeCountsTables()`
 (`R/createCodeCountsTables.R`), called by `runApiServer(buildCountsTable = TRUE)`.
 
 ### 2a · `stratified_code_counts`
@@ -124,7 +127,6 @@ One row per unique combination of stratification keys, for every domain:
 | `visit_group_concept_id` | FinnGen visit-source grouping (`0` when disabled) |
 | `calendar_year`, `gender_concept_id`, `age_decile` | demographic / time strata |
 | `record_counts` | number of events in that stratum |
-| `persons_hll_counts` | HLL sketch (BigQuery) / placeholder (SQLite) for distinct-person counts |
 
 - **R:** `createStratifiedCodeCountsTable()`
   (`R/createStratifiedCodeCountsTable.R`) creates the empty table, then loops
@@ -140,19 +142,48 @@ One row per unique combination of stratification keys, for every domain:
   or without the FinnGen visit-source-group list (see AGENTS.md →
   *Database-dependent settings*).
 
-### 2b · `code_counts` — how the stratified table is rolled up
+### 2b · `stratified_persons` — the exact person-level bridge
 
-`code_counts` is derived **from** `stratified_code_counts` (it never touches the
-raw CDM again), in two SQL steps inside
+Distinct-person counts can't be summed across strata, and overlap questions
+(does this person also have that other code?) need the actual person, not a
+summary. So a second table keeps `person_id` instead of collapsing it to a
+count — one row per distinct `concept_id × stratum × person_id`:
+
+| Column | Meaning |
+|--------|---------|
+| `person_id` | the OMOP person |
+| `concept_id`, `maps_to_concept_id`, `visit_group_concept_id`, `calendar_year`, `gender_concept_id`, `age_decile` | same grain as `stratified_code_counts` |
+
+`createStratifiedPersonsTable()` (`R/createStratifiedPersonsTable.R`) mirrors
+`createStratifiedCodeCountsTable()` — same domain loop, same per-domain SQL
+templates (`inst/sql/{sql_server,bigquery}/appendToStratifiedPersonsTable.sql`),
+just `SELECT DISTINCT` instead of `COUNT`/`GROUP BY`. `COUNT(DISTINCT person_id)`
+over this table is exact on every backend (unlike a sketch, it works the same
+on SQLite and BigQuery) and is what `code_counts` (§2c) and `getPersonCounts()`
+(§3) build on. See `.scratchpad/no_HLL_or_sketches.md` for why sketches
+(HLL/KMV/Theta) were rejected in favor of this exact bridge: strata are small
+(median ~5 persons/row) so exact overlap is cheap, and sketches either can't
+intersect at all (HLL) or need to sample nearly the whole set to resolve the
+tiny bars an overlap plot cares about.
+
+### 2c · `code_counts` — how the stratified tables are rolled up
+
+`code_counts` is derived **from** `stratified_code_counts` and
+`stratified_persons` (it never touches the raw CDM again), inside
 `inst/sql/{sql_server,bigquery}/createCodeCountsTable.sql`:
 
-1. **Collapse strata → atomic per-concept counts.** Sum `record_counts` across
-   all strata (year, gender, age, visit) for each concept. Two sources are
-   unioned so both the standard concept and its unmapped source code get a row:
-   grouping by `concept_id`, then by `maps_to_concept_id` where the two differ.
+1. **Collapse strata → atomic per-concept counts.** Sum `record_counts` (and,
+   from the person bridge, take distinct persons) across all strata for each
+   concept. Two sources are unioned so both the standard concept and its
+   unmapped source code get a row: grouping by `concept_id`, then by
+   `maps_to_concept_id` where the two differ.
 2. **Add the hierarchy → descendant rollup.** Join those atomic counts to
    `concept_ancestor` so every concept also gets the sum of **all its
-   descendants'** counts, and a count of how many descendants it has.
+   descendants'** event counts, a count of how many descendants it has, and the
+   **distinct** person count across the concept and its descendants (computed
+   as `COUNT(DISTINCT person_id)` over the bridge — descendant person counts are
+   never summed, since the same person can appear under more than one
+   descendant).
 
 The result is one row per concept:
 
@@ -162,20 +193,14 @@ The result is one row per concept:
 | `record_counts` | its own events (atomic, from step 1) |
 | `descendant_record_counts` | events of the concept **and all descendants** (step 2) |
 | `number_of_descendants` | size of that descendant set |
+| `person_counts` | distinct persons with the concept's own events |
+| `descendant_person_counts` | distinct persons across the concept **and all descendants** |
 
 This table powers the "does this concept have any data, and how much" lookups
 that the API front-loads (`getConceptsWithCodeCounts`), while
 `stratified_code_counts` is kept for the per-concept, per-stratum detail the
-`/getCodeCounts` and `/report` endpoints need.
-
-### 2c · HyperLogLog (BigQuery distinct-person counts)
-
-Distinct-person counts can't be summed across strata, so on BigQuery they are
-stored as **HLL++ sketches** (`persons_hll_counts BYTES`). `R/hllCount.R` is a
-pure-R port of BigQuery's `HLL_COUNT.MERGE_PARTIAL` — it lets R merge sketches
-(e.g. inside `dplyr::summarise`) with the same encoding BigQuery uses, so
-person-count math stays correct when the getters aggregate across strata. SQLite
-has no HLL, so the column is a plain integer placeholder there.
+`/getCodeCounts` and `/report` endpoints need, and `stratified_persons` backs
+the exact stratum breakdowns and set-overlap regions `/getPersonCounts` needs.
 
 ---
 
@@ -190,7 +215,9 @@ from the cache key. The API calls the memoised versions.
 | Function (file) | Reads from | Returns |
 |-----------------|------------|---------|
 | `getConceptsWithCodeCounts()` (`R/getConceptsWithCodeCounts.R`) | `code_counts` ⨝ `concept` — the catalogue of every concept that has counts, with its name/vocabulary/class | tibble |
-| `getCodeCounts()` (`R/getCodeCounts.R`) | `concept_ancestor` (build the family tree), `stratified_code_counts` (per-stratum counts + HLL for the concept, its descendants and mapped codes), and `concept` (via `getConceptsWithCodeCounts` for details); 'Maps to'/'Mapped from' are derived from the stored `maps_to_concept_id` column | list of tibbles |
+| `getConceptTree()` (`R/getConceptTree.R`) | `concept_ancestor` — builds the family tree pruned to nodes that have counts or a counted descendant. Shared by `getCodeCounts()` and `getPersonCounts()` so the tree is built once | list(family_tree, concept_ids) |
+| `getCodeCounts()` (`R/getCodeCounts.R`) | `getConceptTree_memoise` (the tree), `stratified_code_counts` (per-stratum counts for the concept, its descendants and mapped codes), and `concept` (via `getConceptsWithCodeCounts` for details); 'Maps to'/'Mapped from' are derived from the stored `maps_to_concept_id` column | list of tibbles |
+| `getPersonCounts()` (`R/getPersonCounts.R`) | `getConceptTree_memoise` (the tree) and `stratified_persons` (the exact person bridge) — stratum breakdowns and exact set-overlap (UpSet) regions for the tree; per-concept `person_counts`/`descendant_person_counts` are read from `code_counts` via `getCodeCounts()`'s `concepts` tibble instead of being duplicated here | list of tibbles |
 | `getVisitTypeNames()` (`R/getVisitTypeNames.R`) | `stratified_code_counts` (distinct `visit_group_concept_id`) ⨝ `concept` (their names/codes) | tibble |
 | `getAPIInfo()` (`R/getAPIInfo.R`) | `cdm_source` (CDM name, vocabulary version) + package version | list |
 | `getLogs()` / `sendFeedback()` (`R/getLogs.R`, `R/sendFeedback.R`) | in-process log file / feedback capture — no DB | — |
@@ -217,10 +244,22 @@ One row per concept that has counts. The catalogue the API front-loads.
 | `record_counts` | the concept's own events (from `code_counts`) |
 | `descendant_record_counts` | events of the concept and all descendants |
 | `number_of_descendants` | size of that descendant set |
+| `person_counts` | distinct persons with the concept's own events |
+| `descendant_person_counts` | distinct persons across the concept and all descendants |
 
 > The `/getListOfConcepts` endpoint returns a **subset** of these columns:
 > `concept_id`, `concept_name`, `vocabulary_id`, `concept_code`,
 > `number_of_descendants`.
+
+#### `getConceptTree()` → `list(family_tree, concept_ids)`
+
+The tree-building block shared by `getCodeCounts()` and `getPersonCounts()`
+(memoised as `getConceptTree_memoise`). `family_tree` has the same
+`parent_concept_id`/`child_concept_id`/`levels`/`paths` shape as the tree rows
+in `concept_relationships` below (minus the mapping edges, which each getter
+derives separately since they depend on that getter's own counts read).
+`concept_ids` is the unique, `"-1"`-excluded concept-id list used to query the
+counts tables.
 
 #### `getCodeCounts()` → list of **three** tibbles
 
@@ -246,12 +285,39 @@ the tree:
 | `calendar_year`, `gender_concept_id`, `age_decile` | demographic / time strata |
 | `node_record_counts` | events of this concept in the stratum |
 | `node_descendant_record_counts` | events of this concept **and its descendants** in the stratum |
-| `node_hll_person_counts` | distinct-person count for the stratum — base64 HLL sketch (BigQuery) / integer placeholder (SQLite) |
 
 **`concepts`** — details for every concept referenced in the tree (same columns
 as `getConceptsWithCodeCounts` **minus** `number_of_descendants`): `concept_id`,
 `concept_name`, `domain_id`, `vocabulary_id`, `concept_class_id`,
-`standard_concept`, `concept_code`, `record_counts`, `descendant_record_counts`.
+`standard_concept`, `concept_code`, `record_counts`, `descendant_record_counts`,
+`person_counts`, `descendant_person_counts`.
+
+#### `getPersonCounts()` → list of **two** tibbles
+
+Keyed `filter_person_counts`, `upset_person_counts`. Per-concept
+`person_counts`/`descendant_person_counts` are *not* repeated here — read them
+from `getCodeCounts()`'s `concepts` tibble above.
+
+**`filter_person_counts`** — a breakdown of the full tree's persons by each
+filterable dimension, independent of the `level`/stratum arguments (lets a
+client discover which strata are worth filtering by, and how many persons they
+hold):
+
+| Column | Meaning |
+|--------|---------|
+| `filter` | which dimension: `"sex"`, `"age"`, or `"visit"` |
+| `stratum` | the `gender_concept_id` / `age_decile` / `visit_group_concept_id` value |
+| `person_counts` | distinct persons in the full tree with that stratum value |
+
+**`upset_person_counts`** — exact UpSet exclusive-region counts for the
+concepts at or under `level`, restricted to the requested strata. Computed by
+pulling each person's membership across the target concepts from
+`stratified_persons` and grouping — exact, not sketch-reconstructed (see §2b):
+
+| Column | Meaning |
+|--------|---------|
+| `group` | the concept IDs of the exclusive region, joined by `"-"` |
+| `person_counts` | distinct persons in exactly that region (no more, no fewer of the target concepts) |
 
 #### `getVisitTypeNames()` → one tibble
 
@@ -307,6 +373,7 @@ memoised getter:
 | Endpoint | Backed by |
 |----------|-----------|
 | `GET /getCodeCounts?conceptId=` | `getCodeCounts_memoise` |
+| `GET /getPersonCounts?conceptId=&level=&sexStratum=&ageStratum=&yearStratum=&visitStratum=` | `getPersonCounts_memoise` |
 | `GET /getListOfConcepts` | `getConceptsWithCodeCounts_memoise` |
 | `GET /getVisitTypeNames` | `getVisitTypeNames_memoise` |
 | `GET /getAPIInfo` | `getAPIInfo` |
