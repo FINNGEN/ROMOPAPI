@@ -62,8 +62,7 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
       "calendar_year",
       "gender_concept_id",
       "age_decile",
-      "record_counts",
-      "persons_hll_counts"
+      "record_counts"
     ))
   
   stratifiedCodeCounts |> 
@@ -141,8 +140,7 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
       "calendar_year",
       "gender_concept_id",
       "age_decile",
-      "record_counts",
-      "persons_hll_counts"
+      "record_counts"
     ))
   
   
@@ -269,8 +267,7 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
       "calendar_year",
       "gender_concept_id",
       "age_decile",
-      "record_counts",
-      "persons_hll_counts"
+      "record_counts"
     ))
   
   
@@ -369,7 +366,9 @@ test_that("createCodeCountsTables works", {
       "concept_id",
       "record_counts",
       "descendant_record_counts",
-      "number_of_descendants"
+      "number_of_descendants",
+      "person_counts",
+      "descendant_person_counts"
     ))
 
   # check that descendant_record_counts is greater than or equal to record_counts
@@ -405,6 +404,24 @@ test_that("createCodeCountsTables works", {
   code_counts |>
     dplyr::filter(number_of_descendants > 1) |>
     dplyr::filter(record_counts > descendant_record_counts) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # check that descendant_person_counts is greater than or equal to person_counts
+  # (exact COUNT(DISTINCT person_id), never a sum — persons can repeat across descendants)
+  code_counts |>
+    dplyr::filter(descendant_person_counts < person_counts) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # check that concepts with no other counted descendant (mirrors the
+  # record_counts == descendant_record_counts check above) have
+  # person_counts == descendant_person_counts
+  code_counts |>
+    dplyr::filter(record_counts == descendant_record_counts) |>
+    dplyr::filter(person_counts != descendant_person_counts) |>
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_equal(0)
@@ -476,7 +493,9 @@ test_that("createCodeCountsTables works stratified by visit_group_concept_id", {
       "concept_id",
       "record_counts",
       "descendant_record_counts",
-      "number_of_descendants"
+      "number_of_descendants",
+      "person_counts",
+      "descendant_person_counts"
     ))
 
   # check that descendant_record_counts is greater than or equal to record_counts
@@ -512,6 +531,24 @@ test_that("createCodeCountsTables works stratified by visit_group_concept_id", {
   code_counts |>
     dplyr::filter(number_of_descendants > 1) |>
     dplyr::filter(record_counts > descendant_record_counts) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # check that descendant_person_counts is greater than or equal to person_counts
+  # (exact COUNT(DISTINCT person_id), never a sum — persons can repeat across descendants)
+  code_counts |>
+    dplyr::filter(descendant_person_counts < person_counts) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # check that concepts with no other counted descendant (mirrors the
+  # record_counts == descendant_record_counts check above) have
+  # person_counts == descendant_person_counts
+  code_counts |>
+    dplyr::filter(record_counts == descendant_record_counts) |>
+    dplyr::filter(person_counts != descendant_person_counts) |>
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_equal(0)
@@ -602,8 +639,7 @@ test_that("stratified table keeps source concepts with no standard concept (conc
        calendar_year INTEGER,
        gender_concept_id INTEGER,
        age_decile INTEGER,
-       record_counts INTEGER,
-       persons_hll_counts INTEGER
+       record_counts INTEGER
      )",
     resultsDatabaseSchema = resultsDatabaseSchema,
     stratifiedCodeCountsTable = stratifiedCodeCountsTable
@@ -653,6 +689,46 @@ test_that("stratified table keeps source concepts with no standard concept (conc
     nrow() |>
     expect_equal(1)
 
+  # - Build the stratified_persons bridge table exactly as createStratifiedPersonsTable does
+  stratifiedPersonsTable <- "stratified_persons_test_nomesco"
+  createPersonsSql <- SqlRender::render(
+    "DROP TABLE IF EXISTS @resultsDatabaseSchema.@stratifiedPersonsTable;
+     CREATE TABLE @resultsDatabaseSchema.@stratifiedPersonsTable (
+       person_id INTEGER,
+       concept_id INTEGER,
+       maps_to_concept_id INTEGER,
+       visit_group_concept_id INTEGER,
+       calendar_year INTEGER,
+       gender_concept_id INTEGER,
+       age_decile INTEGER
+     )",
+    resultsDatabaseSchema = resultsDatabaseSchema,
+    stratifiedPersonsTable = stratifiedPersonsTable
+  )
+  DatabaseConnector::executeSql(
+    connection, SqlRender::translate(createPersonsSql, targetDialect = connection@dbms),
+    progressBar = FALSE, reportOverallTime = FALSE
+  )
+
+  appendPersonsSql <- SqlRender::readSql(
+    system.file("sql", "sql_server", "appendToStratifiedPersonsTable.sql", package = "ROMOPAPI")
+  )
+  appendPersonsSql <- SqlRender::render(
+    appendPersonsSql,
+    stratifiedPersonsTable = stratifiedPersonsTable,
+    cdmDatabaseSchema = cdmDatabaseSchema,
+    resultsDatabaseSchema = resultsDatabaseSchema,
+    table_name = domain$table_name,
+    concept_id_field = domain$concept_id_field,
+    date_field = domain$date_field,
+    maps_to_concept_id_field = domain$maps_to_concept_id_field,
+    visit_group_concept_ids = "0"
+  )
+  DatabaseConnector::executeSql(
+    connection, SqlRender::translate(appendPersonsSql, targetDialect = connection@dbms),
+    progressBar = FALSE, reportOverallTime = FALSE
+  )
+
   # - Aggregate to code_counts and check the source concept surfaces, no phantom 0
   codeCountsTable <- "code_counts_test_nomesco"
   ccSql <- SqlRender::readSql(
@@ -663,7 +739,8 @@ test_that("stratified table keeps source concepts with no standard concept (conc
     cdmDatabaseSchema = cdmDatabaseSchema,
     resultsDatabaseSchema = resultsDatabaseSchema,
     codeCountsTable = codeCountsTable,
-    stratifiedCodeCountsTable = stratifiedCodeCountsTable
+    stratifiedCodeCountsTable = stratifiedCodeCountsTable,
+    stratifiedPersonsTable = stratifiedPersonsTable
   )
   DatabaseConnector::executeSql(
     connection, SqlRender::translate(ccSql, targetDialect = connection@dbms),
