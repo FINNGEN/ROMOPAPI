@@ -77,9 +77,20 @@ Off-by-one in the boundary check dropped the last bucket's records.
 Fixes #58
 ```
 
+## After committing
+
+Once all commits are made, show the user a summary list of every commit
+created this run, most recent last, one line each: short hash and commit
+subject (first line of the message only). No other commentary.
+
+```
+- `<hash>` <subject line>
+```
+
 ## Your task
 
 Based on the context above, group the changes by type and create one commit
 per type, in the priority order above (planing, infra, code, test, docu),
 staging only that type's files for each. If a rule blocks a commit, stop and
-explain why. Otherwise, stage and commit — no extra commentary.
+explain why. Otherwise, stage and commit each type in turn — no commentary
+during this — then finish with the summary list described above.
