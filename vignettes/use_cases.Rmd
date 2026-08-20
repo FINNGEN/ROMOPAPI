@@ -12,6 +12,17 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+
+# getCodeCounts() was split into getConceptRelationships() + getCodeCountsStratified();
+# rebuild the combined shape the plotting/table helpers below still expect.
+getCodeCounts <- function(CDMdbHandler, conceptId) {
+  relationships <- getConceptRelationships(CDMdbHandler, conceptId = conceptId)
+  list(
+    concept_relationships = relationships$concept_relationships,
+    concepts = relationships$concepts,
+    stratified_code_counts = getCodeCountsStratified(CDMdbHandler, conceptId = conceptId)
+  )
+}
 ```
 
 ```{r setup}
