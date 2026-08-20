@@ -34,7 +34,7 @@ getPersonCountsFilters <- function(
     #
     CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
     conceptId |> checkmate::assertIntegerish(lower = 1)
-    yearsRange |> checkmate::assertIntegerish(len = 2, null.ok = TRUE)
+    yearsRange |> checkmate::assertIntegerish(len = 2, any.missing = FALSE, null.ok = TRUE)
     if (!is.null(yearsRange) && yearsRange[1] > yearsRange[2]) {
         stop("yearsRange: first year must be <= second year")
     }

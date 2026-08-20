@@ -47,14 +47,14 @@ getPersonCountsUpset <- function(
     #
     CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
     conceptId |> checkmate::assertIntegerish(lower = 1)
-    yearsRange |> checkmate::assertIntegerish(len = 2, null.ok = TRUE)
+    yearsRange |> checkmate::assertIntegerish(len = 2, any.missing = FALSE, null.ok = TRUE)
     if (!is.null(yearsRange) && yearsRange[1] > yearsRange[2]) {
         stop("yearsRange: first year must be <= second year")
     }
-    level |> checkmate::assertIntegerish(lower = 0, null.ok = TRUE)
-    sexStratum |> checkmate::assertIntegerish(null.ok = TRUE)
-    ageStratum |> checkmate::assertIntegerish(null.ok = TRUE)
-    visitStratum |> checkmate::assertIntegerish(null.ok = TRUE)
+    level |> checkmate::assertIntegerish(lower = 0, any.missing = FALSE, null.ok = TRUE)
+    sexStratum |> checkmate::assertIntegerish(any.missing = FALSE, null.ok = TRUE)
+    ageStratum |> checkmate::assertIntegerish(any.missing = FALSE, null.ok = TRUE)
+    visitStratum |> checkmate::assertIntegerish(any.missing = FALSE, null.ok = TRUE)
     codeCountsTable |> checkmate::assertString()
 
     stratifiedPersonsTable <- "stratified_persons"

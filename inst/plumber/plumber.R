@@ -208,9 +208,15 @@ function(res, conceptId=0L, showsMappings = FALSE, pruneLevels = 0L, pruneClass 
     return(list(error = jsonlite::unbox("pruneClass must be a character")))
   }
 
-  tmp_html <- createReport(conceptId, CDMdbHandler, showsMappings = showsMappings, pruneLevels = pruneLevels, pruneClass = pruneClass)
-  # Return the HTML contents
-  paste(readLines(tmp_html), collapse = "\n")
+  tryCatch({
+    tmp_html <- createReport(conceptId, CDMdbHandler, showsMappings = showsMappings, pruneLevels = pruneLevels, pruneClass = pruneClass)
+    # Return the HTML contents
+    paste(readLines(tmp_html), collapse = "\n")
+  }, error = function(e) {
+    # @serializer html expects a character value, not a list — a plain string here
+    res$status <- 400
+    paste0("<p>Error: ", e$message, "</p>")
+  })
 }
 
 #* Serve mermaid.min.js directly
