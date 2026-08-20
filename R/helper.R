@@ -159,14 +159,14 @@ helper_createSqliteDatabaseFromDatabase <- function(
   conceptIdsToExtract <- c()
   personConceptIdsToExtract <- c()
   for (conceptId in conceptIds) {
-    results <- getCodeCounts(
+    relationships <- getConceptRelationships(
       CDMdbHandler,
       conceptId = conceptId
     )
 
-    conceptIdsToExtract <- c(conceptIdsToExtract, results$concepts$concept_id)
+    conceptIdsToExtract <- c(conceptIdsToExtract, relationships$concepts$concept_id)
     if (conceptId %in% personBridgeConceptIds) {
-      personConceptIdsToExtract <- c(personConceptIdsToExtract, results$concepts$concept_id)
+      personConceptIdsToExtract <- c(personConceptIdsToExtract, relationships$concepts$concept_id)
     }
   }
 

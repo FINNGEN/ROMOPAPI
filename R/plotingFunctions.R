@@ -376,7 +376,7 @@ createPlotFromResults <- function(results, showsMappings = FALSE, ...) {
 
 #' Create a pie chart of person counts by sex
 #'
-#' @param filterPersonCounts The `filter_person_counts` tibble from \code{\link{getPersonCounts}}
+#' @param filterPersonCounts The `filter_person_counts` tibble from \code{\link{getPersonCountsFilters}}
 #'
 #' @return A plotly object
 #' @importFrom dplyr filter mutate
@@ -394,7 +394,7 @@ createSexPieChartFromPersonCounts <- function(filterPersonCounts) {
 
 #' Create a bar chart of person counts by age decile
 #'
-#' @param filterPersonCounts The `filter_person_counts` tibble from \code{\link{getPersonCounts}}
+#' @param filterPersonCounts The `filter_person_counts` tibble from \code{\link{getPersonCountsFilters}}
 #'
 #' @return A plotly object
 #' @importFrom dplyr filter arrange mutate
@@ -418,7 +418,7 @@ createAgeHistogramFromPersonCounts <- function(filterPersonCounts) {
 
 #' Create a bar chart of person counts by visit-source group
 #'
-#' @param filterPersonCounts The `filter_person_counts` tibble from \code{\link{getPersonCounts}}
+#' @param filterPersonCounts The `filter_person_counts` tibble from \code{\link{getPersonCountsFilters}}
 #' @param visitTypeNames Optional tibble from \code{\link{getVisitTypeNames}} (columns
 #'   `visit_group_concept_id`, `concept_name`) used to label the groups. NULL (default)
 #'   labels by the raw `visit_group_concept_id`.
@@ -456,14 +456,14 @@ createVisitBarplotFromPersonCounts <- function(filterPersonCounts, visitTypeName
 #'
 #' @description
 #' Renders the exact exclusive-region person counts from
-#' \code{\link{getPersonCounts}}'s `upset_person_counts` as a bar chart of region sizes
+#' \code{\link{getPersonCountsUpset}}'s `upset_person_counts` as a bar chart of region sizes
 #' (top) stacked on a set-membership matrix (bottom), sharing the region ordering on the
 #' x-axis — the standard UpSet plot layout.
 #'
-#' @param upsetPersonCounts The `upset_person_counts` tibble from \code{\link{getPersonCounts}}
+#' @param upsetPersonCounts The `upset_person_counts` tibble from \code{\link{getPersonCountsUpset}}
 #'   (columns `group`, `person_counts`)
 #' @param concepts Optional tibble with `concept_id`/`concept_name` (e.g.
-#'   \code{\link{getCodeCounts}}'s `concepts`) used to label the sets. NULL (default)
+#'   \code{\link{getConceptRelationships}}'s `concepts`) used to label the sets. NULL (default)
 #'   labels by the raw concept ID.
 #'
 #' @return A plotly object
@@ -534,7 +534,7 @@ createUpsetPlotFromPersonCounts <- function(upsetPersonCounts, concepts = NULL) 
 
 #' Prune levels from results
 #'
-#' @param results A list of results from getCodeCounts
+#' @param results A list of results from getConceptRelationships and getCodeCountsStratified
 #' @param pruneLevels The levels to prune
 #' @param pruneClass Character string specifying a concept class to filter results.
 #'   NULL includes all concept classes. Common values include "Ingredient", "Clinical Drug", etc.

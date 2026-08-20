@@ -1,37 +1,29 @@
-#' Get person-count breakdowns and set overlaps for a concept tree
+#' Get exact set-overlap (UpSet) person counts for a concept tree
 #'
 #' @description
-#' Computes exact distinct-person breakdowns for the concept tree rooted at
+#' Computes exact UpSet exclusive-region person counts for the concept tree rooted at
 #' `conceptId`, reading the `stratified_persons` person-level bridge table (see
-#' `createStratifiedPersonsTable()`). Per-concept `person_counts` and
-#' `descendant_person_counts` already live in `code_counts` and are reachable
-#' via `getCodeCounts()`'s `concepts` tibble — this function covers what that
-#' table can't answer: stratum breakdowns and exact set-overlap (UpSet) regions.
+#' `createStratifiedPersonsTable()`). Reuses the memoised tree getter so the tree is only
+#' computed once across repeated calls.
 #'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
 #' @param conceptId The concept ID to get person counts for
-#' @param level Maximum tree depth (distance from `conceptId`) of concepts to include
-#'   in `upset_person_counts`. NULL (default) includes the full tree.
-#' @param sexStratum Optional integer vector of `gender_concept_id` values to restrict
-#'   `upset_person_counts` to. NULL or empty (default) includes all.
-#' @param ageStratum Optional integer vector of `age_decile` values to restrict
-#'   `upset_person_counts` to. NULL or empty (default) includes all.
-#' @param yearStratum Optional integer vector of `calendar_year` values to restrict
-#'   `upset_person_counts` to. NULL or empty (default) includes all.
+#' @param yearsRange Optional integer vector of length 2, `c(startYear, endYear)`, restricting
+#'   the regions to that inclusive calendar-year range. NULL or empty (default) uses the
+#'   full range.
+#' @param level Maximum tree depth (distance from `conceptId`) of concepts to include.
+#'   NULL (default) includes the full tree.
+#' @param sexStratum Optional integer vector of `gender_concept_id` values to restrict to.
+#'   NULL or empty (default) includes all.
+#' @param ageStratum Optional integer vector of `age_decile` values to restrict to.
+#'   NULL or empty (default) includes all.
 #' @param visitStratum Optional integer vector of `visit_group_concept_id` values to
-#'   restrict `upset_person_counts` to. NULL or empty (default) includes all.
+#'   restrict to. NULL or empty (default) includes all.
 #' @param codeCountsTable Name of the code counts table in the results schema. Defaults to "code_counts"
 #'
-#' @return A list containing:
-#' \itemize{
-#'   \item `filter_person_counts` - Tibble of `filter` ("sex"/"age"/"visit"), `stratum`,
-#'     `person_counts` — a breakdown of the full tree's persons by each filterable
-#'     dimension, independent of `level` and the stratum arguments. Lets a client
-#'     discover which strata are worth filtering by, and how many persons they hold.
-#'   \item `upset_person_counts` - Tibble of `group` (the concept IDs of the exclusive
-#'     region, joined by "-") and `person_counts` — exact UpSet exclusive-region counts
-#'     for the concepts at or under `level`, restricted to the requested strata.
-#' }
+#' @return A tibble of `group` (the concept IDs of the exclusive region, joined by "-")
+#'   and `person_counts` — exact UpSet exclusive-region counts for the concepts at or
+#'   under `level`, restricted to `yearsRange` and the requested strata.
 #'
 #' @importFrom checkmate assertClass assertIntegerish assertString
 #' @importFrom DatabaseConnector renderTranslateQuerySql
@@ -40,25 +32,28 @@
 #' @importFrom stringr str_detect str_extract
 #'
 #' @export
-getPersonCounts <- function(
+getPersonCountsUpset <- function(
     CDMdbHandler,
     conceptId,
+    yearsRange = NULL,
     level = NULL,
     sexStratum = NULL,
     ageStratum = NULL,
-    yearStratum = NULL,
     visitStratum = NULL,
     codeCountsTable = "code_counts") {
-    ParallelLogger::logInfo("getPersonCounts: Getting person counts for conceptId: ", conceptId)
+    ParallelLogger::logInfo("getPersonCountsUpset: Getting upset person counts for conceptId: ", conceptId)
     #
     # VALIDATE
     #
     CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
     conceptId |> checkmate::assertIntegerish(lower = 1)
+    yearsRange |> checkmate::assertIntegerish(len = 2, null.ok = TRUE)
+    if (!is.null(yearsRange) && yearsRange[1] > yearsRange[2]) {
+        stop("yearsRange: first year must be <= second year")
+    }
     level |> checkmate::assertIntegerish(lower = 0, null.ok = TRUE)
     sexStratum |> checkmate::assertIntegerish(null.ok = TRUE)
     ageStratum |> checkmate::assertIntegerish(null.ok = TRUE)
-    yearStratum |> checkmate::assertIntegerish(null.ok = TRUE)
     visitStratum |> checkmate::assertIntegerish(null.ok = TRUE)
     codeCountsTable |> checkmate::assertString()
 
@@ -71,7 +66,7 @@ getPersonCounts <- function(
     # FUNCTION
     #
 
-    # - Get the concept tree (shared with getCodeCounts, memoised)
+    # - Get the concept tree (shared with getPersonCountsFilters / getConceptRelationships, memoised)
     conceptTree <- getConceptTree_memoise(CDMdbHandler, conceptId = conceptId, codeCountsTable = codeCountsTable)
     familyTree <- conceptTree$family_tree
     treeConceptIds <- conceptTree$concept_ids
@@ -97,42 +92,14 @@ getPersonCounts <- function(
             unique()
     }
 
-    # - filter_person_counts: breakdown of the FULL tree's persons by sex/age/visit,
-    #   independent of `level` and the stratum arguments — lets a client discover
-    #   which strata are worth filtering by.
-    sql <- "
-        WITH tree_persons AS (
-            SELECT DISTINCT person_id, gender_concept_id, age_decile, visit_group_concept_id
-            FROM @resultsDatabaseSchema.@stratifiedPersonsTable
-            WHERE concept_id IN (@conceptIds) OR maps_to_concept_id IN (@conceptIds)
-        )
-        SELECT 'sex' AS filter, CAST(gender_concept_id AS BIGINT) AS stratum, COUNT(DISTINCT person_id) AS person_counts
-        FROM tree_persons GROUP BY gender_concept_id
-        UNION ALL
-        SELECT 'age' AS filter, CAST(age_decile AS BIGINT) AS stratum, COUNT(DISTINCT person_id) AS person_counts
-        FROM tree_persons GROUP BY age_decile
-        UNION ALL
-        SELECT 'visit' AS filter, CAST(visit_group_concept_id AS BIGINT) AS stratum, COUNT(DISTINCT person_id) AS person_counts
-        FROM tree_persons GROUP BY visit_group_concept_id;
-    "
-    filterPersonCounts <- DatabaseConnector::renderTranslateQuerySql(
-        connection = connection,
-        sql = sql,
-        resultsDatabaseSchema = resultsDatabaseSchema,
-        stratifiedPersonsTable = stratifiedPersonsTable,
-        conceptIds = paste(treeConceptIds, collapse = ",")
-    ) |>
-        tibble::as_tibble()
-    names(filterPersonCounts) <- tolower(names(filterPersonCounts))
-
-    # - upset_person_counts: exact set-overlap regions for the concepts at/under
-    #   `level`, restricted to the requested strata. Pull the (person, target
-    #   concept) membership pairs and build the exclusive-region key in R — the
-    #   membership pull is bounded by the (small, user-picked) concept set.
+    # - Exact set-overlap regions for the concepts at/under `level`, restricted to
+    #   yearsRange and the requested strata. Pull the (person, target concept)
+    #   membership pairs and build the exclusive-region key in R — the membership
+    #   pull is bounded by the (small, user-picked) concept set.
     strataFilterSql <- paste0(
         .inFilterSql("gender_concept_id", sexStratum),
         .inFilterSql("age_decile", ageStratum),
-        .inFilterSql("calendar_year", yearStratum),
+        .betweenFilterSql("calendar_year", yearsRange),
         .inFilterSql("visit_group_concept_id", visitStratum)
     )
 
@@ -164,10 +131,7 @@ getPersonCounts <- function(
         ) |>
         dplyr::count(group, name = "person_counts")
 
-    return(list(
-        filter_person_counts = filterPersonCounts,
-        upset_person_counts = upsetPersonCounts
-    ))
+    return(upsetPersonCounts)
 }
 
 # Builds " AND @column IN (v1,v2,...)", or "" when values is NULL/empty.
@@ -179,28 +143,28 @@ getPersonCounts <- function(
     paste0(" AND ", column, " IN (", paste(as.integer(values), collapse = ","), ")")
 }
 
-#' Memoised version of getPersonCounts
+#' Memoised version of getPersonCountsUpset
 #'
 #' @description
-#' A memoised version of the getPersonCounts function that caches results to improve
+#' A memoised version of the getPersonCountsUpset function that caches results to improve
 #' performance for repeated calls with the same parameters. The CDMdbHandler argument is
 #' omitted from the cache key to allow sharing across different database connections.
 #'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
 #' @param conceptId The concept ID to get person counts for
-#' @param level Maximum tree depth to include in `upset_person_counts`. NULL includes the full tree.
+#' @param yearsRange Optional integer vector of length 2, `c(startYear, endYear)`. NULL uses the full range.
+#' @param level Maximum tree depth to include. NULL includes the full tree.
 #' @param sexStratum Optional integer vector of `gender_concept_id` values to restrict to.
 #' @param ageStratum Optional integer vector of `age_decile` values to restrict to.
-#' @param yearStratum Optional integer vector of `calendar_year` values to restrict to.
 #' @param visitStratum Optional integer vector of `visit_group_concept_id` values to restrict to.
 #' @param codeCountsTable Name of the code counts table in the results schema. Defaults to "code_counts"
 #'
 #' @importFrom memoise memoise
 #'
-#' @return Same shape as \code{\link{getPersonCounts}}.
+#' @return Same shape as \code{\link{getPersonCountsUpset}}.
 #'
 #' @export
-getPersonCounts_memoise <- memoise::memoise(
-    getPersonCounts,
+getPersonCountsUpset_memoise <- memoise::memoise(
+    getPersonCountsUpset,
     omit_args = "CDMdbHandler"
 )

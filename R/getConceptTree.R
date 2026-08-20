@@ -4,8 +4,9 @@
 #' Builds the family tree (ancestors and descendants) for a concept, pruned to
 #' only the nodes that have code counts or have a descendant with code counts
 #' — the same "counted, or has a counted descendant" rule `code_counts` uses to
-#' decide which concepts get a row. Shared by `getCodeCounts()` and
-#' `getPersonCounts()` so the tree is built (and memoised) once.
+#' decide which concepts get a row. Shared by `getConceptRelationships()`,
+#' `getCodeCountsStratified()`, `getPersonCountsFilters()` and
+#' `getPersonCountsUpset()` so the tree is built (and memoised) once.
 #'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
 #' @param conceptId The concept ID to get the tree for

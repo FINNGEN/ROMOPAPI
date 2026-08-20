@@ -21,9 +21,9 @@ function(msg = "") {
   list(msg = paste0("The message is: '", msg, "'"))
 }
 
-#* Get the code counts for a given concept ID
-#* @param conceptId The concept ID to get counts and relationships for
-#* @get /getCodeCounts
+#* Get the concept relationships and concept details for a given concept ID
+#* @param conceptId The concept ID to get relationships and details for
+#* @get /getConceptRelationships
 function(res, conceptId=0L) {
 
   conceptId <- as.integer(conceptId)
@@ -34,7 +34,7 @@ function(res, conceptId=0L) {
   }
 
   tryCatch({
-  getCodeCounts_memoise(
+  getConceptRelationships_memoise(
     CDMdbHandler = CDMdbHandler,
     conceptId = conceptId
   )
@@ -44,16 +44,57 @@ function(res, conceptId=0L) {
   })
 }
 
+#* Get the stratified code counts for a given concept ID
+#* @param conceptId The concept ID to get stratified counts for
+#* @get /getCodeCountsStratified
+function(res, conceptId=0L) {
 
-#* Get person-count breakdowns and set overlaps for a concept
+  conceptId <- as.integer(conceptId)
+
+  if (is.na(conceptId)) {
+    res$status <- 400 # Bad request
+    return(list(error = jsonlite::unbox("conceptId must be an integer")))
+  }
+
+  tryCatch({
+  getCodeCountsStratified_memoise(
+    CDMdbHandler = CDMdbHandler,
+    conceptId = conceptId
+  )
+  }, error = function(e) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox(e$message)))
+  })
+}
+
+# Splits "a,b" into an integer vector; "" -> NULL. Shared by the person-counts endpoints below.
+.plumberParseIntCsv <- function(x) {
+  x <- trimws(x)
+  if (!nzchar(x)) {
+    return(NULL)
+  }
+  as.integer(strsplit(x, ",")[[1]])
+}
+
+# Splits "startYear,endYear" into a length-2 integer vector; "" -> NULL. Errors (via NA) on
+# any other length so the caller's is.na()-based 400 check catches malformed input.
+.plumberParseYearsRange <- function(x) {
+  x <- trimws(x)
+  if (!nzchar(x)) {
+    return(NULL)
+  }
+  parts <- as.integer(strsplit(x, ",")[[1]])
+  if (length(parts) != 2) {
+    return(NA_integer_)
+  }
+  parts
+}
+
+#* Get person-count breakdowns by sex, age and visit type for a concept
 #* @param conceptId The concept ID to get person counts for
-#* @param level Maximum tree depth to include in upset_person_counts. Omit for the full tree
-#* @param sexStratum Comma-separated gender_concept_id values to restrict upset_person_counts to
-#* @param ageStratum Comma-separated age_decile values to restrict upset_person_counts to
-#* @param yearStratum Comma-separated calendar_year values to restrict upset_person_counts to
-#* @param visitStratum Comma-separated visit_group_concept_id values to restrict upset_person_counts to
-#* @get /getPersonCounts
-function(res, conceptId = 0L, level = "", sexStratum = "", ageStratum = "", yearStratum = "", visitStratum = "") {
+#* @param yearsRange Comma-separated "startYear,endYear" to restrict to. Omit for the full range
+#* @get /getPersonCountsFilters
+function(res, conceptId = 0L, yearsRange = "") {
 
   conceptId <- as.integer(conceptId)
   if (is.na(conceptId)) {
@@ -61,12 +102,44 @@ function(res, conceptId = 0L, level = "", sexStratum = "", ageStratum = "", year
     return(list(error = jsonlite::unbox("conceptId must be an integer")))
   }
 
-  parseIntCsv <- function(x) {
-    x <- trimws(x)
-    if (!nzchar(x)) {
-      return(NULL)
-    }
-    as.integer(strsplit(x, ",")[[1]])
+  yearsRange <- .plumberParseYearsRange(yearsRange)
+  if (length(yearsRange) == 1 && is.na(yearsRange)) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("yearsRange must be \"startYear,endYear\"")))
+  }
+
+  tryCatch({
+    getPersonCountsFilters_memoise(
+      CDMdbHandler = CDMdbHandler,
+      conceptId = conceptId,
+      yearsRange = yearsRange
+    )
+  }, error = function(e) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox(e$message)))
+  })
+}
+
+#* Get exact set-overlap (UpSet) person counts for a concept
+#* @param conceptId The concept ID to get person counts for
+#* @param yearsRange Comma-separated "startYear,endYear" to restrict to. Omit for the full range
+#* @param level Maximum tree depth to include. Omit for the full tree
+#* @param sexStratum Comma-separated gender_concept_id values to restrict to
+#* @param ageStratum Comma-separated age_decile values to restrict to
+#* @param visitStratum Comma-separated visit_group_concept_id values to restrict to
+#* @get /getPersonCountsUpset
+function(res, conceptId = 0L, yearsRange = "", level = "", sexStratum = "", ageStratum = "", visitStratum = "") {
+
+  conceptId <- as.integer(conceptId)
+  if (is.na(conceptId)) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("conceptId must be an integer")))
+  }
+
+  yearsRange <- .plumberParseYearsRange(yearsRange)
+  if (length(yearsRange) == 1 && is.na(yearsRange)) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("yearsRange must be \"startYear,endYear\"")))
   }
 
   level <- if (nzchar(trimws(level))) as.integer(level) else NULL
@@ -76,14 +149,14 @@ function(res, conceptId = 0L, level = "", sexStratum = "", ageStratum = "", year
   }
 
   tryCatch({
-    getPersonCounts_memoise(
+    getPersonCountsUpset_memoise(
       CDMdbHandler = CDMdbHandler,
       conceptId = conceptId,
+      yearsRange = yearsRange,
       level = level,
-      sexStratum = parseIntCsv(sexStratum),
-      ageStratum = parseIntCsv(ageStratum),
-      yearStratum = parseIntCsv(yearStratum),
-      visitStratum = parseIntCsv(visitStratum)
+      sexStratum = .plumberParseIntCsv(sexStratum),
+      ageStratum = .plumberParseIntCsv(ageStratum),
+      visitStratum = .plumberParseIntCsv(visitStratum)
     )
   }, error = function(e) {
     res$status <- 400
@@ -102,9 +175,9 @@ function() {
 #* Get the list of concepts with code counts
 #* @get /getListOfConcepts
 function() {
-  concepts <- getConceptsWithCodeCounts_memoise(CDMdbHandler = CDMdbHandler)
+  concepts <- getAllConceptsInfo_memoise(CDMdbHandler = CDMdbHandler)
   concepts <- concepts |>
-    dplyr::select(concept_id, concept_name, vocabulary_id, concept_code, number_of_descendants)
+    dplyr::select(concept_id, concept_name, vocabulary_id, concept_code)
   return(concepts)
 }
 

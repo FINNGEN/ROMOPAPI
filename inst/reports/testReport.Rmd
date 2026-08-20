@@ -29,15 +29,23 @@ if (!is.null(conceptId)) {
 # `r title`
   
 ```{r}
-results <- getCodeCounts_memoise(
+relationships <- getConceptRelationships_memoise(
   CDMdbHandler,
   conceptId = conceptId
+)
+results <- list(
+  concept_relationships = relationships$concept_relationships,
+  concepts = relationships$concepts,
+  stratified_code_counts = getCodeCountsStratified_memoise(
+    CDMdbHandler,
+    conceptId = conceptId
+  )
 )
 
 if (pruneLevels != 0L | pruneClass != '') {
   results <- pruneLevelsFromResults(results, pruneLevels, pruneClass = pruneClass)
 }
-``` 
+```
 
 
 Graph
@@ -59,7 +67,10 @@ createPlotFromResults(results, showsMappings = showsMappings, width = 1000, heig
 ## Person Counts
 
 ```{r}
-personCounts <- getPersonCounts_memoise(CDMdbHandler, conceptId = conceptId)
+personCounts <- list(
+  filter_person_counts = getPersonCountsFilters_memoise(CDMdbHandler, conceptId = conceptId),
+  upset_person_counts = getPersonCountsUpset_memoise(CDMdbHandler, conceptId = conceptId)
+)
 visitTypeNames <- getVisitTypeNames_memoise(CDMdbHandler)
 ```
 
