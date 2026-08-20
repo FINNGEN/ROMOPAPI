@@ -7,6 +7,8 @@
 helper_createSqliteDatabaseFromDatabase(
   CDMdbHandler,
   conceptIds = c(317009, 21601855),
+  personBridgeConceptIds = conceptIds,
+  maxPersonsPerConcept = 1000,
   pathToSqliteDatabase = tempfile(fileext = ".sqlite"),
   codeCountsTable = "code_counts"
 )
@@ -15,6 +17,17 @@ helper_createSqliteDatabaseFromDatabase(
 \item{CDMdbHandler}{A CDMdbHandler object containing database connection details}
 
 \item{conceptIds}{Vector of concept IDs to extract. Defaults to c(317009, 21601855)}
+
+\item{personBridgeConceptIds}{Subset of \code{conceptIds} whose trees are extracted into the
+\code{stratified_persons} bridge table. Defaults to \code{conceptIds} (all of them). A person-level
+bridge fans out to one row per person per stratum, so a broad concept's tree can make the
+extract far larger than the record-level tables — narrow this to keep the fixture small.}
+
+\item{maxPersonsPerConcept}{Maximum distinct persons kept per target concept (in
+\code{personBridgeConceptIds}'s trees) in the \code{stratified_persons} extract — the lowest-\code{person_id}
+ones, deterministically. All of a kept person's stratum rows for that concept are included, so
+this bounds the person-level fan-out for common real-world codes without truncating any one
+person's detail. Defaults to 1000.}
 
 \item{pathToSqliteDatabase}{Path where the new SQLite database should be created.
 Defaults to a temporary file with .sqlite extension}
@@ -27,7 +40,7 @@ No return value. Creates a new SQLite database file at the specified path.
 }
 \description{
 Creates a new SQLite database by extracting specific concept data from a CDM database.
-The function extracts concept information, concept ancestors, code counts, and
-stratified code counts for the specified concept IDs and creates a new SQLite
-database with this subset of data.
+The function extracts concept information, concept ancestors, code counts, stratified
+code counts, and the stratified persons bridge table for the specified concept IDs and
+creates a new SQLite database with this subset of data.
 }

@@ -107,6 +107,8 @@ The API serves precomputed counts, so a deployment is two steps — build, then 
 - Only a human opens the `development` → `main` (release) PR — don't attempt it,
   even if asked to "finish the release."
 - Link the PR to its issue (`Fixes #<n>`); commit in small logical chunks.
+- Only commit when the user explicitly asks — never commit proactively. The
+  diffs must be evaluated first, so leave changes unstaged until then.
 - Use the `commit` skill (`.claude/skills/commit/`) — it applies the repo's
   Conventional Commits format and safety checks.
 

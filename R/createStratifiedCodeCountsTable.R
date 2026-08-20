@@ -81,7 +81,6 @@ createStratifiedCodeCountsTable <- function(
     sqlPath <- system.file("sql", sqlDialectFolder, "appendToStratrifiedCodeCountsTable.sql", package = "ROMOPAPI")
     baseSql <- SqlRender::readSql(sqlPath)
 
-    isBigQuery <- as.integer(connection@dbms == "bigquery")
     sql <- "DROP TABLE IF EXISTS @resultsDatabaseSchema.@stratifiedCodeCountsTable;
     CREATE TABLE @resultsDatabaseSchema.@stratifiedCodeCountsTable (
         concept_id INTEGER,
@@ -90,13 +89,11 @@ createStratifiedCodeCountsTable <- function(
         calendar_year INTEGER,
         gender_concept_id INTEGER,
         age_decile INTEGER,
-        record_counts INTEGER,
-        {@isBigQuery == 1} ? {persons_hll_counts BYTES} : {persons_hll_counts INTEGER}
+        record_counts INTEGER
     )"
     sql <- SqlRender::render(sql,
         resultsDatabaseSchema = resultsDatabaseSchema,
-        stratifiedCodeCountsTable = stratifiedCodeCountsTable,
-        isBigQuery = isBigQuery
+        stratifiedCodeCountsTable = stratifiedCodeCountsTable
     )
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     DatabaseConnector::executeSql(connection, sql)

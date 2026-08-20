@@ -29,15 +29,23 @@ if (!is.null(conceptId)) {
 # `r title`
   
 ```{r}
-results <- getCodeCounts_memoise(
+relationships <- getConceptRelationships_memoise(
   CDMdbHandler,
   conceptId = conceptId
+)
+results <- list(
+  concept_relationships = relationships$concept_relationships,
+  concepts = relationships$concepts,
+  stratified_code_counts = getCodeCountsStratified_memoise(
+    CDMdbHandler,
+    conceptId = conceptId
+  )
 )
 
 if (pruneLevels != 0L | pruneClass != '') {
   results <- pruneLevelsFromResults(results, pruneLevels, pruneClass = pruneClass)
 }
-``` 
+```
 
 
 Graph
@@ -54,8 +62,37 @@ createCodeCountsTableFromResults(results)
 Plot
 ```{r}
 createPlotFromResults(results, showsMappings = showsMappings, width = 1000, height = 1000)
-``` 
+```
 
+## Person Counts
+
+```{r}
+personCounts <- list(
+  filter_person_counts = getPersonCountsFilters_memoise(CDMdbHandler, conceptId = conceptId),
+  upset_person_counts = getPersonCountsUpset_memoise(CDMdbHandler, conceptId = conceptId)
+)
+visitTypeNames <- getVisitTypeNames_memoise(CDMdbHandler)
+```
+
+Sex
+```{r}
+createSexPieChartFromPersonCounts(personCounts$filter_person_counts)
+```
+
+Age
+```{r}
+createAgeHistogramFromPersonCounts(personCounts$filter_person_counts)
+```
+
+Visit type
+```{r}
+createVisitBarplotFromPersonCounts(personCounts$filter_person_counts, visitTypeNames)
+```
+
+Set overlap (UpSet)
+```{r}
+createUpsetPlotFromPersonCounts(personCounts$upset_person_counts, results$concepts)
+```
 
 <!-- Load mermaid.js -->
 <script src="mermaid.min.js"></script>

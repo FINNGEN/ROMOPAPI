@@ -13,6 +13,12 @@ conceptIds <- c(
     21600744 # bug in plot
 )
 
+# 320136 and 4024567 are deliberately huge (population-wide) trees: fine for the
+# record-level tables, but a person-level bridge fans out to one row per person
+# per stratum, so including them there blows the fixture up 10x+. Keep the
+# person bridge to the narrower concepts.
+personBridgeConceptIds <- setdiff(conceptIds, c(320136, 4024567))
+
 CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
     test_cohortTableHandlerConfig,
     loadConnectionChecksLevel = "basicChecks"
@@ -29,6 +35,7 @@ createCodeCountsTables(
 helper_createSqliteDatabaseFromDatabase(
     CDMdbHandler,
     conceptIds = conceptIds,
+    personBridgeConceptIds = personBridgeConceptIds,
     pathToSqliteDatabase = "inst/testdata/data/FinnGenR13_countsOnly.sqlite"
 )
 
@@ -46,7 +53,8 @@ DatabaseConnector::dbListTables(connection) |>
         "code_counts",
         "concept",
         "concept_ancestor",
-        "stratified_code_counts"
+        "stratified_code_counts",
+        "stratified_persons"
     ))
 
 dplyr::tbl(connection, "concept") |>
@@ -65,6 +73,11 @@ dplyr::tbl(connection, "code_counts") |>
     expect_gt(0)
 
 dplyr::tbl(connection, "stratified_code_counts") |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
+
+dplyr::tbl(connection, "stratified_persons") |>
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_gt(0)

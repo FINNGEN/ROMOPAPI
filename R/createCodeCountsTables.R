@@ -12,18 +12,12 @@
 #'
 #' @return Nothing. Creates a table called 'code_counts' in the results schema with columns:
 #' \itemize{
-#'   \item `domain` - The domain of the code (Condition, Drug, etc.)
 #'   \item `concept_id` - The OMOP concept ID
-#'   \item `calendar_year` - The year of the events
-#'   \item `gender_concept_id` - The gender concept ID
-#'   \item `age_decile` - The age decile (0-9, 10-19, etc.)
 #'   \item `record_counts` - Number of events for this code
-#'   \item `person_counts` - Number of persons with this code
-#'   \item `incidence_person_counts` - Number of persons with first occurrence of this code
 #'   \item `descendant_record_counts` - Number of events including descendant concepts
-#'   \item `descendant_person_counts` - Number of persons including descendant concepts
-#'   \item `descendant_incidence_person_counts` - Number of persons with first occurrence including descendants
-#'   \item `total_person_counts` - Total number of persons in the stratum
+#'   \item `number_of_descendants` - Number of descendant concepts (including itself)
+#'   \item `person_counts` - Number of distinct persons with this code
+#'   \item `descendant_person_counts` - Number of distinct persons including descendant concepts
 #' }
 #'
 #' @importFrom checkmate assertClass
@@ -68,6 +62,15 @@ createCodeCountsTables <- function(
         visitSourceGroupConceptIds = visitSourceGroupConceptIds
     )
 
+    # - Create stratified persons bridge table
+    stratifiedPersonsTable <- "stratified_persons"
+    createStratifiedPersonsTable(
+        CDMdbHandler,
+        domains = domains,
+        stratifiedPersonsTable = stratifiedPersonsTable,
+        visitSourceGroupConceptIds = visitSourceGroupConceptIds
+    )
+
     # - Create code counts table
     sqlDialectFolder <- if (connection@dbms == "bigquery") "bigquery" else "sql_server"
     sqlPath <- system.file(
@@ -82,7 +85,8 @@ createCodeCountsTables <- function(
         cdmDatabaseSchema = cdmDatabaseSchema,
         resultsDatabaseSchema = resultsDatabaseSchema,
         codeCountsTable = codeCountsTable,
-        stratifiedCodeCountsTable = stratifiedCodeCountsTable
+        stratifiedCodeCountsTable = stratifiedCodeCountsTable,
+        stratifiedPersonsTable = stratifiedPersonsTable
     )
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     DatabaseConnector::executeSql(connection, sql)

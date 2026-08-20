@@ -67,9 +67,9 @@ runApiServer <- function(
         createCodeCountsTables(CDMdbHandler, codeCountsTable = "code_counts", visitSourceGroupConceptIds = visitSourceGroupConceptIds)
     }
 
-    # Call getConceptsWithCodeCounts, to populate the cache
+    # Call getAllConceptsInfo, to populate the cache
     ParallelLogger::logInfo("Populating cache with concepts with code counts")
-    getConceptsWithCodeCounts_memoise(CDMdbHandler)
+    getAllConceptsInfo_memoise(CDMdbHandler)
 
 
     # Create plumber router

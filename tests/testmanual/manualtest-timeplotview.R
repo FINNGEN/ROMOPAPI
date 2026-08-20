@@ -20,10 +20,19 @@ conceptId <- 21602735
 conceptId <- 2010001618 # test endpoint
 
 
-results <- getCodeCounts(
+relationships <- getConceptRelationships(
     CDMdbHandler,
-    conceptId = conceptId, 
+    conceptId = conceptId,
     codeCountsTable = "code_counts"
+)
+results <- list(
+    concept_relationships = relationships$concept_relationships,
+    concepts = relationships$concepts,
+    stratified_code_counts = getCodeCountsStratified(
+        CDMdbHandler,
+        conceptId = conceptId,
+        codeCountsTable = "code_counts"
+    )
 )
 
 
@@ -65,9 +74,17 @@ browseURL(report.html)
 
 conceptId <- 21601855 
 
-results <- getCodeCounts(
+relationships <- getConceptRelationships(
     CDMdbHandler,
     conceptId = conceptId
+)
+results <- list(
+    concept_relationships = relationships$concept_relationships,
+    concepts = relationships$concepts,
+    stratified_code_counts = getCodeCountsStratified(
+        CDMdbHandler,
+        conceptId = conceptId
+    )
 )
 
 createMermaidGraphFromResults(results) |> clipr::write_clip()
@@ -115,9 +132,17 @@ browseURL(report.html)
 
 conceptId <- 21601862
 
-results <- getCodeCounts(
+relationships <- getConceptRelationships(
     CDMdbHandler,
     conceptId = conceptId
+)
+results <- list(
+    concept_relationships = relationships$concept_relationships,
+    concepts = relationships$concepts,
+    stratified_code_counts = getCodeCountsStratified(
+        CDMdbHandler,
+        conceptId = conceptId
+    )
 )
 
 createMermaidGraphFromResults(results) |> clipr::write_clip()
@@ -132,7 +157,15 @@ createMermaidGraphFromResults(results2) |> clipr::write_clip()
 
 conceptId <- 21602515
 
-results <- getCodeCounts(
+relationships <- getConceptRelationships(
     CDMdbHandler,
     conceptId = conceptId
+)
+results <- list(
+    concept_relationships = relationships$concept_relationships,
+    concepts = relationships$concepts,
+    stratified_code_counts = getCodeCountsStratified(
+        CDMdbHandler,
+        conceptId = conceptId
+    )
 )
