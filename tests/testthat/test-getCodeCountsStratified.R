@@ -1,4 +1,4 @@
-test_that("getCodeCounts works", {
+test_that("getCodeCountsStratified works", {
   # post-counts test: reads the pre-built code_counts table
   skip_if_not(testingDatabase %in% postCountsDatabases)
 
@@ -12,64 +12,21 @@ test_that("getCodeCounts works", {
   codeCountsTable <- "code_counts"
 
   # memoise cache is keyed without CDMdbHandler — drop entries that may exist from earlier runs
-  memoise::forget(getConceptsWithCodeCounts_memoise)
-  memoise::forget(getCodeCounts_memoise)
+  memoise::forget(getConceptTree_memoise)
+  memoise::forget(getCodeCountsStratified_memoise)
 
   suppressWarnings(
-    result <- getCodeCounts(
+    stratified_code_counts <- getCodeCountsStratified(
       CDMdbHandler,
       conceptId = c(317009),
       codeCountsTable = codeCountsTable
     )
   )
 
-  concept_relationships <- result$concept_relationships
-  stratified_code_counts <- result$stratified_code_counts
-  concepts <- result$concepts
-
   stratified_code_counts |>
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_gt(0)
-  concept_relationships |>
-    dplyr::count() |>
-    dplyr::pull(n) |>
-    expect_gt(0)
-  concepts |>
-    dplyr::count() |>
-    dplyr::pull(n) |>
-    expect_gt(0)
-
-  #
-  # concept_relationships
-  #
-
-  # Check column names 
-  concept_relationships |>
-    colnames() |>
-    expect_equal(c("parent_concept_id", "child_concept_id", "levels", "concept_class_id"))
-
-  # columns not empty
-  concept_relationships |>
-    dplyr::filter(is.na(parent_concept_id) | is.na(child_concept_id) | is.na(levels) ) |>
-    nrow() |>
-    expect_equal(0)
-
-  # check that all the child_concept_id are in parent_concept_id
-  concept_relationships |>
-    dplyr::anti_join(concept_relationships, by = c("parent_concept_id" = "child_concept_id")) |>
-    nrow() |>
-    expect_equal(0)
-
-  # check that all concept_id in concept_relationships are in the concepts
-  concept_relationships |>
-    dplyr::anti_join(concepts, by = c("child_concept_id" = "concept_id")) |>
-    nrow() |>
-    expect_equal(0)
-
-  #
-  # stratified_code_counts
-  #
 
   # Check column names.
   expectedStratifiedCols <- c(
@@ -87,26 +44,12 @@ test_that("getCodeCounts works", {
     nrow() |>
     expect_equal(0)
 
-  # check that all the concept_id are in the concepts
+  # check that all the concept_id are in the tree's concept relationships
+  concepts <- getConceptRelationships(CDMdbHandler, conceptId = c(317009), codeCountsTable = codeCountsTable)$concepts
   stratified_code_counts |>
     dplyr::anti_join(concepts, by = c("concept_id" = "concept_id")) |>
     nrow() |>
     expect_equal(0)
-
-  #
-  # concepts
-  #
-
-  # Check column names
-  concepts |>
-    colnames() |>
-    expect_equal(c("concept_id", "concept_name", "domain_id", "vocabulary_id", "concept_class_id", "standard_concept", "concept_code", "record_counts", "descendant_record_counts", "person_counts", "descendant_person_counts"))
-
-  # columns not empty
-  concepts |>
-    dplyr::filter(is.na(concept_id) | is.na(concept_name) | is.na(domain_id) | is.na(vocabulary_id) | is.na(standard_concept) | is.na(concept_code) | is.na(record_counts) | is.na(descendant_record_counts)) |>
-      nrow() |>
-      expect_equal(0)
 
   # check that the record_counts and descendant_record_counts are the same as the aggregated_counts
   aggregated_counts <- stratified_code_counts |>
@@ -116,10 +59,9 @@ test_that("getCodeCounts works", {
     dplyr::left_join(aggregated_counts, by = "concept_id") |>
     nrow() |>
     expect_equal(nrow(concepts))
-
 })
 
-test_that("getCodeCounts returns error if conceptId is not found", {
+test_that("getCodeCountsStratified returns error if conceptId is not found", {
   # post-counts test: reads the pre-built code_counts table
   skip_if_not(testingDatabase %in% postCountsDatabases)
 
@@ -130,12 +72,9 @@ test_that("getCodeCounts returns error if conceptId is not found", {
   })
 
   expect_error(
-    getCodeCounts(
+    getCodeCountsStratified(
       CDMdbHandler,
       conceptId = c(1000000000)
     )
   )
-
 })
-
-

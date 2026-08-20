@@ -10,13 +10,13 @@
 # the full bridge is far too large to ship as a git-committed fixture). So counts
 # derived from it are bounded by, but generally don't equal, the true
 # person_counts/descendant_person_counts in code_counts (built from the
-# uncapped source). Bridge-vs-bridge invariants (filter_person_counts vs
-# upset_person_counts, both from the same capped data) stay exact; the
+# uncapped source). Bridge-vs-bridge invariants (getPersonCountsFilters vs
+# getPersonCountsUpset, both from the same capped data) stay exact; the
 # exact-equality invariant against code_counts is fully covered elsewhere by the
 # Eunomia-GiBleed and AtlasDevelopment-5k creation-time tests, which build the
 # bridge uncapped from the real CDM.
 
-test_that("getPersonCounts works", {
+test_that("getPersonCountsUpset works", {
   # post-counts test: reads the pre-built code_counts / stratified_persons tables
   skip_if_not(testingDatabase %in% postCountsDatabases)
 
@@ -27,39 +27,9 @@ test_that("getPersonCounts works", {
   })
 
   memoise::forget(getConceptTree_memoise)
-  memoise::forget(getPersonCounts_memoise)
+  memoise::forget(getPersonCountsUpset_memoise)
 
-  result <- getPersonCounts(CDMdbHandler, conceptId = 317009L)
-
-  result |>
-    names() |>
-    expect_equal(c("filter_person_counts", "upset_person_counts"))
-
-  #
-  # filter_person_counts
-  #
-
-  filterPersonCounts <- result$filter_person_counts
-
-  filterPersonCounts |>
-    colnames() |>
-    expect_equal(c("filter", "stratum", "person_counts"))
-
-  filterPersonCounts |>
-    dplyr::pull(filter) |>
-    unique() |>
-    (\(x) expect_true(all(x %in% c("sex", "age", "visit"))))()
-
-  filterPersonCounts |>
-    dplyr::filter(is.na(filter) | is.na(stratum) | is.na(person_counts)) |>
-    nrow() |>
-    expect_equal(0)
-
-  #
-  # upset_person_counts
-  #
-
-  upsetPersonCounts <- result$upset_person_counts
+  upsetPersonCounts <- getPersonCountsUpset(CDMdbHandler, conceptId = 317009L)
 
   upsetPersonCounts |>
     colnames() |>
@@ -82,7 +52,7 @@ test_that("getPersonCounts works", {
   totalUpsetPersons |> expect_lte(codeCounts$descendant_person_counts)
 })
 
-test_that("getPersonCounts level cutoff restricts upset_person_counts to the root", {
+test_that("getPersonCountsUpset level cutoff restricts to the root", {
   # post-counts test: reads the pre-built code_counts / stratified_persons tables
   skip_if_not(testingDatabase %in% postCountsDatabases)
 
@@ -93,11 +63,11 @@ test_that("getPersonCounts level cutoff restricts upset_person_counts to the roo
   })
 
   memoise::forget(getConceptTree_memoise)
-  memoise::forget(getPersonCounts_memoise)
+  memoise::forget(getPersonCountsUpset_memoise)
 
-  result <- getPersonCounts(CDMdbHandler, conceptId = 317009L, level = 0L)
+  upsetPersonCounts <- getPersonCountsUpset(CDMdbHandler, conceptId = 317009L, level = 0L)
 
-  result$upset_person_counts |>
+  upsetPersonCounts |>
     dplyr::pull(group) |>
     expect_equal("317009")
 
@@ -105,12 +75,12 @@ test_that("getPersonCounts level cutoff restricts upset_person_counts to the roo
     dplyr::filter(concept_id == 317009) |>
     dplyr::collect()
 
-  rootUpsetPersons <- result$upset_person_counts |> dplyr::pull(person_counts)
+  rootUpsetPersons <- upsetPersonCounts |> dplyr::pull(person_counts)
   rootUpsetPersons |> expect_gt(0)
   rootUpsetPersons |> expect_lte(codeCounts$person_counts)
 })
 
-test_that("getPersonCounts stratum filters narrow upset_person_counts consistently with filter_person_counts", {
+test_that("getPersonCountsUpset stratum filters narrow totals consistently with getPersonCountsFilters", {
   # post-counts test: reads the pre-built code_counts / stratified_persons tables
   skip_if_not(testingDatabase %in% postCountsDatabases)
 
@@ -121,29 +91,45 @@ test_that("getPersonCounts stratum filters narrow upset_person_counts consistent
   })
 
   memoise::forget(getConceptTree_memoise)
-  memoise::forget(getPersonCounts_memoise)
+  memoise::forget(getPersonCountsUpset_memoise)
+  memoise::forget(getPersonCountsFilters_memoise)
 
-  full <- getPersonCounts(CDMdbHandler, conceptId = 317009L)
-  sexStrata <- full$filter_person_counts |>
+  fullUpset <- getPersonCountsUpset(CDMdbHandler, conceptId = 317009L)
+  filterPersonCounts <- getPersonCountsFilters(CDMdbHandler, conceptId = 317009L)
+  sexStrata <- filterPersonCounts |>
     dplyr::filter(filter == "sex") |>
     dplyr::pull(stratum)
 
   # filtering by every sex stratum present recovers the unfiltered total
-  filtered <- getPersonCounts(CDMdbHandler, conceptId = 317009L, sexStratum = sexStrata)
-  filtered$upset_person_counts |>
+  filtered <- getPersonCountsUpset(CDMdbHandler, conceptId = 317009L, sexStratum = sexStrata)
+  filtered |>
     dplyr::pull(person_counts) |>
     sum() |>
-    expect_equal(full$upset_person_counts |> dplyr::pull(person_counts) |> sum())
+    expect_equal(fullUpset |> dplyr::pull(person_counts) |> sum())
 
-  # filtering by a single sex stratum matches its filter_person_counts row
-  oneSex <- getPersonCounts(CDMdbHandler, conceptId = 317009L, sexStratum = sexStrata[1])
-  oneSex$upset_person_counts |>
+  # filtering by a single sex stratum matches its getPersonCountsFilters row
+  oneSex <- getPersonCountsUpset(CDMdbHandler, conceptId = 317009L, sexStratum = sexStrata[1])
+  oneSex |>
     dplyr::pull(person_counts) |>
     sum() |>
-    expect_equal(full$filter_person_counts |> dplyr::filter(filter == "sex", stratum == sexStrata[1]) |> dplyr::pull(person_counts))
+    expect_equal(filterPersonCounts |> dplyr::filter(filter == "sex", stratum == sexStrata[1]) |> dplyr::pull(person_counts))
 })
 
-test_that("getPersonCounts returns error if conceptId is not found", {
+test_that("getPersonCountsUpset rejects an inverted yearsRange", {
+  skip_if_not(testingDatabase %in% postCountsDatabases)
+
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+  withr::defer({
+    CDMdbHandler <- NULL
+    gc()
+  })
+
+  expect_error(
+    getPersonCountsUpset(CDMdbHandler, conceptId = 317009L, yearsRange = c(2020L, 2015L))
+  )
+})
+
+test_that("getPersonCountsUpset returns error if conceptId is not found", {
   # post-counts test: reads the pre-built code_counts / stratified_persons tables
   skip_if_not(testingDatabase %in% postCountsDatabases)
 
@@ -154,7 +140,7 @@ test_that("getPersonCounts returns error if conceptId is not found", {
   })
 
   expect_error(
-    getPersonCounts(
+    getPersonCountsUpset(
       CDMdbHandler,
       conceptId = c(1000000000)
     )

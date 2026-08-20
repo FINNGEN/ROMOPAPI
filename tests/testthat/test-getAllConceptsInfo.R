@@ -1,4 +1,4 @@
-test_that("getConceptsWithCodeCounts works", {
+test_that("getAllConceptsInfo works", {
   # post-counts test: reads the pre-built code_counts table
   skip_if_not(testingDatabase %in% postCountsDatabases)
 
@@ -9,9 +9,9 @@ test_that("getConceptsWithCodeCounts works", {
   })
 
   suppressWarnings(
-    result <- getConceptsWithCodeCounts(CDMdbHandler)
+    result <- getAllConceptsInfo(CDMdbHandler)
   )
-  
+
   # Check that we have at least some concepts
   result |>
     dplyr::count() |>
@@ -20,9 +20,7 @@ test_that("getConceptsWithCodeCounts works", {
 
   # Check column names match expected structure
   expected_columns <- c("concept_id", "concept_name", "domain_id", "vocabulary_id",
-                       "concept_class_id", "standard_concept", "concept_code",
-                       "record_counts", "descendant_record_counts", "number_of_descendants",
-                       "person_counts", "descendant_person_counts")
+                       "concept_class_id", "standard_concept", "concept_code")
 
   result |>
     colnames() |>
@@ -32,9 +30,7 @@ test_that("getConceptsWithCodeCounts works", {
   result |>
     dplyr::filter(is.na(concept_id) | is.na(concept_name) | is.na(domain_id) |
                  is.na(vocabulary_id) | is.na(concept_class_id) |
-                 is.na(concept_code) | is.na(record_counts) |
-                 is.na(descendant_record_counts) | is.na(person_counts) |
-                 is.na(descendant_person_counts)) |>
+                 is.na(concept_code)) |>
     nrow() |>
     expect_equal(0)
 
@@ -47,13 +43,6 @@ test_that("getConceptsWithCodeCounts works", {
   result |>
     dplyr::pull(concept_id) |>
     expect_type("double")
-
-  # Check that record_counts, descendant_record_counts, person_counts and
-  # descendant_person_counts are numeric and non-negative
-  result |>
-    dplyr::filter(record_counts < 0 | descendant_record_counts < 0 | person_counts < 0 | descendant_person_counts < 0) |>
-    nrow() |>
-    expect_equal(0)
 
   # Check that all concept_ids are unique
   result |>
