@@ -24,6 +24,7 @@ A list containing:
 Builds the family tree (ancestors and descendants) for a concept, pruned to
 only the nodes that have code counts or have a descendant with code counts
 — the same "counted, or has a counted descendant" rule \code{code_counts} uses to
-decide which concepts get a row. Shared by \code{getCodeCounts()} and
-\code{getPersonCounts()} so the tree is built (and memoised) once.
+decide which concepts get a row. Shared by \code{getConceptRelationships()},
+\code{getCodeCountsStratified()}, \code{getPersonCountsFilters()} and
+\code{getPersonCountsUpset()} so the tree is built (and memoised) once.
 }

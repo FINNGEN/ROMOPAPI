@@ -7,7 +7,7 @@
 createVisitBarplotFromPersonCounts(filterPersonCounts, visitTypeNames = NULL)
 }
 \arguments{
-\item{filterPersonCounts}{The `filter_person_counts` tibble from \code{\link{getPersonCounts}}}
+\item{filterPersonCounts}{The `filter_person_counts` tibble from \code{\link{getPersonCountsFilters}}}
 
 \item{visitTypeNames}{Optional tibble from \code{\link{getVisitTypeNames}} (columns
 `visit_group_concept_id`, `concept_name`) used to label the groups. NULL (default)

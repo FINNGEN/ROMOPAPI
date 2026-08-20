@@ -7,7 +7,7 @@
 createAgeHistogramFromPersonCounts(filterPersonCounts)
 }
 \arguments{
-\item{filterPersonCounts}{The `filter_person_counts` tibble from \code{\link{getPersonCounts}}}
+\item{filterPersonCounts}{The `filter_person_counts` tibble from \code{\link{getPersonCountsFilters}}}
 }
 \value{
 A plotly object
