@@ -90,16 +90,21 @@ function(res, conceptId=0L) {
   parts
 }
 
-#* Get person-count breakdowns by sex, age and visit type for a concept
-#* @param conceptId The concept ID to get person counts for
-#* @param yearsRange Comma-separated "startYear,endYear" to restrict to. Omit for the full range
+#* Get person-count breakdowns by sex, age, visit type and year for a list of concept sets
+#* @param conceptIds Comma-separated tagged concept ids, e.g. "317009SD,2000403993MD" —
+#*   each token is <conceptId><S|M><D?>: S/M picks concept_id vs maps_to_concept_id,
+#*   trailing D expands to the concept and all its descendants
+#* @param yearsRange Comma-separated "startYear,endYear" marking the selected year strata.
+#*   Omit to select none
+#* @param sexStratum Comma-separated gender_concept_id values marking the selected sex strata
+#* @param ageStratum Comma-separated age_decile values marking the selected age strata
+#* @param visitStratum Comma-separated visit_group_concept_id values marking the selected visit strata
 #* @get /getPersonCountsFilters
-function(res, conceptId = 0L, yearsRange = "") {
+function(res, conceptIds = "", yearsRange = "", sexStratum = "", ageStratum = "", visitStratum = "") {
 
-  conceptId <- as.integer(conceptId)
-  if (is.na(conceptId)) {
+  if (!nzchar(trimws(conceptIds))) {
     res$status <- 400
-    return(list(error = jsonlite::unbox("conceptId must be an integer")))
+    return(list(error = jsonlite::unbox("conceptIds must not be empty")))
   }
 
   yearsRange <- .plumberParseYearsRange(yearsRange)
@@ -111,8 +116,11 @@ function(res, conceptId = 0L, yearsRange = "") {
   tryCatch({
     getPersonCountsFilters_memoise(
       CDMdbHandler = CDMdbHandler,
-      conceptId = conceptId,
-      yearsRange = yearsRange
+      conceptIds = conceptIds,
+      yearsRange = yearsRange,
+      sexStratum = .plumberParseIntCsv(sexStratum),
+      ageStratum = .plumberParseIntCsv(ageStratum),
+      visitStratum = .plumberParseIntCsv(visitStratum)
     )
   }, error = function(e) {
     res$status <- 400
@@ -120,20 +128,21 @@ function(res, conceptId = 0L, yearsRange = "") {
   })
 }
 
-#* Get exact set-overlap (UpSet) person counts for a concept
-#* @param conceptId The concept ID to get person counts for
+#* Get exact set-overlap (UpSet) person counts for a list of concept sets
+#* @param conceptIds Comma-separated tagged concept ids, e.g. "317009SD,2000403993MD" —
+#*   each token is <conceptId><S|M><D?>: S/M picks concept_id vs maps_to_concept_id,
+#*   trailing D expands to the concept and all its descendants. Each token is its own
+#*   set in the returned regions
 #* @param yearsRange Comma-separated "startYear,endYear" to restrict to. Omit for the full range
-#* @param level Maximum tree depth to include. Omit for the full tree
 #* @param sexStratum Comma-separated gender_concept_id values to restrict to
 #* @param ageStratum Comma-separated age_decile values to restrict to
 #* @param visitStratum Comma-separated visit_group_concept_id values to restrict to
 #* @get /getPersonCountsUpset
-function(res, conceptId = 0L, yearsRange = "", level = "", sexStratum = "", ageStratum = "", visitStratum = "") {
+function(res, conceptIds = "", yearsRange = "", sexStratum = "", ageStratum = "", visitStratum = "") {
 
-  conceptId <- as.integer(conceptId)
-  if (is.na(conceptId)) {
+  if (!nzchar(trimws(conceptIds))) {
     res$status <- 400
-    return(list(error = jsonlite::unbox("conceptId must be an integer")))
+    return(list(error = jsonlite::unbox("conceptIds must not be empty")))
   }
 
   yearsRange <- .plumberParseYearsRange(yearsRange)
@@ -142,18 +151,11 @@ function(res, conceptId = 0L, yearsRange = "", level = "", sexStratum = "", ageS
     return(list(error = jsonlite::unbox("yearsRange must be \"startYear,endYear\"")))
   }
 
-  level <- if (nzchar(trimws(level))) as.integer(level) else NULL
-  if (!is.null(level) && is.na(level)) {
-    res$status <- 400
-    return(list(error = jsonlite::unbox("level must be an integer")))
-  }
-
   tryCatch({
     getPersonCountsUpset_memoise(
       CDMdbHandler = CDMdbHandler,
-      conceptId = conceptId,
+      conceptIds = conceptIds,
       yearsRange = yearsRange,
-      level = level,
       sexStratum = .plumberParseIntCsv(sexStratum),
       ageStratum = .plumberParseIntCsv(ageStratum),
       visitStratum = .plumberParseIntCsv(visitStratum)

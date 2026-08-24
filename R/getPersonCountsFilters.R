@@ -1,44 +1,66 @@
-#' Get person-count breakdowns by sex, age and visit type for a concept tree
+#' Get person-count breakdowns by sex, age, visit type and year for a list of tagged concept sets
 #'
 #' @description
-#' Computes exact distinct-person breakdowns, by sex/age/visit-source-group, for the
-#' concept tree rooted at `conceptId` (the concept and all its descendants), reading the
+#' Computes exact distinct-person breakdowns, by sex/age/visit-source-group/calendar-year,
+#' for the pooled population of an explicit list of tagged concept references, reading the
 #' `stratified_persons` person-level bridge table (see `createStratifiedPersonsTable()`).
-#' Reuses the memoised tree getter so the tree is only computed once across repeated calls.
+#' Each item in `conceptIds` uses the same tag grammar as `getPersonCountsUpset()`
+#' (`<conceptId><S|M><D?>`), but here every set is pooled into one combined population
+#' rather than reported as separate overlapping regions.
+#'
+#' Each of the four dimensions (sex, age, visit, year) is computed with the *other three*
+#' dimensions' filters applied, but not its own — so a client can see, for example, how
+#' the sex breakdown looks under the current age/visit/year filters, while still being told
+#' which sex value(s) were actually selected (`selected` column).
 #'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
-#' @param conceptId The concept ID to get person counts for
-#' @param yearsRange Optional integer vector of length 2, `c(startYear, endYear)`, restricting
-#'   the breakdown to that inclusive calendar-year range. NULL or empty (default) uses the
-#'   full range.
-#' @param codeCountsTable Name of the code counts table in the results schema. Defaults to "code_counts"
+#' @param conceptIds Comma-separated list of tagged concept references. See
+#'   \code{\link{getPersonCountsUpset}} for the tag grammar.
+#' @param yearsRange Optional integer vector of length 2, `c(startYear, endYear)`, marking
+#'   which `year` strata are `selected`, and applied when computing the `sex`/`age`/`visit`
+#'   breakdowns. NULL or empty (default) selects nothing and applies no year restriction.
+#' @param sexStratum Optional integer vector of `gender_concept_id` values, marking which
+#'   `sex` strata are `selected`, and applied when computing the `age`/`visit`/`year`
+#'   breakdowns. NULL or empty (default) selects nothing and applies no restriction.
+#' @param ageStratum Optional integer vector of `age_decile` values, marking which `age`
+#'   strata are `selected`, and applied when computing the `sex`/`visit`/`year` breakdowns.
+#'   NULL or empty (default) selects nothing and applies no restriction.
+#' @param visitStratum Optional integer vector of `visit_group_concept_id` values, marking
+#'   which `visit` strata are `selected`, and applied when computing the `sex`/`age`/`year`
+#'   breakdowns. NULL or empty (default) selects nothing and applies no restriction.
 #'
-#' @return A tibble of `filter` ("sex"/"age"/"visit"), `stratum`, `person_counts` — a
-#'   breakdown of the tree's persons (concept + all descendants) by each filterable
-#'   dimension, over `yearsRange`. Lets a client discover which strata are worth
-#'   filtering by, and how many persons they hold.
+#' @return A tibble of `filter` ("sex"/"age"/"visit"/"year"), `stratum`, `person_counts`,
+#'   `selected` — a breakdown of the pooled population's persons by each filterable
+#'   dimension, each computed with the other three dimensions' filters applied, with
+#'   `selected` marking the stratum value(s) that were part of that dimension's own filter.
 #'
-#' @importFrom checkmate assertClass assertIntegerish assertString
+#' @importFrom checkmate assertClass assertString assertIntegerish
 #' @importFrom DatabaseConnector renderTranslateQuerySql
 #' @importFrom tibble as_tibble
+#' @importFrom dplyr mutate case_when
+#' @importFrom purrr pmap_chr
 #'
 #' @export
 getPersonCountsFilters <- function(
     CDMdbHandler,
-    conceptId,
+    conceptIds,
     yearsRange = NULL,
-    codeCountsTable = "code_counts") {
-    ParallelLogger::logInfo("getPersonCountsFilters: Getting person count filters for conceptId: ", conceptId)
+    sexStratum = NULL,
+    ageStratum = NULL,
+    visitStratum = NULL) {
+    ParallelLogger::logInfo("getPersonCountsFilters: Getting person count filters for conceptIds: ", conceptIds)
     #
     # VALIDATE
     #
     CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
-    conceptId |> checkmate::assertIntegerish(lower = 1)
+    conceptIds |> checkmate::assertString()
     yearsRange |> checkmate::assertIntegerish(len = 2, any.missing = FALSE, null.ok = TRUE)
     if (!is.null(yearsRange) && yearsRange[1] > yearsRange[2]) {
         stop("yearsRange: first year must be <= second year")
     }
-    codeCountsTable |> checkmate::assertString()
+    sexStratum |> checkmate::assertIntegerish(any.missing = FALSE, null.ok = TRUE)
+    ageStratum |> checkmate::assertIntegerish(any.missing = FALSE, null.ok = TRUE)
+    visitStratum |> checkmate::assertIntegerish(any.missing = FALSE, null.ok = TRUE)
 
     stratifiedPersonsTable <- "stratified_persons"
 
@@ -49,38 +71,73 @@ getPersonCountsFilters <- function(
     # FUNCTION
     #
 
-    # - Get the concept tree (shared with getPersonCountsUpset / getConceptRelationships, memoised)
-    conceptTree <- getConceptTree_memoise(CDMdbHandler, conceptId = conceptId, codeCountsTable = codeCountsTable)
-    treeConceptIds <- conceptTree$concept_ids
+    # - Parse and resolve each tagged token to its (column, id set)
+    parsedTokens <- .parsePersonCountsConceptIds(conceptIds)
+    resolvedTokens <- .resolveTaggedConceptIdSets(CDMdbHandler, parsedTokens)
 
-    # - Breakdown of the tree's (concept + all descendants) persons by sex/age/visit,
-    #   over yearsRange (full range when NULL).
+    # - Pool all sets into one population: OR their (column, ids) predicates together
+    populationPredicate <- resolvedTokens |>
+        purrr::pmap_chr(function(column, resolved_ids, ...) {
+            paste0(column, " IN (", paste(resolved_ids, collapse = ","), ")")
+        }) |>
+        paste(collapse = " OR ")
+
+    sexFilterSql <- .inFilterSql("gender_concept_id", sexStratum)
+    ageFilterSql <- .inFilterSql("age_decile", ageStratum)
+    visitFilterSql <- .inFilterSql("visit_group_concept_id", visitStratum)
     yearFilterSql <- .betweenFilterSql("calendar_year", yearsRange)
 
     sql <- paste0("
         WITH tree_persons AS (
-            SELECT DISTINCT person_id, gender_concept_id, age_decile, visit_group_concept_id
+            SELECT DISTINCT person_id, gender_concept_id, age_decile, visit_group_concept_id, calendar_year
             FROM @resultsDatabaseSchema.@stratifiedPersonsTable
-            WHERE (concept_id IN (@conceptIds) OR maps_to_concept_id IN (@conceptIds))", yearFilterSql, "
+            WHERE (", populationPredicate, ")
         )
         SELECT 'sex' AS filter, CAST(gender_concept_id AS BIGINT) AS stratum, COUNT(DISTINCT person_id) AS person_counts
-        FROM tree_persons GROUP BY gender_concept_id
+        FROM tree_persons WHERE 1=1", ageFilterSql, visitFilterSql, yearFilterSql, "
+        GROUP BY gender_concept_id
         UNION ALL
         SELECT 'age' AS filter, CAST(age_decile AS BIGINT) AS stratum, COUNT(DISTINCT person_id) AS person_counts
-        FROM tree_persons GROUP BY age_decile
+        FROM tree_persons WHERE 1=1", sexFilterSql, visitFilterSql, yearFilterSql, "
+        GROUP BY age_decile
         UNION ALL
         SELECT 'visit' AS filter, CAST(visit_group_concept_id AS BIGINT) AS stratum, COUNT(DISTINCT person_id) AS person_counts
-        FROM tree_persons GROUP BY visit_group_concept_id;
+        FROM tree_persons WHERE 1=1", sexFilterSql, ageFilterSql, yearFilterSql, "
+        GROUP BY visit_group_concept_id
+        UNION ALL
+        SELECT 'year' AS filter, CAST(calendar_year AS BIGINT) AS stratum, COUNT(DISTINCT person_id) AS person_counts
+        FROM tree_persons WHERE 1=1", sexFilterSql, ageFilterSql, visitFilterSql, "
+        GROUP BY calendar_year;
     ")
     filterPersonCounts <- DatabaseConnector::renderTranslateQuerySql(
         connection = connection,
         sql = sql,
         resultsDatabaseSchema = resultsDatabaseSchema,
-        stratifiedPersonsTable = stratifiedPersonsTable,
-        conceptIds = paste(treeConceptIds, collapse = ",")
+        stratifiedPersonsTable = stratifiedPersonsTable
     ) |>
         tibble::as_tibble()
     names(filterPersonCounts) <- tolower(names(filterPersonCounts))
+
+    # `selected` marks the stratum value(s) that were part of that dimension's own
+    # filter — sex/age/visit are membership checks, year is a range check (computed
+    # separately to avoid comparing against a possibly-NULL yearsRange in case_when).
+    yearSelected <- if (is.null(yearsRange)) {
+        rep(FALSE, nrow(filterPersonCounts))
+    } else {
+        filterPersonCounts$filter == "year" &
+            filterPersonCounts$stratum >= yearsRange[1] &
+            filterPersonCounts$stratum <= yearsRange[2]
+    }
+
+    filterPersonCounts <- filterPersonCounts |>
+        dplyr::mutate(
+            selected = dplyr::case_when(
+                filter == "sex" & stratum %in% sexStratum ~ TRUE,
+                filter == "age" & stratum %in% ageStratum ~ TRUE,
+                filter == "visit" & stratum %in% visitStratum ~ TRUE,
+                TRUE ~ FALSE
+            ) | yearSelected
+        )
 
     return(filterPersonCounts)
 }
@@ -102,9 +159,12 @@ getPersonCountsFilters <- function(
 #' omitted from the cache key to allow sharing across different database connections.
 #'
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
-#' @param conceptId The concept ID to get person counts for
-#' @param yearsRange Optional integer vector of length 2, `c(startYear, endYear)`. NULL uses the full range.
-#' @param codeCountsTable Name of the code counts table in the results schema. Defaults to "code_counts"
+#' @param conceptIds Comma-separated list of tagged concept references. See
+#'   \code{\link{getPersonCountsUpset}} for the tag grammar.
+#' @param yearsRange Optional integer vector of length 2, `c(startYear, endYear)`.
+#' @param sexStratum Optional integer vector of `gender_concept_id` values.
+#' @param ageStratum Optional integer vector of `age_decile` values.
+#' @param visitStratum Optional integer vector of `visit_group_concept_id` values.
 #'
 #' @importFrom memoise memoise
 #'
