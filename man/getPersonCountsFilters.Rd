@@ -2,35 +2,55 @@
 % Please edit documentation in R/getPersonCountsFilters.R
 \name{getPersonCountsFilters}
 \alias{getPersonCountsFilters}
-\title{Get person-count breakdowns by sex, age and visit type for a concept tree}
+\title{Get person-count breakdowns by sex, age, visit type and year for a list of tagged concept sets}
 \usage{
 getPersonCountsFilters(
   CDMdbHandler,
-  conceptId,
+  conceptIds,
   yearsRange = NULL,
-  codeCountsTable = "code_counts"
+  sexStratum = NULL,
+  ageStratum = NULL,
+  visitStratum = NULL
 )
 }
 \arguments{
 \item{CDMdbHandler}{A CDMdbHandler object that contains database connection details}
 
-\item{conceptId}{The concept ID to get person counts for}
+\item{conceptIds}{Comma-separated list of tagged concept references. See
+\code{\link{getPersonCountsUpset}} for the tag grammar.}
 
-\item{yearsRange}{Optional integer vector of length 2, \code{c(startYear, endYear)}, restricting
-the breakdown to that inclusive calendar-year range. NULL or empty (default) uses the
-full range.}
+\item{yearsRange}{Optional integer vector of length 2, \code{c(startYear, endYear)}, marking
+which \code{year} strata are \code{selected}, and applied when computing the \code{sex}/\code{age}/\code{visit}
+breakdowns. NULL or empty (default) selects nothing and applies no year restriction.}
 
-\item{codeCountsTable}{Name of the code counts table in the results schema. Defaults to "code_counts"}
+\item{sexStratum}{Optional integer vector of \code{gender_concept_id} values, marking which
+\code{sex} strata are \code{selected}, and applied when computing the \code{age}/\code{visit}/\code{year}
+breakdowns. NULL or empty (default) selects nothing and applies no restriction.}
+
+\item{ageStratum}{Optional integer vector of \code{age_decile} values, marking which \code{age}
+strata are \code{selected}, and applied when computing the \code{sex}/\code{visit}/\code{year} breakdowns.
+NULL or empty (default) selects nothing and applies no restriction.}
+
+\item{visitStratum}{Optional integer vector of \code{visit_group_concept_id} values, marking
+which \code{visit} strata are \code{selected}, and applied when computing the \code{sex}/\code{age}/\code{year}
+breakdowns. NULL or empty (default) selects nothing and applies no restriction.}
 }
 \value{
-A tibble of \code{filter} ("sex"/"age"/"visit"), \code{stratum}, \code{person_counts} — a
-breakdown of the tree's persons (concept + all descendants) by each filterable
-dimension, over \code{yearsRange}. Lets a client discover which strata are worth
-filtering by, and how many persons they hold.
+A tibble of \code{filter} ("sex"/"age"/"visit"/"year"), \code{stratum}, \code{person_counts},
+\code{selected} — a breakdown of the pooled population's persons by each filterable
+dimension, each computed with the other three dimensions' filters applied, with
+\code{selected} marking the stratum value(s) that were part of that dimension's own filter.
 }
 \description{
-Computes exact distinct-person breakdowns, by sex/age/visit-source-group, for the
-concept tree rooted at \code{conceptId} (the concept and all its descendants), reading the
+Computes exact distinct-person breakdowns, by sex/age/visit-source-group/calendar-year,
+for the pooled population of an explicit list of tagged concept references, reading the
 \code{stratified_persons} person-level bridge table (see \code{createStratifiedPersonsTable()}).
-Reuses the memoised tree getter so the tree is only computed once across repeated calls.
+Each item in \code{conceptIds} uses the same tag grammar as \code{getPersonCountsUpset()}
+(\verb{<conceptId><S|M><D?>}), but here every set is pooled into one combined population
+rather than reported as separate overlapping regions.
+
+Each of the four dimensions (sex, age, visit, year) is computed with the \emph{other three}
+dimensions' filters applied, but not its own — so a client can see, for example, how
+the sex breakdown looks under the current age/visit/year filters, while still being told
+which sex value(s) were actually selected (\code{selected} column).
 }
