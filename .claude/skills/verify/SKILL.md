@@ -28,9 +28,10 @@ All defined in `inst/plumber/plumber.R`. Known-good example ID: `conceptId=31700
 - `/getListOfConcepts` — concept_id, concept_name, vocabulary_id, concept_code only.
 - `/getConceptRelationships?conceptId=` → `{concept_relationships, concepts}`.
 - `/getCodeCountsStratified?conceptId=` → flat array of per-stratum rows.
-- `/getPersonCountsFilters?conceptId=&yearsRange=2015,2020` → sex/age/visit breakdown.
-- `/getPersonCountsUpset?conceptId=&yearsRange=&level=&sexStratum=&ageStratum=&visitStratum=`
-  → UpSet exclusive-region counts.
+- `/getPersonCountsFilters?conceptIds=317009SD&yearsRange=2015,2020` → sex/age/visit/year breakdown.
+  `conceptIds` is a comma-separated list of tagged tokens (`<conceptId><S|M><D?>`).
+- `/getPersonCountsUpset?conceptIds=317009SD&yearsRange=&sexStratum=&ageStratum=&visitStratum=`
+  → UpSet exclusive-region counts, one region per combination of `conceptIds` tokens.
 - `/report?conceptId=` → full HTML report (mermaid tree + tables + 5 plotly
   widgets: code-counts plot + sex pie + age histogram + visit barplot + upset).
 

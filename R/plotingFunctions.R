@@ -469,6 +469,7 @@ createVisitBarplotFromPersonCounts <- function(filterPersonCounts, visitTypeName
 #' @return A plotly object
 #' @importFrom dplyr arrange desc mutate group_by summarise pull filter left_join select coalesce
 #' @importFrom tidyr unnest
+#' @importFrom stringr str_extract
 #' @importFrom plotly plot_ly add_markers add_segments subplot layout
 #' @export
 #'
@@ -477,18 +478,22 @@ createUpsetPlotFromPersonCounts <- function(upsetPersonCounts, concepts = NULL) 
     dplyr::arrange(dplyr::desc(person_counts)) |>
     dplyr::mutate(region = factor(group, levels = group))
 
+  # `group` is "-"-joined tagged tokens (e.g. "317009SD-2000403993M"), not bare
+  # concept ids — extract the leading digits to look up the concept name, but
+  # keep the full token as the set label so tag variants of the same id (e.g.
+  # "2000403993M" vs "2000403993MD") stay distinguishable.
   membership <- regions |>
-    dplyr::mutate(concept_id = strsplit(group, "-")) |>
-    tidyr::unnest(concept_id) |>
-    dplyr::mutate(concept_id = as.integer(concept_id))
+    dplyr::mutate(token = strsplit(group, "-")) |>
+    tidyr::unnest(token) |>
+    dplyr::mutate(concept_id = as.integer(stringr::str_extract(token, "^[0-9]+")))
 
   if (!is.null(concepts)) {
     membership <- membership |>
       dplyr::left_join(dplyr::select(concepts, concept_id, concept_name), by = "concept_id") |>
-      dplyr::mutate(set_label = dplyr::coalesce(concept_name, paste0("Concept ", concept_id)))
+      dplyr::mutate(set_label = paste0(dplyr::coalesce(concept_name, paste0("Concept ", concept_id)), " (", token, ")"))
   } else {
     membership <- membership |>
-      dplyr::mutate(set_label = paste0("Concept ", concept_id))
+      dplyr::mutate(set_label = token)
   }
 
   setLevels <- membership |>

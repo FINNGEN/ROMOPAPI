@@ -68,8 +68,8 @@ createPlotFromResults(results, showsMappings = showsMappings, width = 1000, heig
 
 ```{r}
 personCounts <- list(
-  filter_person_counts = getPersonCountsFilters_memoise(CDMdbHandler, conceptId = conceptId),
-  upset_person_counts = getPersonCountsUpset_memoise(CDMdbHandler, conceptId = conceptId)
+  filter_person_counts = getPersonCountsFilters_memoise(CDMdbHandler, conceptIds = paste0(conceptId, "SD")),
+  upset_person_counts = getPersonCountsUpset_memoise(CDMdbHandler, conceptIds = paste0(conceptId, "SD"))
 )
 visitTypeNames <- getVisitTypeNames_memoise(CDMdbHandler)
 ```

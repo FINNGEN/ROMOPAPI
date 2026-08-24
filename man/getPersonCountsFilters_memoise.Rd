@@ -6,19 +6,26 @@
 \usage{
 getPersonCountsFilters_memoise(
   CDMdbHandler,
-  conceptId,
+  conceptIds,
   yearsRange = NULL,
-  codeCountsTable = "code_counts"
+  sexStratum = NULL,
+  ageStratum = NULL,
+  visitStratum = NULL
 )
 }
 \arguments{
 \item{CDMdbHandler}{A CDMdbHandler object that contains database connection details}
 
-\item{conceptId}{The concept ID to get person counts for}
+\item{conceptIds}{Comma-separated list of tagged concept references. See
+\code{\link{getPersonCountsUpset}} for the tag grammar.}
 
-\item{yearsRange}{Optional integer vector of length 2, \code{c(startYear, endYear)}. NULL uses the full range.}
+\item{yearsRange}{Optional integer vector of length 2, \code{c(startYear, endYear)}.}
 
-\item{codeCountsTable}{Name of the code counts table in the results schema. Defaults to "code_counts"}
+\item{sexStratum}{Optional integer vector of \code{gender_concept_id} values.}
+
+\item{ageStratum}{Optional integer vector of \code{age_decile} values.}
+
+\item{visitStratum}{Optional integer vector of \code{visit_group_concept_id} values.}
 }
 \value{
 Same shape as \code{\link{getPersonCountsFilters}}.

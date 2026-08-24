@@ -216,11 +216,11 @@ from the cache key. The API calls the memoised versions.
 | Function (file) | Reads from | Returns |
 |-----------------|------------|---------|
 | `getAllConceptsInfo()` (`R/getAllConceptsInfo.R`) | `code_counts` ⨝ `concept` (join only restricts to concepts that have counts — the counts themselves aren't returned) — the catalogue of every concept that has counts, with its name/vocabulary/class | tibble |
-| `getConceptTree()` (`R/getConceptTree.R`) | `concept_ancestor` — builds the family tree pruned to nodes that have counts or a counted descendant. Shared by `getConceptRelationships()`, `getCodeCountsStratified()`, `getPersonCountsFilters()` and `getPersonCountsUpset()` so the tree is built once | list(family_tree, concept_ids) |
+| `getConceptTree()` (`R/getConceptTree.R`) | `concept_ancestor` — builds the family tree pruned to nodes that have counts or a counted descendant. Shared by `getConceptRelationships()` and `getCodeCountsStratified()` so the tree is built once | list(family_tree, concept_ids) |
 | `getConceptRelationships()` (`R/getConceptRelationships.R`) | `getConceptTree_memoise` (the tree) and `code_counts` ⨝ `concept` scoped to the tree's concept ids (for details + counts); 'Maps to'/'Mapped from' are derived from the stratified table's `maps_to_concept_id` column | list of tibbles |
 | `getCodeCountsStratified()` (`R/getCodeCountsStratified.R`) | `getConceptTree_memoise` (the tree) and `stratified_code_counts` (per-stratum counts for the concept, its descendants and mapped codes) | tibble |
-| `getPersonCountsFilters()` (`R/getPersonCountsFilters.R`) | `getConceptTree_memoise` (the tree) and `stratified_persons` (the exact person bridge) — sex/age/visit breakdowns for the tree (concept + all descendants), over an optional `yearsRange` | tibble |
-| `getPersonCountsUpset()` (`R/getPersonCountsUpset.R`) | `getConceptTree_memoise` (the tree) and `stratified_persons` — exact set-overlap (UpSet) regions for the tree, over an optional `yearsRange`; per-concept `person_counts`/`descendant_person_counts` are read from `code_counts` via `getConceptRelationships()`'s `concepts` tibble instead of being duplicated here | tibble |
+| `getPersonCountsFilters()` (`R/getPersonCountsFilters.R`) | `stratified_persons` (the exact person bridge), via `.parsePersonCountsConceptIds()`/`.resolveTaggedConceptIdSets()` (`R/parsePersonCountsConceptIds.R`) — sex/age/visit/year breakdowns for the pooled population of an explicit list of tagged concept sets | tibble |
+| `getPersonCountsUpset()` (`R/getPersonCountsUpset.R`) | `stratified_persons`, via the same tagged-concept-id helpers — exact set-overlap (UpSet) regions across an explicit list of tagged concept sets, over an optional `yearsRange` and the requested strata; per-concept `person_counts`/`descendant_person_counts` are read from `code_counts` via `getConceptRelationships()`'s `concepts` tibble instead of being duplicated here | tibble |
 | `getVisitTypeNames()` (`R/getVisitTypeNames.R`) | `stratified_code_counts` (distinct `visit_group_concept_id`) ⨝ `concept` (their names/codes) | tibble |
 | `getAPIInfo()` (`R/getAPIInfo.R`) | `cdm_source` (CDM name, vocabulary version) + package version | list |
 | `getLogs()` / `sendFeedback()` (`R/getLogs.R`, `R/sendFeedback.R`) | in-process log file / feedback capture — no DB | — |
@@ -255,9 +255,12 @@ via `getConceptRelationships()$concepts` below).
 
 #### `getConceptTree()` → `list(family_tree, concept_ids)`
 
-The tree-building block shared by `getConceptRelationships()`,
-`getCodeCountsStratified()`, `getPersonCountsFilters()` and
-`getPersonCountsUpset()` (memoised as `getConceptTree_memoise`). `family_tree`
+The tree-building block shared by `getConceptRelationships()` and
+`getCodeCountsStratified()` (memoised as `getConceptTree_memoise`).
+`getPersonCountsFilters()`/`getPersonCountsUpset()` don't use it — they resolve
+each of their tagged `conceptIds` entries directly against `concept_ancestor`
+via `.resolveTaggedConceptIdSets()` (`R/parsePersonCountsConceptIds.R`).
+`family_tree`
 has the same `parent_concept_id`/`child_concept_id`/`levels`/`paths` shape as
 the tree rows in `concept_relationships` below (minus the mapping edges, which
 `getConceptRelationships()` derives separately since it depends on its own
@@ -296,33 +299,49 @@ Per-concept, per-stratum counts for every node in the tree:
 | `node_record_counts` | events of this concept in the stratum |
 | `node_descendant_record_counts` | events of this concept **and its descendants** in the stratum |
 
+#### Tagged `conceptIds` — shared by both functions below
+
+`getPersonCountsFilters()` and `getPersonCountsUpset()` take an explicit list
+of tagged concept references instead of a single `conceptId` + tree: a
+comma-separated string of `<conceptId><S|M><D?>` tokens, e.g.
+`"317009S,4191479SD,2000403993M,2000403993MD"`. `S`/`M` picks which
+`stratified_persons` column to match (`concept_id` vs `maps_to_concept_id`); a
+trailing `D` expands the token to the concept **and all its descendants**
+(via `concept_ancestor`, self-inclusive) instead of the exact code alone. Two
+tokens sharing a raw concept id but differing in tag (e.g. `2000403993M` vs
+`2000403993MD`) are independent sets. Parsed and resolved once by
+`.parsePersonCountsConceptIds()` / `.resolveTaggedConceptIdSets()`
+(`R/parsePersonCountsConceptIds.R`), shared by both getters — neither getter
+uses `getConceptTree()`.
+
 #### `getPersonCountsFilters()` → one tibble
 
-A breakdown of the tree's persons (the concept **and all its descendants**) by
-each filterable dimension, over an optional `yearsRange` (`c(startYear,
-endYear)`; NULL/empty uses the full range). Lets a client discover which
-strata are worth filtering by, and how many persons they hold. Per-concept
-`person_counts`/`descendant_person_counts` are *not* repeated here — read them
-from `getConceptRelationships()`'s `concepts` tibble above.
+A breakdown, by each filterable dimension, of the **pooled** population across
+every set in `conceptIds` (not one row per set — see `getPersonCountsUpset()`
+for the per-set breakdown). Each dimension is computed with the *other three*
+dimensions' filters applied, but not its own, so a client can see how e.g. the
+sex breakdown looks under the current age/visit/year filters while still being
+told which value(s) were actually selected for sex.
 
 | Column | Meaning |
 |--------|---------|
-| `filter` | which dimension: `"sex"`, `"age"`, or `"visit"` |
-| `stratum` | the `gender_concept_id` / `age_decile` / `visit_group_concept_id` value |
-| `person_counts` | distinct persons in the tree with that stratum value, over `yearsRange` |
+| `filter` | which dimension: `"sex"`, `"age"`, `"visit"`, or `"year"` |
+| `stratum` | the `gender_concept_id` / `age_decile` / `visit_group_concept_id` / `calendar_year` value |
+| `person_counts` | distinct persons with that stratum value, with the other three dimensions' filters applied |
+| `selected` | `TRUE` if this stratum value was part of that dimension's own filter (`sexStratum`/`ageStratum`/`visitStratum`/`yearsRange`), else `FALSE` |
 
 #### `getPersonCountsUpset()` → one tibble
 
-Exact UpSet exclusive-region counts for the concepts at or under `level`,
+Exact UpSet exclusive-region counts across the sets in `conceptIds`,
 restricted to `yearsRange` and the requested strata (`sexStratum`,
 `ageStratum`, `visitStratum`). Computed by pulling each person's membership
-across the target concepts from `stratified_persons` and grouping — exact, not
+across the target sets from `stratified_persons` and grouping — exact, not
 sketch-reconstructed (see §2b):
 
 | Column | Meaning |
 |--------|---------|
-| `group` | the concept IDs of the exclusive region, joined by `"-"` |
-| `person_counts` | distinct persons in exactly that region (no more, no fewer of the target concepts) |
+| `group` | the tagged tokens of the exclusive region, joined by `"-"` (e.g. `"317009SD"` or `"317009S-317009SD"`) |
+| `person_counts` | distinct persons in exactly that region (no more, no fewer of the target sets) |
 
 #### `getVisitTypeNames()` → one tibble
 
@@ -394,8 +413,8 @@ memoised getter:
 |----------|-----------|
 | `GET /getConceptRelationships?conceptId=` | `getConceptRelationships_memoise` |
 | `GET /getCodeCountsStratified?conceptId=` | `getCodeCountsStratified_memoise` |
-| `GET /getPersonCountsFilters?conceptId=&yearsRange=` | `getPersonCountsFilters_memoise` |
-| `GET /getPersonCountsUpset?conceptId=&yearsRange=&level=&sexStratum=&ageStratum=&visitStratum=` | `getPersonCountsUpset_memoise` |
+| `GET /getPersonCountsFilters?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=` | `getPersonCountsFilters_memoise` |
+| `GET /getPersonCountsUpset?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=` | `getPersonCountsUpset_memoise` |
 | `GET /getListOfConcepts` | `getAllConceptsInfo_memoise` |
 | `GET /getVisitTypeNames` | `getVisitTypeNames_memoise` |
 | `GET /getAPIInfo` | `getAPIInfo` |

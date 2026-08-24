@@ -2,30 +2,26 @@
 % Please edit documentation in R/getPersonCountsUpset.R
 \name{getPersonCountsUpset}
 \alias{getPersonCountsUpset}
-\title{Get exact set-overlap (UpSet) person counts for a concept tree}
+\title{Get exact set-overlap (UpSet) person counts for a list of tagged concept sets}
 \usage{
 getPersonCountsUpset(
   CDMdbHandler,
-  conceptId,
+  conceptIds,
   yearsRange = NULL,
-  level = NULL,
   sexStratum = NULL,
   ageStratum = NULL,
-  visitStratum = NULL,
-  codeCountsTable = "code_counts"
+  visitStratum = NULL
 )
 }
 \arguments{
 \item{CDMdbHandler}{A CDMdbHandler object that contains database connection details}
 
-\item{conceptId}{The concept ID to get person counts for}
+\item{conceptIds}{Comma-separated list of tagged concept references, e.g.
+\code{"317009S,4191479SD,2000403993M,2000403993MD"}. See description for the tag grammar.}
 
 \item{yearsRange}{Optional integer vector of length 2, \code{c(startYear, endYear)}, restricting
 the regions to that inclusive calendar-year range. NULL or empty (default) uses the
 full range.}
-
-\item{level}{Maximum tree depth (distance from \code{conceptId}) of concepts to include.
-NULL (default) includes the full tree.}
 
 \item{sexStratum}{Optional integer vector of \code{gender_concept_id} values to restrict to.
 NULL or empty (default) includes all.}
@@ -35,17 +31,20 @@ NULL or empty (default) includes all.}
 
 \item{visitStratum}{Optional integer vector of \code{visit_group_concept_id} values to
 restrict to. NULL or empty (default) includes all.}
-
-\item{codeCountsTable}{Name of the code counts table in the results schema. Defaults to "code_counts"}
 }
 \value{
-A tibble of \code{group} (the concept IDs of the exclusive region, joined by "-")
-and \code{person_counts} — exact UpSet exclusive-region counts for the concepts at or
-under \code{level}, restricted to \code{yearsRange} and the requested strata.
+A tibble of \code{group} (the tagged tokens of the exclusive region, joined by "-")
+and \code{person_counts} — exact UpSet exclusive-region counts for the given concept
+sets, restricted to \code{yearsRange} and the requested strata.
 }
 \description{
-Computes exact UpSet exclusive-region person counts for the concept tree rooted at
-\code{conceptId}, reading the \code{stratified_persons} person-level bridge table (see
-\code{createStratifiedPersonsTable()}). Reuses the memoised tree getter so the tree is only
-computed once across repeated calls.
+Computes exact UpSet exclusive-region person counts for an explicit list of
+tagged concept references, reading the \code{stratified_persons} person-level bridge
+table (see \code{createStratifiedPersonsTable()}). Each item in \code{conceptIds} is an
+independent set: \verb{<conceptId><S|M><D?>} — \code{S}/\code{M} picks which column to match
+(\code{concept_id} vs \code{maps_to_concept_id}), and an optional trailing \code{D} expands the
+set to the concept and all its descendants (via \code{concept_ancestor}, including
+the concept itself) instead of matching the code directly. Two tokens that share
+the same concept id but differ in tag (e.g. \code{"2000403993M"} and \code{"2000403993MD"})
+are independent sets.
 }
