@@ -118,6 +118,53 @@ test_that("getPersonCountsUpset keeps tokens with the same concept id but differ
   groups |> (\(x) "317009S" %in% x)() |> expect_false()
 })
 
+test_that("getPersonCountsUpset gives exact overlapping-region counts on a hand-built fixture (synthetic)", {
+  # Checks the actual exclusive-region ARITHMETIC, not just shape/bounds, against
+  # .buildSyntheticPersonCountsHandler() (tests/testthat/helper.R): 6 persons,
+  # where persons 1 and 6 each carry an event under BOTH concept trees (100 and
+  # 200), so "100SD"/"200MD" genuinely overlap instead of only ever containing
+  # disjoint singletons.
+  #   100SD (100 + descendant 101) -> persons {1,2,3,6}
+  #   200MD (200 + descendant 201, via maps_to_concept_id) -> persons {1,4,5,6}
+  #   overlap {1,6}; 100SD-only {2,3}; 200MD-only {4,5}
+  CDMdbHandler <- .buildSyntheticPersonCountsHandler()
+
+  result <- getPersonCountsUpset(CDMdbHandler, conceptIds = "100SD,200MD")
+
+  expected <- tibble::tribble(
+    ~group, ~person_counts,
+    "100SD-200MD", 2L,
+    "100SD", 2L,
+    "200MD", 2L
+  )
+
+  result |>
+    dplyr::mutate(person_counts = as.integer(person_counts)) |>
+    dplyr::arrange(group) |>
+    expect_equal(expected |> dplyr::arrange(group))
+})
+
+test_that("getPersonCountsUpset gives exact self-inclusive overlap counts on a hand-built fixture (synthetic)", {
+  # 100S (concept 100 only) -> persons {1,6}; 100SD (100 + descendant 101) ->
+  # persons {1,2,3,6}. SD is self-inclusive, so 100S is always a subset of
+  # 100SD: the exclusive regions are the shared root {1,6} and the
+  # descendants-only remainder {2,3} — a 2-person overlap, not a singleton.
+  CDMdbHandler <- .buildSyntheticPersonCountsHandler()
+
+  result <- getPersonCountsUpset(CDMdbHandler, conceptIds = "100S,100SD")
+
+  expected <- tibble::tribble(
+    ~group, ~person_counts,
+    "100S-100SD", 2L,
+    "100SD", 2L
+  )
+
+  result |>
+    dplyr::mutate(person_counts = as.integer(person_counts)) |>
+    dplyr::arrange(group) |>
+    expect_equal(expected |> dplyr::arrange(group))
+})
+
 test_that("getPersonCountsUpset stratum filters narrow totals consistently with getPersonCountsFilters", {
   # post-counts test: reads the pre-built code_counts / stratified_persons tables
   skip_if_not(testingDatabase %in% postCountsDatabases)
