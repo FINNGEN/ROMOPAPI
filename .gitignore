@@ -18,6 +18,8 @@ FinnGenR12_v5.4_counts.sqlite
 
 GITHUBPAT.txt
 
+tmp/
+
 
 inst/doc
 /doc/
