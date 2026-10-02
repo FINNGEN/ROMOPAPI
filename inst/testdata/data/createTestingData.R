@@ -53,6 +53,7 @@ DatabaseConnector::dbListTables(connection) |>
         "code_counts",
         "concept",
         "concept_ancestor",
+        "observed_persons_counts_stratified",
         "stratified_code_counts",
         "stratified_persons"
     ))
@@ -78,6 +79,11 @@ dplyr::tbl(connection, "stratified_code_counts") |>
     expect_gt(0)
 
 dplyr::tbl(connection, "stratified_persons") |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
+
+dplyr::tbl(connection, "observed_persons_counts_stratified") |>
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_gt(0)

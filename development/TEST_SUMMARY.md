@@ -28,9 +28,10 @@ several tests earn more than one tag.
 - **`helper.R`** — `.buildSyntheticPersonCountsHandler()`, a hand-built,
   throwaway-SQLite `CDMdbHandler` (6 persons, 2 concept trees; persons 1 and 6
   each carry events under *both* trees, so exclusive-region math has a real
-  overlap to get right, not only disjoint singletons) used by the
-  **synthetic** tests in `test-getPersonCountsUpset.R` and
-  `test-getPersonCountsFilters.R`.
+  overlap to get right, not only disjoint singletons; also seeds a small
+  `observed_persons_counts_stratified` denominator table with hand-picked round
+  numbers) used by the **synthetic** tests in `test-getPersonCountsUpset.R`,
+  `test-getPersonCountsFilters.R` and `test-getPersonCountsPrevalence.R`.
 
 ---
 
@@ -72,6 +73,13 @@ unmapped-source (`concept_id = 0`) condition row. Asserts, by exact concept
 id, that the unmapped event survives into `stratified_code_counts` and
 `code_counts` under its source concept, and that no events get silently
 merged into a phantom `concept_id = 0` row.
+
+### "createObservedPersonsCountsTable works" — *(integration, behavioral)*
+Builds `stratified_code_counts` then `observed_persons_counts_stratified` from
+a real CDM; checks columns, non-emptiness, no `NA`/non-positive
+`observed_persons_counts`, and that the set of `calendar_year` values matches
+exactly the years present in `stratified_code_counts` (the denominator table's
+year range is derived from it, not independently computed).
 
 ---
 
@@ -193,6 +201,46 @@ Same reciprocal-filtering check for the `year` dimension via `yearsRange`.
 
 ### "getPersonCountsFilters returns error if concept id has no descendants" — *(validation)*
 A `...D` token on a nonexistent concept id (empty descendant expansion).
+
+---
+
+## `test-getPersonCountsPrevalence.R`
+
+### "getPersonCountsPrevalence rejects malformed conceptIds tokens" — *(validation)*
+
+### "getPersonCountsPrevalence rejects an inverted yearsRange" — *(validation)*
+
+### "getPersonCountsPrevalence works for a single descendant-expanded set" — *(behavioral, invariant, fixture)*
+Checks the 4-column shape, no `NA`s, every row tagged with the requested
+token, a strictly-positive denominator, and `person_counts <=
+observed_persons_counts` on every row.
+
+### "getPersonCountsPrevalence yearsRange restricts the returned years" — *(fixture)*
+Restricting `yearsRange` to a single year returns rows for that year only.
+
+### "getPersonCountsPrevalence's per-year numerator matches getPersonCountsFilters' year breakdown" — *(invariant, fixture)*
+For a single (unpooled) token with no sex/age/visit filters, the per-year
+distinct-person numerator must be identical to `getPersonCountsFilters()`'s
+`filter == "year"` breakdown — both read the same `stratified_persons` rows
+under the same predicate.
+
+### "getPersonCountsPrevalence gives exact counts on a hand-built fixture (synthetic)" — *(synthetic)*
+Against `.buildSyntheticPersonCountsHandler()` (`helper.R`): exact
+numerator/denominator pairs, per token per year, for `"100SD,200MD"` —
+including a token/year combination with a zero numerator against a
+non-zero denominator.
+
+### "getPersonCountsPrevalence's sexStratum/ageStratum narrow both numerator and denominator (synthetic)" — *(synthetic)*
+Filtering to one sex on the synthetic fixture narrows the denominator to the
+single matching (year, sex, age) cell and the numerator to the one matching
+person, both exactly.
+
+### "getPersonCountsPrevalence's visitStratum narrows the numerator only (synthetic)" — *(synthetic)*
+Confirms the documented asymmetry: restricting to a visit group changes the
+numerator (down to zero for a group nobody used) while the denominator stays
+identical to the unfiltered value.
+
+### "getPersonCountsPrevalence returns error if concept id has no descendants" — *(validation)*
 
 ---
 

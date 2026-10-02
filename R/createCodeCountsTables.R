@@ -71,6 +71,14 @@ createCodeCountsTables <- function(
         visitSourceGroupConceptIds = visitSourceGroupConceptIds
     )
 
+    # - Create observed persons counts table (prevalence denominator) -- reads
+    #   its year range from stratifiedCodeCountsTable, so must come after it
+    createObservedPersonsCountsTable(
+        CDMdbHandler,
+        observedPersonsCountsTable = "observed_persons_counts_stratified",
+        stratifiedCodeCountsTable = stratifiedCodeCountsTable
+    )
+
     # - Create code counts table
     sqlDialectFolder <- if (connection@dbms == "bigquery") "bigquery" else "sql_server"
     sqlPath <- system.file(
