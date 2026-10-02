@@ -7,7 +7,7 @@
 pruneLevelsFromResults(results, pruneLevels, pruneClass = NULL)
 }
 \arguments{
-\item{results}{A list of results from getCodeCounts}
+\item{results}{A list of results from getConceptRelationships and getCodeCountsStratified}
 
 \item{pruneLevels}{The levels to prune}
 

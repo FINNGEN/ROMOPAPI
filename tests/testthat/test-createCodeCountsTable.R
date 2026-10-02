@@ -1,8 +1,11 @@
 test_that("createStratifiedCodeCountsTable works with duplicated counts", {
-  # only works in a full CDM database
-  skip_if(testingDatabase == "OnlyCounts-FinnGen")
+  # counts-creation test: needs a raw OMOP CDM
+  skip_if_not(testingDatabase %in% creationDatabases)
 
-  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
   withr::defer({
     CDMdbHandler <- NULL
     gc()
@@ -12,27 +15,41 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
   resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
 
   withr::defer({
-    CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable))
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ",
+      resultsDatabaseSchema,
+      ".",
+      stratifiedCodeCountsTable
+    ))
   })
 
-  domain  <- tibble::tribble(
-    ~domain_id, ~table_name, ~concept_id_field, ~date_field, ~maps_to_concept_id_field,
-    "Condition", "condition_occurrence", "condition_concept_id", "condition_start_date", "condition_source_concept_id"
+  domain <- tibble::tribble(
+    ~domain_id  , ~table_name            , ~concept_id_field      , ~date_field            , ~maps_to_concept_id_field     ,
+    "Condition" , "condition_occurrence" , "condition_concept_id" , "condition_start_date" , "condition_source_concept_id"
   )
 
   # codeAtomicCountsWithDuplicatedCounts
   suppressWarnings(
-    createStratifiedCodeCountsTable(CDMdbHandler, domains = domain, stratifiedCodeCountsTable = stratifiedCodeCountsTable)
+    createStratifiedCodeCountsTable(
+      CDMdbHandler,
+      domains = domain,
+      stratifiedCodeCountsTable = stratifiedCodeCountsTable
+    )
   )
 
-  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(resultsDatabaseSchema, ".", stratifiedCodeCountsTable)))
+  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    resultsDatabaseSchema,
+    ".",
+    stratifiedCodeCountsTable
+  )))
 
-  # check that the table was created 
-  stratifiedCodeCounts |>
-   dplyr::count() |>
-   dplyr::pull(n) |>
-   expect_gt(0)
-   
+  # check that the table was created
+  nrows <- stratifiedCodeCounts |>
+    dplyr::count() |>
+    dplyr::pull(n) 
+  
+  nrows |> expect_gt(0)
+
   # check that the table was created with correct columns
   stratifiedCodeCounts |>
     head() |>
@@ -41,11 +58,230 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
     expect_equal(c(
       "concept_id",
       "maps_to_concept_id",
+      "visit_group_concept_id",
       "calendar_year",
       "gender_concept_id",
       "age_decile",
       "record_counts"
     ))
+  
+  stratifiedCodeCounts |> 
+    dplyr::filter(visit_group_concept_id != 0) |> 
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+})
+
+test_that("createStratifiedCodeCountsTable works with visit_source_group_concept_ids", {
+  # visit-source-group logic needs the FinnGen visit concepts (BigQuery only)
+  skip_if(testingDatabase != "AtlasDevelopment-5k")
+
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
+  withr::defer({
+    CDMdbHandler <- NULL
+    gc()
+  })
+
+  stratifiedCodeCountsTable <- "stratified_code_counts_test0"
+  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+
+  withr::defer({
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ",
+      resultsDatabaseSchema,
+      ".",
+      stratifiedCodeCountsTable
+    ))
+  })
+
+  domain <- tibble::tribble(
+    ~domain_id  , ~table_name            , ~concept_id_field      , ~date_field            , ~maps_to_concept_id_field     ,
+    "Condition" , "condition_occurrence" , "condition_concept_id" , "condition_start_date" , "condition_source_concept_id"
+  )
+
+  # database-dependent, from databasesConfig.yml (see setup.R)
+  visitSourceGroupConceptIds <- test_visitSourceGroupConceptIds
+
+  # codeAtomicCountsWithDuplicatedCounts
+  suppressWarnings(
+    createStratifiedCodeCountsTable(
+      CDMdbHandler,
+      domains = domain,
+      stratifiedCodeCountsTable = stratifiedCodeCountsTable,
+      visitSourceGroupConceptIds = visitSourceGroupConceptIds
+    )
+  )
+
+  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    resultsDatabaseSchema,
+    ".",
+    stratifiedCodeCountsTable
+  )))
+
+  # check that the table was created
+  nrows <- stratifiedCodeCounts |>
+    dplyr::count() |>
+    dplyr::pull(n) 
+  
+  nrows |> expect_gt(0)
+
+  # check that the table was created with correct columns
+  stratifiedCodeCounts |>
+    head() |>
+    dplyr::collect() |>
+    colnames() |>
+    expect_equal(c(
+      "concept_id",
+      "maps_to_concept_id",
+      "visit_group_concept_id",
+      "calendar_year",
+      "gender_concept_id",
+      "age_decile",
+      "record_counts"
+    ))
+  
+  
+  stratifiedCodeCounts |> 
+    dplyr::filter(visit_group_concept_id == 0) |> 
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  ## All the visit_group_concept_id are in the provided visitSourceGroupConceptIds 
+  stratifiedCodeCounts |> 
+    dplyr::distinct(visit_group_concept_id) |> 
+    dplyr::pull(visit_group_concept_id) |>
+    (\(x) expect_true(all(x %in% visitSourceGroupConceptIds)))()
+})
+
+
+test_that("served stratified_code_counts is grouped by visit_source_group_concept_ids", {
+  # post-counts test: the served counts were built with the FinnGen visit groups.
+  # Runs on both AtlasDevelopment-5k (built in setup) and the OnlyCounts-FinnGen
+  # sqlite fixture (shipped precomputed).
+  skip_if_not(testingDatabase %in% postCountsDatabases)
+
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
+  withr::defer({
+    CDMdbHandler <- NULL
+    gc()
+  })
+
+  # database-dependent, from databasesConfig.yml (see setup.R)
+  visitSourceGroupConceptIds <- test_visitSourceGroupConceptIds
+
+  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    CDMdbHandler$resultsDatabaseSchema,
+    ".stratified_code_counts"
+  )))
+
+  servedVisitGroups <- stratifiedCodeCounts |>
+    dplyr::distinct(visit_group_concept_id) |>
+    dplyr::pull(visit_group_concept_id)
+
+  # grouping was applied: nothing left ungrouped (visit_group_concept_id == 0)
+  servedVisitGroups |>
+    (\(x) expect_false(0 %in% x))()
+
+  # more than one visit group is present
+  servedVisitGroups |>
+    length() |>
+    expect_gt(1)
+
+  # the grouping used the configured FinnGen visit-source-group concept IDs
+  servedVisitGroups |>
+    (\(x) expect_true(any(x %in% visitSourceGroupConceptIds)))()
+})
+
+test_that("createStratifiedCodeCountsTable works with visit_source_group_concept_ids if one missing takes childern", {
+  # visit-source-group logic needs the FinnGen visit concepts (BigQuery only)
+  skip_if(testingDatabase != "AtlasDevelopment-5k")
+
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
+  withr::defer({
+    CDMdbHandler <- NULL
+    gc()
+  })
+
+  stratifiedCodeCountsTable <- "stratified_code_counts_test0"
+  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+
+  withr::defer({
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ",
+      resultsDatabaseSchema,
+      ".",
+      stratifiedCodeCountsTable
+    ))
+  })
+
+  domain <- tibble::tribble(
+    ~domain_id  , ~table_name            , ~concept_id_field      , ~date_field            , ~maps_to_concept_id_field     ,
+    "Condition" , "condition_occurrence" , "condition_concept_id" , "condition_start_date" , "condition_source_concept_id"
+  )
+
+  # drop OUTPAT (2002330249) so its children must be grouped in instead
+  visitSourceGroupConceptIds <- setdiff(test_visitSourceGroupConceptIds, 2002330249)
+
+  # codeAtomicCountsWithDuplicatedCounts
+  suppressWarnings(
+    createStratifiedCodeCountsTable(
+      CDMdbHandler,
+      domains = domain,
+      stratifiedCodeCountsTable = stratifiedCodeCountsTable,
+      visitSourceGroupConceptIds = visitSourceGroupConceptIds
+    )
+  )
+
+  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    resultsDatabaseSchema,
+    ".",
+    stratifiedCodeCountsTable
+  )))
+
+  # check that the table was created
+  nrows <- stratifiedCodeCounts |>
+    dplyr::count() |>
+    dplyr::pull(n) 
+  
+  nrows |> expect_gt(0)
+
+  # check that the table was created with correct columns
+  stratifiedCodeCounts |>
+    head() |>
+    dplyr::collect() |>
+    colnames() |>
+    expect_equal(c(
+      "concept_id",
+      "maps_to_concept_id",
+      "visit_group_concept_id",
+      "calendar_year",
+      "gender_concept_id",
+      "age_decile",
+      "record_counts"
+    ))
+  
+  
+  stratifiedCodeCounts |> 
+    dplyr::filter(visit_group_concept_id == 0) |> 
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  ## All the visit_group_concept_id are in the provided visitSourceGroupConceptIds 
+  stratifiedCodeCounts |> 
+    dplyr::distinct(visit_group_concept_id) |> 
+    dplyr::pull(visit_group_concept_id) |>
+    (\(x) expect_false(all(x %in% visitSourceGroupConceptIds)))()
 })
 
 # test_that("createObservationCountsTable works", {
@@ -76,12 +312,14 @@ test_that("createStratifiedCodeCountsTable works with duplicated counts", {
 #     expect_gt(0)
 # })
 
-
 test_that("createCodeCountsTables works", {
-  # only works in a full CDM database
-  skip_if(testingDatabase == "OnlyCounts-FinnGen")
+  # counts-creation test: needs a raw OMOP CDM
+  skip_if_not(testingDatabase %in% creationDatabases)
 
-  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
   withr::defer({
     CDMdbHandler <- NULL
     gc()
@@ -90,8 +328,18 @@ test_that("createCodeCountsTables works", {
   codeCountsTable <- "code_counts_test0"
   stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
   withr::defer({
-    CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", codeCountsTable))
-    CDMdbHandler$connectionHandler$executeSql(paste0("DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable))
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ",
+      resultsDatabaseSchema,
+      ".",
+      codeCountsTable
+    ))
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ",
+      resultsDatabaseSchema,
+      ".",
+      stratifiedCodeCountsTable
+    ))
   })
 
   createCodeCountsTables(CDMdbHandler, codeCountsTable = codeCountsTable)
@@ -99,7 +347,11 @@ test_that("createCodeCountsTables works", {
   # - Check if the table was created
   resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
   cdmDatabaseSchema <- CDMdbHandler$cdmDatabaseSchema
-  code_counts <- CDMdbHandler$connectionHandler$tbl(I(paste0(resultsDatabaseSchema, ".", codeCountsTable)))
+  code_counts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    resultsDatabaseSchema,
+    ".",
+    codeCountsTable
+  )))
 
   # check that the table was created with correct columns
   code_counts |>
@@ -114,7 +366,9 @@ test_that("createCodeCountsTables works", {
       "concept_id",
       "record_counts",
       "descendant_record_counts",
-      "number_of_descendants"
+      "number_of_descendants",
+      "person_counts",
+      "descendant_person_counts"
     ))
 
   # check that descendant_record_counts is greater than or equal to record_counts
@@ -153,4 +407,359 @@ test_that("createCodeCountsTables works", {
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_equal(0)
+
+  # check that descendant_person_counts is greater than or equal to person_counts
+  # (exact COUNT(DISTINCT person_id), never a sum — persons can repeat across descendants)
+  code_counts |>
+    dplyr::filter(descendant_person_counts < person_counts) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # check that concepts with no other counted descendant (mirrors the
+  # record_counts == descendant_record_counts check above) have
+  # person_counts == descendant_person_counts
+  code_counts |>
+    dplyr::filter(record_counts == descendant_record_counts) |>
+    dplyr::filter(person_counts != descendant_person_counts) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+})
+
+
+
+
+test_that("createCodeCountsTables works stratified by visit_group_concept_id", {
+  # visit-source-group logic needs the FinnGen visit concepts (BigQuery only)
+  skip_if(testingDatabase != "AtlasDevelopment-5k")
+
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
+  withr::defer({
+    CDMdbHandler <- NULL
+    gc()
+  })
+
+  codeCountsTable <- "code_counts_test0"
+  stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
+  withr::defer({
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ",
+      resultsDatabaseSchema,
+      ".",
+      codeCountsTable
+    ))
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ",
+      resultsDatabaseSchema,
+      ".",
+      stratifiedCodeCountsTable
+    ))
+  })
+
+
+  # database-dependent, from databasesConfig.yml (see setup.R)
+  visitSourceGroupConceptIds <- test_visitSourceGroupConceptIds
+
+
+  createCodeCountsTables(
+    CDMdbHandler,
+     codeCountsTable = codeCountsTable,
+     visitSourceGroupConceptIds = visitSourceGroupConceptIds
+  )
+
+  # - Check if the table was created
+  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+  cdmDatabaseSchema <- CDMdbHandler$cdmDatabaseSchema
+  code_counts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    resultsDatabaseSchema,
+    ".",
+    codeCountsTable
+  )))
+
+  # check that the table was created with correct columns
+  code_counts |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
+  code_counts |>
+    head() |>
+    dplyr::collect() |>
+    colnames() |>
+    expect_equal(c(
+      "concept_id",
+      "record_counts",
+      "descendant_record_counts",
+      "number_of_descendants",
+      "person_counts",
+      "descendant_person_counts"
+    ))
+
+  # check that descendant_record_counts is greater than or equal to record_counts
+  code_counts |>
+    dplyr::filter(descendant_record_counts < record_counts) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # check that concept_id is unique
+  code_counts |>
+    dplyr::distinct(concept_id) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(code_counts |> dplyr::count() |> dplyr::pull(n))
+
+  # check that number_of_descendants is greater than or equal to 1
+  code_counts |>
+    dplyr::filter(number_of_descendants < 1) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # check that all with record_counts = descendant_record_counts have  number_of_descendants = 1
+  code_counts |>
+    dplyr::filter(record_counts == descendant_record_counts) |>
+    dplyr::filter(number_of_descendants != 1) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # check that all with number_of_descendants > 1 have record_counts > descendant_record_counts
+  code_counts |>
+    dplyr::filter(number_of_descendants > 1) |>
+    dplyr::filter(record_counts > descendant_record_counts) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # check that descendant_person_counts is greater than or equal to person_counts
+  # (exact COUNT(DISTINCT person_id), never a sum — persons can repeat across descendants)
+  code_counts |>
+    dplyr::filter(descendant_person_counts < person_counts) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # check that concepts with no other counted descendant (mirrors the
+  # record_counts == descendant_record_counts check above) have
+  # person_counts == descendant_person_counts
+  code_counts |>
+    dplyr::filter(record_counts == descendant_record_counts) |>
+    dplyr::filter(person_counts != descendant_person_counts) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+})
+
+
+test_that("stratified table keeps source concepts with no standard concept (concept_id = 0)", {
+  # Self-contained regression test: events whose standard concept is unmapped
+  # (concept_id = 0) but whose source concept is known (e.g. NOMESCO procedure
+  # codes) must NOT be dropped. They should land in the stratified table under
+  # maps_to_concept_id, and flow through to code_counts as the source concept.
+  # Runs on a throw-away SQLite CDM, so it does not need a full CDM database.
+
+  pathToSqlite <- tempfile(fileext = ".sqlite")
+  connectionDetails <- DatabaseConnector::createConnectionDetails(
+    dbms = "sqlite",
+    server = pathToSqlite
+  )
+  connection <- DatabaseConnector::connect(connectionDetails)
+  withr::defer({
+    DatabaseConnector::disconnect(connection)
+    unlink(pathToSqlite)
+  })
+
+  cdmDatabaseSchema <- "main"
+  resultsDatabaseSchema <- "main"
+
+  # - Minimal OMOP fixtures: one mapped event and one unmapped-source event
+  DatabaseConnector::insertTable(
+    connection,
+    tableName = "person",
+    data = tibble::tibble(person_id = 1L, gender_concept_id = 8507L, year_of_birth = 1980L),
+    dropTableIfExists = TRUE, createTable = TRUE, tempTable = FALSE
+  )
+  DatabaseConnector::insertTable(
+    connection,
+    tableName = "observation_period",
+    data = tibble::tibble(
+      person_id = 1L,
+      observation_period_start_date = "2000-01-01",
+      observation_period_end_date = "2030-01-01"
+    ),
+    dropTableIfExists = TRUE, createTable = TRUE, tempTable = FALSE
+  )
+  DatabaseConnector::insertTable(
+    connection,
+    tableName = "condition_occurrence",
+    data = tibble::tibble(
+      person_id = c(1L, 1L),
+      condition_concept_id = c(320128L, 0L), # second row is unmapped
+      condition_source_concept_id = c(44831230L, 2000999L), # source known in both
+      condition_start_date = c("2010-05-01", "2011-06-01"),
+      visit_occurrence_id = c(NA_integer_, NA_integer_)
+    ),
+    dropTableIfExists = TRUE, createTable = TRUE, tempTable = FALSE
+  )
+  # concept table needed by createCodeCountsTable (TEMP self-ancestor)
+  DatabaseConnector::insertTable(
+    connection,
+    tableName = "concept",
+    data = tibble::tibble(concept_id = c(320128L, 44831230L, 2000999L, 0L)),
+    dropTableIfExists = TRUE, createTable = TRUE, tempTable = FALSE
+  )
+  DatabaseConnector::executeSql(
+    connection,
+    "CREATE TABLE main.concept_ancestor (
+       ancestor_concept_id INTEGER,
+       descendant_concept_id INTEGER,
+       min_levels_of_separation INTEGER,
+       max_levels_of_separation INTEGER
+     );",
+    progressBar = FALSE, reportOverallTime = FALSE
+  )
+
+  domain <- tibble::tribble(
+    ~domain_id  , ~table_name            , ~concept_id_field      , ~date_field            , ~maps_to_concept_id_field     ,
+    "Condition" , "condition_occurrence" , "condition_concept_id" , "condition_start_date" , "condition_source_concept_id"
+  )
+
+  # - Build the stratified table exactly as createStratifiedCodeCountsTable does
+  stratifiedCodeCountsTable <- "stratified_code_counts_test_nomesco"
+  createSql <- SqlRender::render(
+    "DROP TABLE IF EXISTS @resultsDatabaseSchema.@stratifiedCodeCountsTable;
+     CREATE TABLE @resultsDatabaseSchema.@stratifiedCodeCountsTable (
+       concept_id INTEGER,
+       maps_to_concept_id INTEGER,
+       visit_group_concept_id INTEGER,
+       calendar_year INTEGER,
+       gender_concept_id INTEGER,
+       age_decile INTEGER,
+       record_counts INTEGER
+     )",
+    resultsDatabaseSchema = resultsDatabaseSchema,
+    stratifiedCodeCountsTable = stratifiedCodeCountsTable
+  )
+  DatabaseConnector::executeSql(
+    connection, SqlRender::translate(createSql, targetDialect = connection@dbms),
+    progressBar = FALSE, reportOverallTime = FALSE
+  )
+
+  appendSql <- SqlRender::readSql(
+    system.file("sql", "sql_server", "appendToStratrifiedCodeCountsTable.sql", package = "ROMOPAPI")
+  )
+  appendSql <- SqlRender::render(
+    appendSql,
+    stratifiedCodeCountsTable = stratifiedCodeCountsTable,
+    cdmDatabaseSchema = cdmDatabaseSchema,
+    resultsDatabaseSchema = resultsDatabaseSchema,
+    table_name = domain$table_name,
+    concept_id_field = domain$concept_id_field,
+    date_field = domain$date_field,
+    maps_to_concept_id_field = domain$maps_to_concept_id_field,
+    visit_group_concept_ids = "0"
+  )
+  DatabaseConnector::executeSql(
+    connection, SqlRender::translate(appendSql, targetDialect = connection@dbms),
+    progressBar = FALSE, reportOverallTime = FALSE
+  )
+
+  stratified <- DatabaseConnector::renderTranslateQuerySql(
+    connection,
+    "SELECT concept_id, maps_to_concept_id, record_counts
+       FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable",
+    resultsDatabaseSchema = resultsDatabaseSchema,
+    stratifiedCodeCountsTable = stratifiedCodeCountsTable
+  ) |>
+    tibble::as_tibble()
+  names(stratified) <- tolower(names(stratified))
+
+  # the unmapped-source event is kept, tagged concept_id = 0 / source id
+  stratified |>
+    dplyr::filter(concept_id == 0 & maps_to_concept_id == 2000999) |>
+    nrow() |>
+    expect_equal(1)
+  # the mapped event is still there
+  stratified |>
+    dplyr::filter(concept_id == 320128) |>
+    nrow() |>
+    expect_equal(1)
+
+  # - Build the stratified_persons bridge table exactly as createStratifiedPersonsTable does
+  stratifiedPersonsTable <- "stratified_persons_test_nomesco"
+  createPersonsSql <- SqlRender::render(
+    "DROP TABLE IF EXISTS @resultsDatabaseSchema.@stratifiedPersonsTable;
+     CREATE TABLE @resultsDatabaseSchema.@stratifiedPersonsTable (
+       person_id INTEGER,
+       concept_id INTEGER,
+       maps_to_concept_id INTEGER,
+       visit_group_concept_id INTEGER,
+       calendar_year INTEGER,
+       gender_concept_id INTEGER,
+       age_decile INTEGER
+     )",
+    resultsDatabaseSchema = resultsDatabaseSchema,
+    stratifiedPersonsTable = stratifiedPersonsTable
+  )
+  DatabaseConnector::executeSql(
+    connection, SqlRender::translate(createPersonsSql, targetDialect = connection@dbms),
+    progressBar = FALSE, reportOverallTime = FALSE
+  )
+
+  appendPersonsSql <- SqlRender::readSql(
+    system.file("sql", "sql_server", "appendToStratifiedPersonsTable.sql", package = "ROMOPAPI")
+  )
+  appendPersonsSql <- SqlRender::render(
+    appendPersonsSql,
+    stratifiedPersonsTable = stratifiedPersonsTable,
+    cdmDatabaseSchema = cdmDatabaseSchema,
+    resultsDatabaseSchema = resultsDatabaseSchema,
+    table_name = domain$table_name,
+    concept_id_field = domain$concept_id_field,
+    date_field = domain$date_field,
+    maps_to_concept_id_field = domain$maps_to_concept_id_field,
+    visit_group_concept_ids = "0"
+  )
+  DatabaseConnector::executeSql(
+    connection, SqlRender::translate(appendPersonsSql, targetDialect = connection@dbms),
+    progressBar = FALSE, reportOverallTime = FALSE
+  )
+
+  # - Aggregate to code_counts and check the source concept surfaces, no phantom 0
+  codeCountsTable <- "code_counts_test_nomesco"
+  ccSql <- SqlRender::readSql(
+    system.file("sql", "sql_server", "createCodeCountsTable.sql", package = "ROMOPAPI")
+  )
+  ccSql <- SqlRender::render(
+    ccSql,
+    cdmDatabaseSchema = cdmDatabaseSchema,
+    resultsDatabaseSchema = resultsDatabaseSchema,
+    codeCountsTable = codeCountsTable,
+    stratifiedCodeCountsTable = stratifiedCodeCountsTable,
+    stratifiedPersonsTable = stratifiedPersonsTable
+  )
+  DatabaseConnector::executeSql(
+    connection, SqlRender::translate(ccSql, targetDialect = connection@dbms),
+    progressBar = FALSE, reportOverallTime = FALSE
+  )
+
+  codeCounts <- DatabaseConnector::renderTranslateQuerySql(
+    connection,
+    "SELECT concept_id FROM @resultsDatabaseSchema.@codeCountsTable",
+    resultsDatabaseSchema = resultsDatabaseSchema,
+    codeCountsTable = codeCountsTable
+  ) |>
+    tibble::as_tibble()
+  names(codeCounts) <- tolower(names(codeCounts))
+
+  # source concept is counted
+  expect_true(2000999 %in% codeCounts$concept_id)
+  # mapped standard concept is still counted
+  expect_true(320128 %in% codeCounts$concept_id)
+  # unmapped events are not lumped into a phantom concept_id = 0
+  expect_false(0 %in% codeCounts$concept_id)
 })

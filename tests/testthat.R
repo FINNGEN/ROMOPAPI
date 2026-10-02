@@ -10,10 +10,18 @@ library(testthat)
 library(ROMOPAPI)
 
 
+# Post-counts functions against the shipped sqlite counts fixture
 Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "OnlyCounts-FinnGen")
 Sys.setenv(BUILD_COUNTS_TABLE = "FALSE")
 test_check("ROMOPAPI")
 
+# Counts-table creation from a raw OMOP CDM (sqlite)
 Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "Eunomia-GiBleed")
+Sys.setenv(BUILD_COUNTS_TABLE = "TRUE")
+test_check("ROMOPAPI")
+
+# BigQuery: BUILD_COUNTS_TABLE builds the code_counts table that post-counts
+# tests read; counts-creation tests build/drop their own throwaway tables.
+Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-5k")
 Sys.setenv(BUILD_COUNTS_TABLE = "TRUE")
 test_check("ROMOPAPI")

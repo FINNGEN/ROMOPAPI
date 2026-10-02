@@ -72,6 +72,9 @@ cohortTableHandler:
         cdmDatabaseSchema: main
         vocabularyDatabaseSchema: main
         resultsDatabaseSchema: main
+# Optional, database-dependent. Visit source-group concept IDs used when
+# building the counts tables. Omit or set to 0 to disable the grouping.
+visitSourceGroupConceptIds: 0
 ```
 
 If it is the first time running the API server with the custom database, you need add the parameter `buildCountsTable = TRUE` to the `runApiServer` function.
@@ -81,6 +84,7 @@ databaseConfig <- yaml::read_yaml("path/to/database_config.yml")
 
 ROMOPAPI::runApiServer(
   cohortTableHandlerConfig = databaseConfig$cohortTableHandler,
+  visitSourceGroupConceptIds = databaseConfig$visitSourceGroupConceptIds,
   buildCountsTable = TRUE
 )
 ```

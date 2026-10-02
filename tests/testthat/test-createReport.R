@@ -1,4 +1,7 @@
 test_that("createReport works with basic parameters", {
+  # post-counts test: builds a report from the pre-built counts tables
+  skip_if_not(testingDatabase %in% postCountsDatabases)
+
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
   withr::defer({
     CDMdbHandler <- NULL
@@ -30,6 +33,9 @@ test_that("createReport works with basic parameters", {
 })
 
 test_that("createReport works with all parameters", {
+  # post-counts test: builds a report from the pre-built counts tables
+  skip_if_not(testingDatabase %in% postCountsDatabases)
+
   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
   withr::defer({
     CDMdbHandler <- NULL

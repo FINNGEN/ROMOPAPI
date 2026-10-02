@@ -1,0 +1,128 @@
+# Testing databases. Each database has one job — see AGENTS.md "Testing".
+#
+# visitSourceGroupConceptIds is database-dependent (FinnGen visit source groups).
+# It is 0 (disabled) for Eunomia, and the FinnGen list for the FinnGen/BigQuery
+# databases. The default 0 disables the grouping in SQL
+# ({@visit_group_concept_ids != 0} guard), so it is harmless where unused.
+
+# Eunomia-GiBleed — raw OMOP CDM (sqlite). Counts-creation tests only.
+E1:
+  cohortTableHandler:
+    database:
+      databaseId: E1
+      databaseName: GiBleed
+      databaseDescription: Eunomia database GiBleed
+    connection:
+      connectionDetailsSettings:
+          dbms: sqlite
+          server: <pathToGiBleedEunomiaSqlite>
+    cdm:
+        cdmDatabaseSchema: main
+        vocabularyDatabaseSchema: main
+        resultsDatabaseSchema: main
+    cohortTable:
+        cohortDatabaseSchema: main
+        cohortTableName: test_cohort_table_<timestamp>
+  atlasConfig:
+    webapiurl: https://api.ohdsi.org/WebAPI
+    sourcekey:
+    resultsshchema:
+  visitSourceGroupConceptIds: 0
+# AtlasDevelopment-5k — BigQuery, small subset of AtlasDevelopment-full.
+# Both counts-creation and post-counts tests.
+BQ5K:
+  cohortTableHandler:
+    database:
+      databaseId: BQ5K
+      databaseName: bigquery5k
+      databaseDescription: BigQuery database
+    connection:
+      connectionDetailsSettings:
+          dbms: bigquery
+          drv: bigrquery::bigquery()
+          project: atlas-development-270609
+          billing: atlas-development-270609
+          bigint: integer64
+      tempEmulationSchema: atlas-development-270609.sandbox
+    cdm:
+        cdmDatabaseSchema: atlas-development-270609.finngen_omop_dev_5k
+        vocabularyDatabaseSchema: atlas-development-270609.finngen_omop_dev_5k
+        resultsDatabaseSchema: atlas-development-270609.finngen_omop_results_dev_5k
+    cohortTable:
+        cohortDatabaseSchema: atlas-development-270609.sandbox
+        cohortTableName: hadesextras_test_cohort_table_<timestamp>
+  # &finngenVisitGroups defines a YAML anchor: it names this list so it can be
+  # reused below without copy-pasting. BQfull references it with the matching
+  # alias (*finngenVisitGroups), keeping the two BigQuery databases in sync.
+  visitSourceGroupConceptIds: &finngenVisitGroups
+    # longitudinal
+    - 2002330246 # INPAT
+    - 2002330247 # OPER_IN
+    - 2002330248 # OPER_OUT
+    - 2002330249 # OUTPAT
+    - 2002330250 # PRIM_OUT
+    - 2002330102 # REIM
+    - 2002330104 # DEATH
+    - 2002330101 # PURCH
+    - 2002330103 # CANC
+    # registers
+    - 2002330245 # KANTA
+    - 2002330106 # BIOBANK
+    - 2002330186 # KIDNEY
+    - 2002330119 # VISION
+    - 2002330105 # BIRTH_MOTHER
+    # drugs
+    - 2002330251 # PRESCRIPTION
+    - 2002330252 # DELIVERY
+    - 2002330253 # PRESCRIPTION_DELIVERY
+    - 2002330254 # DELIVERY_KELA
+    - 2002330255 # PRESCRIPTION_DELIVERY_KELA
+# AtlasDevelopment-full — BigQuery, full CDM. Used only to regenerate the
+# OnlyCounts-FinnGen fixture (inst/testdata/data/createTestingData.R).
+BQfull:
+  cohortTableHandler:
+    database:
+      databaseId: BQ
+      databaseName: bigquery
+      databaseDescription: BigQuery database with 500k patients
+    connection:
+      connectionDetailsSettings:
+          dbms: bigquery
+          drv: bigrquery::bigquery()
+          project: atlas-development-270609
+          billing: atlas-development-270609
+          bigint: integer64
+      tempEmulationSchema: atlas-development-270609.sandbox
+    cdm:
+        cdmDatabaseSchema: atlas-development-270609.finngen_omop_dev
+        vocabularyDatabaseSchema: atlas-development-270609.finngen_omop_dev
+        resultsDatabaseSchema: atlas-development-270609.finngen_omop_results_dev
+    cohortTable:
+        cohortDatabaseSchema: atlas-development-270609.sandbox
+        cohortTableName: hadesextras_test_cohort_table_<timestamp>
+  # *finngenVisitGroups is the alias: it expands to the exact list anchored as
+  # &finngenVisitGroups on BQ5K above, so both share one definition.
+  visitSourceGroupConceptIds: *finngenVisitGroups
+# OnlyCounts-FinnGen — sqlite subset shipped with counts precomputed.
+# Post-counts tests only; never rebuilt. Its counts were built with the FinnGen
+# visit groups, so it carries the same list (via the *finngenVisitGroups alias)
+# for the post-counts visit-group tests to check against.
+FC:
+  cohortTableHandler:
+    database:
+      databaseId: FC
+      databaseName: FinnGenCounts
+      databaseDescription: Counts only FinnGen
+    connection:
+      connectionDetailsSettings:
+          dbms: sqlite
+          server: <pathToFinnGenCountsSqlite>
+    cdm:
+        cdmDatabaseSchema: main
+        vocabularyDatabaseSchema: main
+        resultsDatabaseSchema: main
+    cohortTable:
+        cohortDatabaseSchema: main
+        cohortTableName: test_cohort_table_<timestamp>
+  # alias again: the shipped counts were built with this same FinnGen list.
+  visitSourceGroupConceptIds: *finngenVisitGroups
