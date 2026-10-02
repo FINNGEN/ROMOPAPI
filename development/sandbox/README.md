@@ -2,9 +2,10 @@
 
 ## export_precomputed_tables.sh
 
-Exports the three ROMOPAPI precomputed counts tables
-(`stratified_code_counts`, `stratified_persons`, `code_counts`) from a
-BigQuery dataset to GCS: one folder per table, each with the table schema
+Exports the four ROMOPAPI precomputed counts tables
+(`stratified_code_counts`, `stratified_persons`, `code_counts`,
+`observed_persons_counts_stratified`) from a BigQuery dataset to GCS: one
+folder per table, each with the table schema
 (`schema.json`) and the data as CSV shard(s) (empty string for NULL cells).
 
 Uses `bq extract` (a server-side BigQuery job) rather than `bq query`, so it
