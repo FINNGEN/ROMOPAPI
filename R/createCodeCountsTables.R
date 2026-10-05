@@ -8,21 +8,16 @@
 #' @param CDMdbHandler A CDMdbHandler object that contains database connection details
 #' @param domains Optional vector of domains to process. If NULL, processes all standard domains
 #' @param codeCountsTable Name of the table to create. Defaults to "code_counts"
+#' @param visitSourceGroupConceptIds Optional vector of visit source group concept IDs to filter by. Defaults to 0
 #'
 #' @return Nothing. Creates a table called 'code_counts' in the results schema with columns:
 #' \itemize{
-#'   \item `domain` - The domain of the code (Condition, Drug, etc.)
 #'   \item `concept_id` - The OMOP concept ID
-#'   \item `calendar_year` - The year of the events
-#'   \item `gender_concept_id` - The gender concept ID
-#'   \item `age_decile` - The age decile (0-9, 10-19, etc.)
 #'   \item `record_counts` - Number of events for this code
-#'   \item `person_counts` - Number of persons with this code
-#'   \item `incidence_person_counts` - Number of persons with first occurrence of this code
 #'   \item `descendant_record_counts` - Number of events including descendant concepts
-#'   \item `descendant_person_counts` - Number of persons including descendant concepts
-#'   \item `descendant_incidence_person_counts` - Number of persons with first occurrence including descendants
-#'   \item `total_person_counts` - Total number of persons in the stratum
+#'   \item `number_of_descendants` - Number of descendant concepts (including itself)
+#'   \item `person_counts` - Number of distinct persons with this code
+#'   \item `descendant_person_counts` - Number of distinct persons including descendant concepts
 #' }
 #'
 #' @importFrom checkmate assertClass
@@ -35,14 +30,16 @@
 #' \dontrun{
 #' # Create code counts table for all domains
 #' createCodeCountsTable(CDMdbHandler)
-#' 
+#'
 #' # Create code counts table for specific domains only
 #' createCodeCountsTable(CDMdbHandler, domains = c("Condition", "Drug"))
 #' }
 createCodeCountsTables <- function(
     CDMdbHandler,
-    domains = NULL, 
-    codeCountsTable = "code_counts") {
+    domains = NULL,
+    codeCountsTable = "code_counts",
+    visitSourceGroupConceptIds = 0
+) {
     #
     # VALIDATE
     #
@@ -58,17 +55,38 @@ createCodeCountsTables <- function(
 
     # - Create stratified code counts table
     stratifiedCodeCountsTable <- paste0("stratified_", codeCountsTable)
-    createStratifiedCodeCountsTable(CDMdbHandler, domains = domains, stratifiedCodeCountsTable = stratifiedCodeCountsTable)
+    createStratifiedCodeCountsTable(
+        CDMdbHandler,
+        domains = domains,
+        stratifiedCodeCountsTable = stratifiedCodeCountsTable,
+        visitSourceGroupConceptIds = visitSourceGroupConceptIds
+    )
 
+    # - Create stratified persons bridge table
+    stratifiedPersonsTable <- "stratified_persons"
+    createStratifiedPersonsTable(
+        CDMdbHandler,
+        domains = domains,
+        stratifiedPersonsTable = stratifiedPersonsTable,
+        visitSourceGroupConceptIds = visitSourceGroupConceptIds
+    )
 
     # - Create code counts table
-    sqlPath <- system.file("sql", "sql_server", "createCodeCountsTable.sql", package = "ROMOPAPI")
+    sqlDialectFolder <- if (connection@dbms == "bigquery") "bigquery" else "sql_server"
+    sqlPath <- system.file(
+        "sql",
+        sqlDialectFolder,
+        "createCodeCountsTable.sql",
+        package = "ROMOPAPI"
+    )
     sql <- SqlRender::readSql(sqlPath)
-    sql <- SqlRender::render(sql,
+    sql <- SqlRender::render(
+        sql,
         cdmDatabaseSchema = cdmDatabaseSchema,
         resultsDatabaseSchema = resultsDatabaseSchema,
         codeCountsTable = codeCountsTable,
-        stratifiedCodeCountsTable = stratifiedCodeCountsTable
+        stratifiedCodeCountsTable = stratifiedCodeCountsTable,
+        stratifiedPersonsTable = stratifiedPersonsTable
     )
     sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
     DatabaseConnector::executeSql(connection, sql)

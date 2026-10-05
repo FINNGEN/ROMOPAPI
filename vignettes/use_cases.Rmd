@@ -12,17 +12,28 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+
+# getCodeCounts() was split into getConceptRelationships() + getCodeCountsStratified();
+# rebuild the combined shape the plotting/table helpers below still expect.
+getCodeCounts <- function(CDMdbHandler, conceptId) {
+  relationships <- getConceptRelationships(CDMdbHandler, conceptId = conceptId)
+  list(
+    concept_relationships = relationships$concept_relationships,
+    concepts = relationships$concepts,
+    stratified_code_counts = getCodeCountsStratified(CDMdbHandler, conceptId = conceptId)
+  )
+}
 ```
 
 ```{r setup}
 library(ROMOPAPI)
 
 test_databasesConfig <- HadesExtras_readAndParseYaml(
-  pathToYalmFile = system.file("testdata", "config", "onlyCounts_databasesConfig.yml", package = "ROMOPAPI"),
+  pathToYalmFile = system.file("testdata", "config", "databasesConfig.yml", package = "ROMOPAPI"),
   pathToFinnGenCountsSqlite = helper_FinnGen_getDatabaseFileCounts()
 )
 
-cohortTableHandlerConfig <- test_databasesConfig[[1]]$cohortTableHandler
+cohortTableHandlerConfig <- test_databasesConfig[["FC"]]$cohortTableHandler
 
 # Create CDMdbHandler
 CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")

@@ -9,4 +9,5 @@ renv/local
 renv/staging
 renv/cache
 tests/testthat/_snaps
-dev/ 
+dev/
+.scratchpad/ 

@@ -1,5 +1,5 @@
 # Get connection
-Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-DBI")
+Sys.setenv(HADESEXTAS_TESTING_ENVIRONMENT = "AtlasDevelopment-full")
 Sys.setenv(BUILD_COUNTS_TABLE = "FALSE")
 source("tests/testthat/setup.R")
 
@@ -9,26 +9,53 @@ conceptIds <- c(
     45596282, # ICD10: Asthma
     21601855, # ATC level 4: C10AA (Statins)
     320136, # Big graph, parent of Asthma snomed concept (Disorders of the respiratory system)
-    4024567,# biger
+    4024567, # biger
     21600744 # bug in plot
 )
 
-CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+# 320136 and 4024567 are deliberately huge (population-wide) trees: fine for the
+# record-level tables, but a person-level bridge fans out to one row per person
+# per stratum, so including them there blows the fixture up 10x+. Keep the
+# person bridge to the narrower concepts.
+personBridgeConceptIds <- setdiff(conceptIds, c(320136, 4024567))
+
+CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+)
 # uncomment to create code counts tables
-createCodeCountsTables(CDMdbHandler)
+
+# database-dependent, from databasesConfig.yml (BQfull) via setup.R
+visitSourceGroupConceptIds <- test_visitSourceGroupConceptIds
+
+createCodeCountsTables(
+    CDMdbHandler,
+    visitSourceGroupConceptIds = visitSourceGroupConceptIds
+)
 helper_createSqliteDatabaseFromDatabase(
     CDMdbHandler,
     conceptIds = conceptIds,
+    personBridgeConceptIds = personBridgeConceptIds,
     pathToSqliteDatabase = "inst/testdata/data/FinnGenR13_countsOnly.sqlite"
 )
 
 
 # Test
-connection  <- DatabaseConnector::connect(DatabaseConnector::createConnectionDetails(dbms = "sqlite", server = "inst/testdata/data/FinnGenR13_countsOnly.sqlite"))
+connection <- DatabaseConnector::connect(DatabaseConnector::createConnectionDetails(
+    dbms = "sqlite",
+    server = "inst/testdata/data/FinnGenR13_countsOnly.sqlite"
+))
 
-DatabaseConnector::dbListTables(connection) |> 
+DatabaseConnector::dbListTables(connection) |>
     sort() |>
-    expect_equal(c("cdm_source", "code_counts", "concept", "concept_ancestor", "stratified_code_counts"))
+    expect_equal(c(
+        "cdm_source",
+        "code_counts",
+        "concept",
+        "concept_ancestor",
+        "stratified_code_counts",
+        "stratified_persons"
+    ))
 
 dplyr::tbl(connection, "concept") |>
     dplyr::count() |>
@@ -50,8 +77,27 @@ dplyr::tbl(connection, "stratified_code_counts") |>
     dplyr::pull(n) |>
     expect_gt(0)
 
+dplyr::tbl(connection, "stratified_persons") |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
+
 dplyr::tbl(connection, "cdm_source") |>
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_gt(0)
 
+# visit_group_concept_id
+dplyr::tbl(connection, "stratified_code_counts") |>
+    dplyr::count(visit_group_concept_id) |> 
+    dplyr::left_join(dplyr::tbl(connection, "concept"), by=c("visit_group_concept_id"="concept_id")) |> 
+    print(n =2122)
+
+dplyr::tbl(connection, "stratified_code_counts") |>
+    dplyr::distinct(visit_group_concept_id) |> 
+    dplyr::pull(visit_group_concept_id) |>
+    (\(x) expect_false(all(x %in% visitSourceGroupConceptIds)))()
+
+
+dplyr::tbl(connection, "stratified_code_counts") |> 
+  head()

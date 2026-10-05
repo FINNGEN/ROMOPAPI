@@ -7,7 +7,8 @@
 createCodeCountsTables(
   CDMdbHandler,
   domains = NULL,
-  codeCountsTable = "code_counts"
+  codeCountsTable = "code_counts",
+  visitSourceGroupConceptIds = 0
 )
 }
 \arguments{
@@ -16,22 +17,18 @@ createCodeCountsTables(
 \item{domains}{Optional vector of domains to process. If NULL, processes all standard domains}
 
 \item{codeCountsTable}{Name of the table to create. Defaults to "code_counts"}
+
+\item{visitSourceGroupConceptIds}{Optional vector of visit source group concept IDs to filter by. Defaults to 0}
 }
 \value{
 Nothing. Creates a table called 'code_counts' in the results schema with columns:
 \itemize{
-\item \code{domain} - The domain of the code (Condition, Drug, etc.)
 \item \code{concept_id} - The OMOP concept ID
-\item \code{calendar_year} - The year of the events
-\item \code{gender_concept_id} - The gender concept ID
-\item \code{age_decile} - The age decile (0-9, 10-19, etc.)
 \item \code{record_counts} - Number of events for this code
-\item \code{person_counts} - Number of persons with this code
-\item \code{incidence_person_counts} - Number of persons with first occurrence of this code
 \item \code{descendant_record_counts} - Number of events including descendant concepts
-\item \code{descendant_person_counts} - Number of persons including descendant concepts
-\item \code{descendant_incidence_person_counts} - Number of persons with first occurrence including descendants
-\item \code{total_person_counts} - Total number of persons in the stratum
+\item \code{number_of_descendants} - Number of descendant concepts (including itself)
+\item \code{person_counts} - Number of distinct persons with this code
+\item \code{descendant_person_counts} - Number of distinct persons including descendant concepts
 }
 }
 \description{

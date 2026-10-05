@@ -7,7 +7,8 @@
 createStratifiedCodeCountsTable(
   CDMdbHandler,
   domains = NULL,
-  stratifiedCodeCountsTable = "stratified_code_counts"
+  stratifiedCodeCountsTable = "stratified_code_counts",
+  visitSourceGroupConceptIds = 0
 )
 }
 \arguments{
@@ -16,6 +17,8 @@ createStratifiedCodeCountsTable(
 \item{domains}{Optional data frame defining domains to process. If NULL, uses standard OMOP domains}
 
 \item{stratifiedCodeCountsTable}{Name of the stratified counts table to create. Defaults to "stratified_code_counts"}
+
+\item{visitSourceGroupConceptIds}{Optional vector of visit source group concept IDs to filter by. Defaults to 0}
 }
 \value{
 Nothing. Creates a table called 'stratified_code_counts' in the results schema with columns:

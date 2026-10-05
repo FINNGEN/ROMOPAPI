@@ -17,6 +17,12 @@ FinnGenR12_v5.4.sqlite
 FinnGenR12_v5.4_counts.sqlite
 
 GITHUBPAT.txt
+
+tmp/
+
+
 inst/doc
 /doc/
 /Meta/
+
+node_modules
