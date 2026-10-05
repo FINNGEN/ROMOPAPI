@@ -4,7 +4,11 @@
 \alias{getConceptRelationships}
 \title{Get concept relationships and concept details for a concept}
 \usage{
-getConceptRelationships(CDMdbHandler, conceptId, codeCountsTable = "code_counts")
+getConceptRelationships(
+  CDMdbHandler,
+  conceptId,
+  codeCountsTable = "code_counts"
+)
 }
 \arguments{
 \item{CDMdbHandler}{A CDMdbHandler object that contains database connection details}

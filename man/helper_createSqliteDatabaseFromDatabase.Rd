@@ -9,6 +9,7 @@ helper_createSqliteDatabaseFromDatabase(
   conceptIds = c(317009, 21601855),
   personBridgeConceptIds = conceptIds,
   maxPersonsPerConcept = 1000,
+  maxEventsPerConcept = 2000,
   pathToSqliteDatabase = tempfile(fileext = ".sqlite"),
   codeCountsTable = "code_counts"
 )
@@ -28,6 +29,13 @@ extract far larger than the record-level tables — narrow this to keep the fixt
 ones, deterministically. All of a kept person's stratum rows for that concept are included, so
 this bounds the person-level fan-out for common real-world codes without truncating any one
 person's detail. Defaults to 1000.}
+
+\item{maxEventsPerConcept}{Maximum measurement events kept per target concept and unit in the
+\code{stratified_measurements} extract. The sample is a deterministic \emph{systematic} one — the rows
+are ranked by \code{value_as_number}, split into that many equal-count buckets with \code{NTILE}, and
+one row is kept from each — so the sampled values keep the shape of the original distribution.
+Taking the first N by value instead would keep only the smallest values and destroy the very
+histogram this fixture exists to test. Defaults to 2000.}
 
 \item{pathToSqliteDatabase}{Path where the new SQLite database should be created.
 Defaults to a temporary file with .sqlite extension}
