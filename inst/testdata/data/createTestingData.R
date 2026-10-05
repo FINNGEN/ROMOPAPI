@@ -10,7 +10,10 @@ conceptIds <- c(
     21601855, # ATC level 4: C10AA (Statins)
     320136, # Big graph, parent of Asthma snomed concept (Disorders of the respiratory system)
     4024567, # biger
-    21600744 # bug in plot
+    21600744, # bug in plot
+    40652733 # LOINC Group "C reactive protein", for getMeasurementValueHistogram().
+    # Has no events of its own; its two descendants (3020460 serum/plasma, 3051387
+    # capillary blood) both carry values in mg/L, so one unit yields two stackable series.
 )
 
 # 320136 and 4024567 are deliberately huge (population-wide) trees: fine for the
@@ -54,6 +57,7 @@ DatabaseConnector::dbListTables(connection) |>
         "concept",
         "concept_ancestor",
         "stratified_code_counts",
+        "stratified_measurements",
         "stratified_persons"
     ))
 
@@ -81,6 +85,24 @@ dplyr::tbl(connection, "stratified_persons") |>
     dplyr::count() |>
     dplyr::pull(n) |>
     expect_gt(0)
+
+dplyr::tbl(connection, "stratified_measurements") |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
+
+# the measurement descendants must actually carry values, or the histogram tests are vacuous
+dplyr::tbl(connection, "stratified_measurements") |>
+    dplyr::filter(concept_id %in% c(3020460, 3051387) | maps_to_concept_id %in% c(3020460, 3051387)) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
+
+# how many units it was recorded in (each unit is its own histogram)
+dplyr::tbl(connection, "stratified_measurements") |>
+    dplyr::count(concept_id, unit_concept_id) |>
+    dplyr::collect() |>
+    print(n = 50)
 
 dplyr::tbl(connection, "cdm_source") |>
     dplyr::count() |>
