@@ -104,8 +104,9 @@ helper_FinnGen_getDatabaseFileCounts <- function() {
 #' @description
 #' Creates a new SQLite database by extracting specific concept data from a CDM database.
 #' The function extracts concept information, concept ancestors, code counts, stratified
-#' code counts, and the stratified persons bridge table for the specified concept IDs and
-#' creates a new SQLite database with this subset of data.
+#' code counts, the stratified persons bridge table, and the observed persons counts
+#' (prevalence denominator) table for the specified concept IDs and creates a new SQLite
+#' database with this subset of data.
 #'
 #' @param CDMdbHandler A CDMdbHandler object containing database connection details
 #' @param conceptIds Vector of concept IDs to extract. Defaults to c(317009, 21601855)
@@ -302,6 +303,25 @@ helper_createSqliteDatabaseFromDatabase <- function(
   targetConnection |> DatabaseConnector::insertTable(
     tableName = "stratified_persons",
     data = stratifiedPersons,
+    dropTableIfExists = TRUE,
+    createTable = TRUE,
+    tempTable = FALSE,
+  )
+
+  # observed_persons_counts_stratified -- population-at-risk denominator, ~1k
+  # rows (calendar_year x gender_concept_id x age_decile), no concept scoping
+  # or person cap applies: extracted verbatim
+  sql <- "SELECT DISTINCT opc.* FROM @resultsDatabaseSchema.observed_persons_counts_stratified opc"
+  observedPersonsCounts <- DatabaseConnector::renderTranslateQuerySql(
+    connection = sourceConnection,
+    sql = sql,
+    resultsDatabaseSchema = sourceResultsDatabaseSchema
+  ) |>
+    tibble::as_tibble()
+
+  targetConnection |> DatabaseConnector::insertTable(
+    tableName = "observed_persons_counts_stratified",
+    data = observedPersonsCounts,
     dropTableIfExists = TRUE,
     createTable = TRUE,
     tempTable = FALSE,

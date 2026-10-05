@@ -9,7 +9,9 @@ export(createAgeHistogramFromPersonCounts)
 export(createCodeCountsTableFromResults)
 export(createCodeCountsTables)
 export(createMermaidGraphFromResults)
+export(createObservedPersonsCountsTable)
 export(createPlotFromResults)
+export(createPrevalencePlotFromPersonCounts)
 export(createReport)
 export(createSexPieChartFromPersonCounts)
 export(createStratifiedCodeCountsTable)
@@ -30,6 +32,8 @@ export(getConceptTree_memoise)
 export(getLogs)
 export(getPersonCountsFilters)
 export(getPersonCountsFilters_memoise)
+export(getPersonCountsPrevalence)
+export(getPersonCountsPrevalence_memoise)
 export(getPersonCountsUpset)
 export(getPersonCountsUpset_memoise)
 export(getVisitTypeNames)
@@ -148,6 +152,7 @@ importFrom(tibble,
   tribble
 )
 importFrom(tidyr,
+  expand_grid,
   nest,
   unnest
 )
