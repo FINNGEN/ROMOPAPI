@@ -19,7 +19,7 @@ stratified counts, and mappings based on the provided parameters."><!-- mathjax 
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">ROMOPAPI</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.4.0</span>
       </span>
     </div>
 
@@ -111,15 +111,22 @@ The file is created as a temporary file and should be cleaned up by the caller.<
     </div>
     <div id="details">
     <h2>Details</h2>
-    <p>This function creates a comprehensive report by:</p><ul><li><p>Retrieving code counts and concept relationships using <code>getCodeCounts_memoise</code></p></li>
+    <p>This function creates a comprehensive report by:</p><ul><li><p>Retrieving concept relationships using <code>getConceptRelationships_memoise</code>
+and stratified code counts using <code>getCodeCountsStratified_memoise</code></p></li>
 <li><p>Optionally pruning results based on hierarchical levels and concept classes</p></li>
 <li><p>Generating interactive Mermaid diagrams showing concept hierarchies</p></li>
 <li><p>Creating detailed tables with stratified code counts</p></li>
 <li><p>Producing visualizations with concept relationships and mappings</p></li>
 </ul><p>The report template includes:</p><ul><li><p>Dynamic title showing concept ID and parameters</p></li>
-<li><p>Interactive Mermaid graph visualization</p></li>
+<li><p>Interactive Mermaid graph visualization, with each node labeled with its
+record counts (RC), descendant record counts (DRC), person counts (PC) and
+descendant person counts (DPC)</p></li>
 <li><p>Comprehensive data tables</p></li>
 <li><p>Statistical plots and charts</p></li>
+<li><p>A person-counts section (from <code>getPersonCountsFilters_memoise</code> and
+<code>getPersonCountsUpset_memoise</code>): a pie chart of
+persons by sex, a bar chart by age decile, a bar chart by visit-source group, and
+an UpSet plot of exact set-overlap regions</p></li>
 </ul></div>
 
   </div>
@@ -134,7 +141,7 @@ The file is created as a temporary file and should be cleaned up by the caller.<
 </div>
 
 <div class="pkgdown">
-  <p></p><p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p></p><p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
       </footer></div>

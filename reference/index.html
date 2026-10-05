@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">ROMOPAPI</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.4.0</span>
       </span>
     </div>
 
@@ -81,6 +81,10 @@
         </td>
         <td><p>Create a ConnectionHandler from a configuration list</p></td>
       </tr><tr><td>
+          <p><code><a href="createAgeHistogramFromPersonCounts.html">createAgeHistogramFromPersonCounts()</a></code> </p>
+        </td>
+        <td><p>Create a bar chart of person counts by age decile</p></td>
+      </tr><tr><td>
           <p><code><a href="createCodeCountsTableFromResults.html">createCodeCountsTableFromResults()</a></code> </p>
         </td>
         <td><p>Create a reactable table from results</p></td>
@@ -101,9 +105,25 @@
         </td>
         <td><p>Create a dynamic HTML report for concept analysis</p></td>
       </tr><tr><td>
+          <p><code><a href="createSexPieChartFromPersonCounts.html">createSexPieChartFromPersonCounts()</a></code> </p>
+        </td>
+        <td><p>Create a pie chart of person counts by sex</p></td>
+      </tr><tr><td>
           <p><code><a href="createStratifiedCodeCountsTable.html">createStratifiedCodeCountsTable()</a></code> </p>
         </td>
         <td><p>Create stratified code counts table</p></td>
+      </tr><tr><td>
+          <p><code><a href="createStratifiedPersonsTable.html">createStratifiedPersonsTable()</a></code> </p>
+        </td>
+        <td><p>Create stratified persons table</p></td>
+      </tr><tr><td>
+          <p><code><a href="createUpsetPlotFromPersonCounts.html">createUpsetPlotFromPersonCounts()</a></code> </p>
+        </td>
+        <td><p>Create an UpSet-style plot of exact set-overlap regions</p></td>
+      </tr><tr><td>
+          <p><code><a href="createVisitBarplotFromPersonCounts.html">createVisitBarplotFromPersonCounts()</a></code> </p>
+        </td>
+        <td><p>Create a bar chart of person counts by visit-source group</p></td>
       </tr><tr><td>
           <p><code><a href="create_api.html">create_api()</a></code> </p>
         </td>
@@ -113,9 +133,21 @@
         </td>
         <td><p>Create Console Appender for Sandbox Logging</p></td>
       </tr><tr><td>
+          <p><code><a href="dot-expandDescendantConceptIds.html">.expandDescendantConceptIds()</a></code> </p>
+        </td>
+        <td><p>Expand concept ids to themselves and all their descendants</p></td>
+      </tr><tr><td>
           <p><code><a href="dot-familyTreeToAncestorTable.html">.familyTreeToAncestorTable()</a></code> </p>
         </td>
         <td><p>Convert family tree to ancestor table</p></td>
+      </tr><tr><td>
+          <p><code><a href="dot-parsePersonCountsConceptIds.html">.parsePersonCountsConceptIds()</a></code> </p>
+        </td>
+        <td><p>Parse a tagged concept-ids string into one row per set</p></td>
+      </tr><tr><td>
+          <p><code><a href="dot-resolveTaggedConceptIdSets.html">.resolveTaggedConceptIdSets()</a></code> </p>
+        </td>
+        <td><p>Resolve every parsed token to its concrete id set</p></td>
       </tr><tr><td>
           <p><code><a href="fct_setUpLogger.html">fct_setUpLogger()</a></code> </p>
         </td>
@@ -125,25 +157,65 @@
         </td>
         <td><p>Get the API information</p></td>
       </tr><tr><td>
-          <p><code><a href="getCodeCounts.html">getCodeCounts()</a></code> </p>
+          <p><code><a href="getAllConceptsInfo.html">getAllConceptsInfo()</a></code> </p>
         </td>
-        <td><p>Get code counts and related concept information</p></td>
+        <td><p>Get metadata for all concepts that have code counts</p></td>
       </tr><tr><td>
-          <p><code><a href="getCodeCounts_memoise.html">getCodeCounts_memoise()</a></code> </p>
+          <p><code><a href="getAllConceptsInfo_memoise.html">getAllConceptsInfo_memoise()</a></code> </p>
         </td>
-        <td><p>Memoised version of getCodeCounts</p></td>
+        <td><p>Memoised version of getAllConceptsInfo</p></td>
       </tr><tr><td>
-          <p><code><a href="getConceptsWithCodeCounts.html">getConceptsWithCodeCounts()</a></code> </p>
+          <p><code><a href="getCodeCountsStratified.html">getCodeCountsStratified()</a></code> </p>
         </td>
-        <td><p>Get list of concepts with code counts</p></td>
+        <td><p>Get per-stratum code counts for a concept tree</p></td>
       </tr><tr><td>
-          <p><code><a href="getConceptsWithCodeCounts_memoise.html">getConceptsWithCodeCounts_memoise()</a></code> </p>
+          <p><code><a href="getCodeCountsStratified_memoise.html">getCodeCountsStratified_memoise()</a></code> </p>
         </td>
-        <td><p>Memoised version of getConceptsWithCodeCounts</p></td>
+        <td><p>Memoised version of getCodeCountsStratified</p></td>
+      </tr><tr><td>
+          <p><code><a href="getConceptRelationships.html">getConceptRelationships()</a></code> </p>
+        </td>
+        <td><p>Get concept relationships and concept details for a concept</p></td>
+      </tr><tr><td>
+          <p><code><a href="getConceptRelationships_memoise.html">getConceptRelationships_memoise()</a></code> </p>
+        </td>
+        <td><p>Memoised version of getConceptRelationships</p></td>
+      </tr><tr><td>
+          <p><code><a href="getConceptTree.html">getConceptTree()</a></code> </p>
+        </td>
+        <td><p>Get the concept relationship tree for a concept</p></td>
+      </tr><tr><td>
+          <p><code><a href="getConceptTree_memoise.html">getConceptTree_memoise()</a></code> </p>
+        </td>
+        <td><p>Memoised version of getConceptTree</p></td>
       </tr><tr><td>
           <p><code><a href="getLogs.html">getLogs()</a></code> </p>
         </td>
         <td><p>Get logs from ParallelLogger temp file</p></td>
+      </tr><tr><td>
+          <p><code><a href="getPersonCountsFilters.html">getPersonCountsFilters()</a></code> </p>
+        </td>
+        <td><p>Get person-count breakdowns by sex, age, visit type and year for a list of tagged concept sets</p></td>
+      </tr><tr><td>
+          <p><code><a href="getPersonCountsFilters_memoise.html">getPersonCountsFilters_memoise()</a></code> </p>
+        </td>
+        <td><p>Memoised version of getPersonCountsFilters</p></td>
+      </tr><tr><td>
+          <p><code><a href="getPersonCountsUpset.html">getPersonCountsUpset()</a></code> </p>
+        </td>
+        <td><p>Get exact set-overlap (UpSet) person counts for a list of tagged concept sets</p></td>
+      </tr><tr><td>
+          <p><code><a href="getPersonCountsUpset_memoise.html">getPersonCountsUpset_memoise()</a></code> </p>
+        </td>
+        <td><p>Memoised version of getPersonCountsUpset</p></td>
+      </tr><tr><td>
+          <p><code><a href="getVisitTypeNames.html">getVisitTypeNames()</a></code> </p>
+        </td>
+        <td><p>Get visit type names</p></td>
+      </tr><tr><td>
+          <p><code><a href="getVisitTypeNames_memoise.html">getVisitTypeNames_memoise()</a></code> </p>
+        </td>
+        <td><p>Memoised version of getVisitTypeNames</p></td>
       </tr><tr><td>
           <p><code><a href="helper_FinnGen_getDatabaseFile.html">helper_FinnGen_getDatabaseFile()</a></code> </p>
         </td>
@@ -181,7 +253,7 @@
 </div>
 
 <div class="pkgdown">
-  <p></p><p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p></p><p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
       </footer></div>
