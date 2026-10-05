@@ -71,6 +71,13 @@ createCodeCountsTables <- function(
         visitSourceGroupConceptIds = visitSourceGroupConceptIds
     )
 
+    # - Create stratified measurements table (event-level measured values)
+    createStratifiedMeasurementsTable(
+        CDMdbHandler,
+        stratifiedMeasurementsTable = "stratified_measurements",
+        visitSourceGroupConceptIds = visitSourceGroupConceptIds
+    )
+
     # - Create code counts table
     sqlDialectFolder <- if (connection@dbms == "bigquery") "bigquery" else "sql_server"
     sqlPath <- system.file(

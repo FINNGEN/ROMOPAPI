@@ -41,6 +41,9 @@
 #'     \code{getPersonCountsUpset_memoise}): a pie chart of
 #'     persons by sex, a bar chart by age decile, a bar chart by visit-source group, and
 #'     an UpSet plot of exact set-overlap regions
+#'   \item A measured-values section (from \code{getMeasurementValueHistogram_memoise}),
+#'     rendered only when the concept is in the Measurement domain and its descendants
+#'     actually carry numeric values: a bar chart of the value histogram, one facet per unit
 #' }
 #'
 #' @importFrom checkmate assertIntegerish assertClass assertLogical assertCharacter

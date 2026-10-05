@@ -166,6 +166,53 @@ function(res, conceptIds = "", yearsRange = "", sexStratum = "", ageStratum = ""
   })
 }
 
+#* Get a histogram of measured values for a list of concept sets
+#* @param conceptIds Comma-separated tagged concept ids, e.g. "40652733S,40652733SD" —
+#*   each token is <conceptId><S|M><D?>: S/M picks concept_id vs maps_to_concept_id,
+#*   trailing D expands to the concept and all its descendants. All concepts must be in
+#*   the Measurement domain. One histogram is returned per token and unit
+#* @param yearsRange Comma-separated "startYear,endYear" to restrict to. Omit for the full range
+#* @param sexStratum Comma-separated gender_concept_id values to restrict to
+#* @param ageStratum Comma-separated age_decile values to restrict to
+#* @param visitStratum Comma-separated visit_group_concept_id values to restrict to
+#* @param nBins Number of in-range bins. Defaults to 100; two outer bins are always added
+#* @get /getMeasurementValueHistogram
+function(res, conceptIds = "", yearsRange = "", sexStratum = "", ageStratum = "",
+         visitStratum = "", nBins = 100L) {
+
+  if (!nzchar(trimws(conceptIds))) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("conceptIds must not be empty")))
+  }
+
+  yearsRange <- .plumberParseYearsRange(yearsRange)
+  if (length(yearsRange) == 1 && is.na(yearsRange)) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("yearsRange must be \"startYear,endYear\"")))
+  }
+
+  nBins <- suppressWarnings(as.integer(nBins))
+  if (is.na(nBins) || nBins < 1) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("nBins must be a positive integer")))
+  }
+
+  tryCatch({
+    getMeasurementValueHistogram_memoise(
+      CDMdbHandler = CDMdbHandler,
+      conceptIds = conceptIds,
+      yearsRange = yearsRange,
+      sexStratum = .plumberParseIntCsv(sexStratum),
+      ageStratum = .plumberParseIntCsv(ageStratum),
+      visitStratum = .plumberParseIntCsv(visitStratum),
+      nBins = nBins
+    )
+  }, error = function(e) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox(e$message)))
+  })
+}
+
 #* Get the API information
 #* @get /getAPIInfo
 function() {

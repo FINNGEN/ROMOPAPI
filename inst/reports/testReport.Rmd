@@ -94,6 +94,35 @@ Set overlap (UpSet)
 createUpsetPlotFromPersonCounts(personCounts$upset_person_counts, results$concepts)
 ```
 
+```{r, include=FALSE}
+# Measured values only exist for the Measurement domain, and
+# getMeasurementValueHistogram() deliberately errors on anything else -- so decide
+# up front whether this section runs at all rather than calling it and catching.
+isMeasurement <- results$concepts |>
+  dplyr::filter(concept_id == conceptId) |>
+  dplyr::pull(domain_id) |>
+  (\(x) length(x) > 0 && all(x == "Measurement"))()
+
+measurementHistogram <- NULL
+if (isMeasurement) {
+  # same "SD" token the person-counts section uses: a LOINC Group carries no events of
+  # its own, so the descendants are where the values actually are
+  measurementHistogram <- getMeasurementValueHistogram_memoise(
+    CDMdbHandler,
+    conceptIds = paste0(conceptId, "SD")
+  )
+}
+hasMeasurementValues <- !is.null(measurementHistogram) && nrow(measurementHistogram) > 0
+```
+
+```{r, eval=hasMeasurementValues, echo=FALSE, results='asis'}
+cat("## Measured Values\n")
+```
+
+```{r, eval=hasMeasurementValues}
+createMeasurementHistogramPlot(measurementHistogram)
+```
+
 <!-- Load mermaid.js -->
 <script src="mermaid.min.js"></script>
 <script>
