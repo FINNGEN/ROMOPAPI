@@ -70,7 +70,8 @@ createPlotFromResults(results, showsMappings = showsMappings, width = 1000, heig
 personCounts <- list(
   filter_person_counts = getPersonCountsFilters_memoise(CDMdbHandler, conceptIds = paste0(conceptId, "SD")),
   upset_person_counts = getPersonCountsUpset_memoise(CDMdbHandler, conceptIds = paste0(conceptId, "SD")),
-  prevalence_person_counts = getPersonCountsPrevalence_memoise(CDMdbHandler, conceptIds = paste0(conceptId, "SD"))
+  prevalence_person_counts = getPersonCountsPrevalence_memoise(CDMdbHandler, conceptIds = paste0(conceptId, "SD")),
+  incidence_person_counts = getPersonCountsIncidence_memoise(CDMdbHandler, conceptIds = paste0(conceptId, "SD"))
 )
 visitTypeNames <- getVisitTypeNames_memoise(CDMdbHandler)
 ```
@@ -98,6 +99,11 @@ createUpsetPlotFromPersonCounts(personCounts$upset_person_counts, results$concep
 Prevalence
 ```{r}
 createPrevalencePlotFromPersonCounts(personCounts$prevalence_person_counts, results$concepts)
+```
+
+Incidence
+```{r}
+createIncidencePlotFromPersonCounts(personCounts$incidence_person_counts, results$concepts)
 ```
 
 ```{r, include=FALSE}
