@@ -277,6 +277,8 @@ from the cache key. The API calls the memoised versions.
 | `getPersonCountsUpset()` (`R/getPersonCountsUpset.R`) | `stratified_persons`, via the same tagged-concept-id helpers — exact set-overlap (UpSet) regions across an explicit list of tagged concept sets, over an optional `yearsRange` and the requested strata; per-concept `person_counts`/`descendant_person_counts` are read from `code_counts` via `getConceptRelationships()`'s `concepts` tibble instead of being duplicated here | tibble |
 | `getMeasurementValueHistogram()` (`R/getMeasurementValueHistogram.R`) | `stratified_measurements` ⨝ `concept` (unit codes), via the same tagged-concept-id helpers — a robust (median ± 7·MAD) histogram of measured values per tagged set and unit | tibble |
 | `getPersonCountsPrevalence()` (`R/getPersonCountsPrevalence.R`) | `stratified_persons` (numerator) and `observed_persons_counts_stratified` (denominator), via the same tagged-concept-id helpers — per-year distinct-person counts for each tagged concept set, alongside the matching population-at-risk; `visitStratum` narrows the numerator only | tibble |
+| `getPersonCountsIncidence()` (`R/getPersonCountsIncidence.R`) | Same tables as `getPersonCountsPrevalence()`, but the numerator is restricted to each person's absolute first-ever record of the token's id set (`.buildIncidentRowsSql()`, `R/parsePersonCountsConceptIds.R`) — per-year distinct **first-occurrence** person counts, alongside the same population-at-risk denominator | tibble |
+| `getPersonCountsIncidenceFilters()` (`R/getPersonCountsIncidenceFilters.R`) | Same as `getPersonCountsFilters()`, but pooling each set's first-occurrence rows (`.buildIncidentRowsSql()`) instead of every raw occurrence — sex/age/visit/year breakdown of the pooled first-incident-event population | tibble |
 | `getVisitTypeNames()` (`R/getVisitTypeNames.R`) | `stratified_code_counts` (distinct `visit_group_concept_id`) ⨝ `concept` (their names/codes) | tibble |
 | `getAPIInfo()` (`R/getAPIInfo.R`) | `cdm_source` (CDM name, vocabulary version) + package version | list |
 | `getLogs()` / `sendFeedback()` (`R/getLogs.R`, `R/sendFeedback.R`) | in-process log file / feedback capture — no DB | — |
@@ -457,6 +459,43 @@ denominator are dropped, since no prevalence can be formed there.
 | `person_counts` | distinct persons matching that token's id set and the requested strata, in that year |
 | `observed_persons_counts` | distinct persons under observation in that year, matching `sexStratum`/`ageStratum`/`yearsRange` only |
 
+#### `getPersonCountsIncidence()` → one tibble
+
+Per tagged concept set per calendar year: the exact distinct-person numerator,
+counting a person only **once** — in the year of their first-ever record of
+that token's id set (the concept itself or any requested descendant) —
+alongside the same population-at-risk denominator `getPersonCountsPrevalence()`
+uses. A person's first-ever record is computed **ignoring every filter**;
+`sexStratum`/`ageStratum`/`visitStratum`/`yearsRange` only decide whether that
+already-fixed incident event qualifies for the count, they never change which
+year counts as "first" (see `.buildIncidentRowsSql()`,
+`R/parsePersonCountsConceptIds.R`). One consequence: narrowing `yearsRange` can
+legitimately return an all-zero row for a token whose true first-ever year
+falls outside the range — unlike `getPersonCountsPrevalence()`, where every
+year in range can show a nonzero count.
+
+| Column | Meaning |
+|--------|---------|
+| `tagged_concept_id` | the tagged token from `conceptIds` (e.g. `"317009SD"`) |
+| `calendar_year` | the year |
+| `person_counts` | distinct persons whose first-ever record of that token's id set falls in this year and matches the requested strata |
+| `observed_persons_counts` | distinct persons under observation in that year, matching `sexStratum`/`ageStratum`/`yearsRange` only |
+
+#### `getPersonCountsIncidenceFilters()` → one tibble
+
+Same shape and semantics as `getPersonCountsFilters()`, but pooling each set's
+**first-occurrence** rows instead of every raw occurrence — each of the four
+dimensions is computed with the *other three* dimensions' filters applied, but
+not its own, and a person's first-ever record is fixed ignoring every filter
+(same rule as `getPersonCountsIncidence()` above).
+
+| Column | Meaning |
+|--------|---------|
+| `filter` | which dimension: `"sex"`, `"age"`, `"visit"`, or `"year"` |
+| `stratum` | the `gender_concept_id` / `age_decile` / `visit_group_concept_id` / `calendar_year` value |
+| `person_counts` | distinct persons incident (first-ever record) in that stratum, with the other three dimensions' filters applied |
+| `selected` | `TRUE` if this stratum value was part of that dimension's own filter, else `FALSE` |
+
 #### `getVisitTypeNames()` → one tibble
 
 One row per FinnGen visit-source group present in the counts (empty when grouping
@@ -500,14 +539,15 @@ descendants. `inst/reports/mermaid.min.js` is served locally so reports need no
 CDN.
 
 A **Person Counts** section pulls `getPersonCountsFilters_memoise`,
-`getPersonCountsUpset_memoise`, `getPersonCountsPrevalence_memoise` and
-`getVisitTypeNames_memoise` separately and renders: a pie chart of persons by
-sex (`createSexPieChartFromPersonCounts`), a bar chart by age decile
-(`createAgeHistogramFromPersonCounts`), a bar chart by visit-source group
-(`createVisitBarplotFromPersonCounts`), an UpSet plot of the exact
-set-overlap regions (`createUpsetPlotFromPersonCounts`), and a clustered dot
+`getPersonCountsUpset_memoise`, `getPersonCountsPrevalence_memoise`,
+`getPersonCountsIncidence_memoise` and `getVisitTypeNames_memoise` separately
+and renders: a pie chart of persons by sex (`createSexPieChartFromPersonCounts`),
+a bar chart by age decile (`createAgeHistogramFromPersonCounts`), a bar chart by
+visit-source group (`createVisitBarplotFromPersonCounts`), an UpSet plot of the
+exact set-overlap regions (`createUpsetPlotFromPersonCounts`), a clustered dot
 chart of per-year prevalence, one series per tagged concept set
-(`createPrevalencePlotFromPersonCounts`) — all in `R/plotingFunctions.R`.
+(`createPrevalencePlotFromPersonCounts`), and the same chart for per-year
+incidence (`createIncidencePlotFromPersonCounts`) — all in `R/plotingFunctions.R`.
 
 A **Measured Values** section follows it, but only for `Measurement`-domain
 concepts: it pulls `getMeasurementValueHistogram_memoise` with the same
@@ -542,6 +582,8 @@ memoised getter:
 | `GET /getPersonCountsUpset?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=` | `getPersonCountsUpset_memoise` |
 | `GET /getMeasurementValueHistogram?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=&nBins=` | `getMeasurementValueHistogram_memoise` |
 | `GET /getPersonCountsPrevalence?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=` | `getPersonCountsPrevalence_memoise` |
+| `GET /getPersonCountsIncidence?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=` | `getPersonCountsIncidence_memoise` |
+| `GET /getPersonCountsIncidenceFilters?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=` | `getPersonCountsIncidenceFilters_memoise` |
 | `GET /getListOfConcepts` | `getAllConceptsInfo_memoise` |
 | `GET /getVisitTypeNames` | `getVisitTypeNames_memoise` |
 | `GET /getAPIInfo` | `getAPIInfo` |
