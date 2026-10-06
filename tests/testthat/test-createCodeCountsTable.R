@@ -284,33 +284,94 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
     (\(x) expect_false(all(x %in% visitSourceGroupConceptIds)))()
 })
 
-# test_that("createObservationCountsTable works", {
-#   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
-#   withr::defer({
-#     CDMdbHandler <- NULL
-#     gc()
-#   })
+test_that("createObservedPersonsCountsTable works", {
+  # counts-creation test: needs a raw OMOP CDM
+  skip_if_not(testingDatabase %in% creationDatabases)
 
-#   connection <- CDMdbHandler$connectionHandler$getConnection()
-#   cdmDatabaseSchema <- CDMdbHandler$cdmDatabaseSchema
-#   resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
+  withr::defer({
+    CDMdbHandler <- NULL
+    gc()
+  })
 
-#   sqlPath <- system.file("sql", "sql_server", "createObservationCountsTable.sql", package = "ROMOPAPI")
-#   sql <- SqlRender::readSql(sqlPath)
-#   sql <- SqlRender::render(sql,
-#     cdmDatabaseSchema = cdmDatabaseSchema,
-#     resultsDatabaseSchema = resultsDatabaseSchema
-#   )
-#   sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
+  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+  stratifiedCodeCountsTable <- "stratified_code_counts_test1"
+  observedPersonsCountsTable <- "observed_persons_counts_test1"
+  withr::defer({
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable
+    ))
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ", resultsDatabaseSchema, ".", observedPersonsCountsTable
+    ))
+  })
 
-#   DatabaseConnector::executeSql(connection, sql)
+  # observedPersonsCountsTable reads its year range from stratifiedCodeCountsTable
+  createStratifiedCodeCountsTable(
+    CDMdbHandler,
+    stratifiedCodeCountsTable = stratifiedCodeCountsTable
+  )
+  createObservedPersonsCountsTable(
+    CDMdbHandler,
+    observedPersonsCountsTable = observedPersonsCountsTable,
+    stratifiedCodeCountsTable = stratifiedCodeCountsTable
+  )
 
-#   observation_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".observation_counts"))
-#   observation_counts |>
-#     dplyr::count() |>
-#     dplyr::pull(n) |>
-#     expect_gt(0)
-# })
+  observedPersonsCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    resultsDatabaseSchema, ".", observedPersonsCountsTable
+  )))
+
+  observedPersonsCounts |>
+    head() |>
+    dplyr::collect() |>
+    colnames() |>
+    expect_equal(c(
+      "calendar_year",
+      "gender_concept_id",
+      "age_decile",
+      "observed_persons_counts"
+    ))
+
+  observedPersonsCounts |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
+
+  # every stratum has at least one observed person
+  observedPersonsCounts |>
+    dplyr::filter(observed_persons_counts < 1) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  observedPersonsCounts |>
+    dplyr::filter(is.na(calendar_year)) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # the set of years covered matches exactly the years in stratified_code_counts
+  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    resultsDatabaseSchema, ".", stratifiedCodeCountsTable
+  )))
+
+  observedYears <- observedPersonsCounts |>
+    dplyr::distinct(calendar_year) |>
+    dplyr::collect() |>
+    dplyr::pull(calendar_year) |>
+    sort()
+
+  stratifiedYears <- stratifiedCodeCounts |>
+    dplyr::distinct(calendar_year) |>
+    dplyr::collect() |>
+    dplyr::pull(calendar_year) |>
+    sort()
+
+  observedYears |> expect_equal(stratifiedYears)
+})
 
 test_that("createCodeCountsTables works", {
   # counts-creation test: needs a raw OMOP CDM

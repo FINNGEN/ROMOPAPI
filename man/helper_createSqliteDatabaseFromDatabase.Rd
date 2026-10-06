@@ -49,6 +49,7 @@ No return value. Creates a new SQLite database file at the specified path.
 \description{
 Creates a new SQLite database by extracting specific concept data from a CDM database.
 The function extracts concept information, concept ancestors, code counts, stratified
-code counts, and the stratified persons bridge table for the specified concept IDs and
-creates a new SQLite database with this subset of data.
+code counts, the stratified persons bridge table, and the observed persons counts
+(prevalence denominator) table for the specified concept IDs and creates a new SQLite
+database with this subset of data.
 }

@@ -1,11 +1,12 @@
 # Builds a small synthetic CDMdbHandler (throwaway SQLite file) with hand-picked
-# concept_ancestor / stratified_persons rows whose correct getPersonCountsUpset /
-# getPersonCountsFilters output can be computed by hand — used to test the actual
-# arithmetic, not just shape/invariants, independent of the real FinnGen fixture.
-# Two persons (1 and 6) carry events under BOTH concept trees, so exclusive-region
-# math actually has to combine overlapping patients rather than only ever seeing
-# one patient per set. See the "(synthetic)" tests in test-getPersonCountsUpset.R
-# and test-getPersonCountsFilters.R for the dataset and the hand-computed values.
+# concept_ancestor / stratified_persons / observed_persons_counts_stratified rows
+# whose correct getPersonCountsUpset / getPersonCountsFilters / getPersonCountsPrevalence
+# output can be computed by hand — used to test the actual arithmetic, not just
+# shape/invariants, independent of the real FinnGen fixture. Two persons (1 and 6)
+# carry events under BOTH concept trees, so exclusive-region math actually has to
+# combine overlapping patients rather than only ever seeing one patient per set.
+# See the "(synthetic)" tests in test-getPersonCountsUpset.R, test-getPersonCountsFilters.R
+# and test-getPersonCountsPrevalence.R for the dataset and the hand-computed values.
 .buildSyntheticPersonCountsHandler <- function() {
   dbPath <- tempfile(fileext = ".sqlite")
   withr::defer_parent(unlink(dbPath))
@@ -63,6 +64,29 @@
   connection |> DatabaseConnector::insertTable(
     tableName = "stratified_persons",
     data = stratifiedPersons,
+    dropTableIfExists = TRUE,
+    createTable = TRUE,
+    tempTable = FALSE
+  )
+
+  # Population-at-risk denominator, one row per (year, gender, age_decile)
+  # combination actually present above, with distinct round numbers so the
+  # expected prevalence can be computed by hand (see the "(synthetic)" tests
+  # in test-getPersonCountsPrevalence.R):
+  #   year 2010 -> (gender1,age1)=100 + (gender2,age1)=200 = 300 observed
+  #   year 2011 -> (gender1,age2)=50  + (gender2,age2)=40  =  90 observed
+  #   year 2012 -> (gender1,age3)=10                       =  10 observed
+  observedPersonsCounts <- tibble::tribble(
+    ~calendar_year, ~gender_concept_id, ~age_decile, ~observed_persons_counts,
+    2010L, 1L, 1L, 100L,
+    2010L, 2L, 1L, 200L,
+    2011L, 1L, 2L,  50L,
+    2011L, 2L, 2L,  40L,
+    2012L, 1L, 3L,  10L
+  )
+  connection |> DatabaseConnector::insertTable(
+    tableName = "observed_persons_counts_stratified",
+    data = observedPersonsCounts,
     dropTableIfExists = TRUE,
     createTable = TRUE,
     tempTable = FALSE

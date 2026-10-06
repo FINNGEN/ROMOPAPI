@@ -69,7 +69,8 @@ createPlotFromResults(results, showsMappings = showsMappings, width = 1000, heig
 ```{r}
 personCounts <- list(
   filter_person_counts = getPersonCountsFilters_memoise(CDMdbHandler, conceptIds = paste0(conceptId, "SD")),
-  upset_person_counts = getPersonCountsUpset_memoise(CDMdbHandler, conceptIds = paste0(conceptId, "SD"))
+  upset_person_counts = getPersonCountsUpset_memoise(CDMdbHandler, conceptIds = paste0(conceptId, "SD")),
+  prevalence_person_counts = getPersonCountsPrevalence_memoise(CDMdbHandler, conceptIds = paste0(conceptId, "SD"))
 )
 visitTypeNames <- getVisitTypeNames_memoise(CDMdbHandler)
 ```
@@ -92,6 +93,11 @@ createVisitBarplotFromPersonCounts(personCounts$filter_person_counts, visitTypeN
 Set overlap (UpSet)
 ```{r}
 createUpsetPlotFromPersonCounts(personCounts$upset_person_counts, results$concepts)
+```
+
+Prevalence
+```{r}
+createPrevalencePlotFromPersonCounts(personCounts$prevalence_person_counts, results$concepts)
 ```
 
 ```{r, include=FALSE}
@@ -128,4 +134,3 @@ createMeasurementHistogramPlot(measurementHistogram)
 <script>
 mermaid.initialize({ startOnLoad: true });
 </script>
-

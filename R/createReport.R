@@ -37,10 +37,11 @@
 #'     descendant person counts (DPC)
 #'   \item Comprehensive data tables
 #'   \item Statistical plots and charts
-#'   \item A person-counts section (from \code{getPersonCountsFilters_memoise} and
-#'     \code{getPersonCountsUpset_memoise}): a pie chart of
-#'     persons by sex, a bar chart by age decile, a bar chart by visit-source group, and
-#'     an UpSet plot of exact set-overlap regions
+#'   \item A person-counts section (from \code{getPersonCountsFilters_memoise},
+#'     \code{getPersonCountsUpset_memoise} and \code{getPersonCountsPrevalence_memoise}):
+#'     a pie chart of persons by sex, a bar chart by age decile, a bar chart by
+#'     visit-source group, an UpSet plot of exact set-overlap regions, and a
+#'     clustered dot chart of per-year prevalence
 #'   \item A measured-values section (from \code{getMeasurementValueHistogram_memoise}),
 #'     rendered only when the concept is in the Measurement domain and its descendants
 #'     actually carry numeric values: a bar chart of the value histogram, one facet per unit
