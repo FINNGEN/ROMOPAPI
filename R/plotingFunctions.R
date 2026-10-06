@@ -636,3 +636,61 @@ pruneLevelsFromResults <- function(results, pruneLevels, pruneClass = NULL) {
 
 
 }
+#' Create a bar chart of measured values from a measurement histogram
+#'
+#' @description
+#' Renders \code{\link{getMeasurementValueHistogram}}'s output as a stacked bar chart, one
+#' facet per unit (a descendant-expanded concept recorded in several units yields one
+#' histogram per unit, and their scales are not comparable).
+#'
+#' Within a unit the bars are **stacked by `tagged_conceptid`**: a bin's full height is every
+#' event in that bin, split into one coloured segment per requested concept set. The getter
+#' pools the bin breaks across all sets sharing a unit precisely so this stacking is
+#' meaningful -- every set of one unit carries the same bucket labels.
+#'
+#' Buckets are kept in the order the getter returned them — ascending value, with the
+#' underflow `(-Inf, x]` and overflow `(x, +Inf]` bins first and last — rather than sorted
+#' as text, which would scatter negative and multi-digit labels.
+#'
+#' @param measurementHistogram The tibble from \code{\link{getMeasurementValueHistogram}}
+#'   (columns `tagged_conceptid`, `measured_value_bucket`, `unit`, `n_events`).
+#'
+#' @return A plotly object, or NULL when the histogram is empty
+#'
+#' @importFrom dplyr mutate coalesce arrange distinct pull
+#' @importFrom ggplot2 ggplot aes geom_col theme_minimal theme element_text labs facet_wrap vars
+#' @importFrom plotly ggplotly
+#' @export
+#'
+createMeasurementHistogramPlot <- function(measurementHistogram) {
+  if (is.null(measurementHistogram) || nrow(measurementHistogram) == 0) {
+    return(NULL)
+  }
+
+  # the getter already returns buckets in ascending value order; lock that in so ggplot
+  # does not re-sort the labels alphabetically (which scatters negatives and -Inf/+Inf)
+  bucketLevels <- measurementHistogram |>
+    dplyr::distinct(measured_value_bucket) |>
+    dplyr::pull(measured_value_bucket)
+
+  data <- measurementHistogram |>
+    dplyr::mutate(
+      unit = dplyr::coalesce(unit, "(no unit)"),
+      measured_value_bucket = factor(measured_value_bucket, levels = bucketLevels)
+    )
+
+  plot <- ggplot2::ggplot(
+    data,
+    ggplot2::aes(x = measured_value_bucket, y = n_events, fill = tagged_conceptid)
+  ) +
+    ggplot2::geom_col() +
+    ggplot2::facet_wrap(ggplot2::vars(unit), scales = "free", ncol = 1) +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 90, hjust = 1, size = 6),
+      legend.title = ggplot2::element_blank()
+    ) +
+    ggplot2::labs(x = "Measured value", y = "Events", title = "Measured values")
+
+  plotly::ggplotly(plot)
+}

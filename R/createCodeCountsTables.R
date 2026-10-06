@@ -71,6 +71,13 @@ createCodeCountsTables <- function(
         visitSourceGroupConceptIds = visitSourceGroupConceptIds
     )
 
+    # - Create stratified measurements table (event-level measured values)
+    createStratifiedMeasurementsTable(
+        CDMdbHandler,
+        stratifiedMeasurementsTable = "stratified_measurements",
+        visitSourceGroupConceptIds = visitSourceGroupConceptIds
+    )
+
     # - Create observed persons counts table (prevalence denominator) -- reads
     #   its year range from stratifiedCodeCountsTable, so must come after it
     createObservedPersonsCountsTable(

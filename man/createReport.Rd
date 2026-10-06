@@ -60,5 +60,8 @@ descendant person counts (DPC)
 a pie chart of persons by sex, a bar chart by age decile, a bar chart by
 visit-source group, an UpSet plot of exact set-overlap regions, and a
 clustered dot chart of per-year prevalence
+\item A measured-values section (from \code{getMeasurementValueHistogram_memoise}),
+rendered only when the concept is in the Measurement domain and its descendants
+actually carry numeric values: a bar chart of the value histogram, one facet per unit
 }
 }

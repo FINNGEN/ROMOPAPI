@@ -119,6 +119,12 @@ helper_FinnGen_getDatabaseFileCounts <- function() {
 #'   ones, deterministically. All of a kept person's stratum rows for that concept are included, so
 #'   this bounds the person-level fan-out for common real-world codes without truncating any one
 #'   person's detail. Defaults to 1000.
+#' @param maxEventsPerConcept Maximum measurement events kept per target concept and unit in the
+#'   `stratified_measurements` extract. The sample is a deterministic *systematic* one — the rows
+#'   are ranked by `value_as_number`, split into that many equal-count buckets with `NTILE`, and
+#'   one row is kept from each — so the sampled values keep the shape of the original distribution.
+#'   Taking the first N by value instead would keep only the smallest values and destroy the very
+#'   histogram this fixture exists to test. Defaults to 2000.
 #' @param pathToSqliteDatabase Path where the new SQLite database should be created.
 #'   Defaults to a temporary file with .sqlite extension
 #' @param codeCountsTable Name of the code counts table in the source database.
@@ -137,6 +143,7 @@ helper_createSqliteDatabaseFromDatabase <- function(
     conceptIds = c(317009, 21601855),
     personBridgeConceptIds = conceptIds,
     maxPersonsPerConcept = 1000,
+    maxEventsPerConcept = 2000,
     pathToSqliteDatabase = tempfile(fileext = ".sqlite"),
     codeCountsTable = "code_counts") {
   CDMdbHandler |> checkmate::assertClass("CDMdbHandler")
@@ -182,6 +189,12 @@ helper_createSqliteDatabaseFromDatabase <- function(
           SELECT DISTINCT c.* FROM @vocabularyDatabaseSchema.concept c
           JOIN @resultsDatabaseSchema.@stratifiedCodeCountsTable scc ON c.concept_id = scc.visit_group_concept_id
           WHERE scc.concept_id IN (@conceptIdsToExtract) OR scc.maps_to_concept_id IN (@conceptIdsToExtract)
+          -- Include also the unit concepts in stratified_measurements, otherwise
+          -- getMeasurementValueHistogram() cannot resolve a unit to its concept_code
+          UNION
+          SELECT DISTINCT c.* FROM @vocabularyDatabaseSchema.concept c
+          JOIN @resultsDatabaseSchema.stratified_measurements sm ON c.concept_id = sm.unit_concept_id
+          WHERE sm.concept_id IN (@conceptIdsToExtract) OR sm.maps_to_concept_id IN (@conceptIdsToExtract)
           "
   
   concept <- DatabaseConnector::renderTranslateQuerySql(
@@ -303,6 +316,67 @@ helper_createSqliteDatabaseFromDatabase <- function(
   targetConnection |> DatabaseConnector::insertTable(
     tableName = "stratified_persons",
     data = stratifiedPersons,
+    dropTableIfExists = TRUE,
+    createTable = TRUE,
+    tempTable = FALSE,
+  )
+
+  # stratified measurements table — event-level measured values for the extracted concepts,
+  # capped to maxEventsPerConcept rows per (concept, unit). The cap is a systematic sample
+  # over the value distribution (NTILE buckets of equal count, one row kept per bucket) so
+  # the fixture's histogram keeps the shape of the real one; note there is deliberately NO
+  # DISTINCT here, since two events sharing a value and stratum are two separate events and
+  # collapsing them would corrupt the counts.
+  sql <- "
+    WITH target_measurements AS (
+        SELECT
+            sm.concept_id AS concept_id,
+            sm.maps_to_concept_id AS maps_to_concept_id,
+            sm.visit_group_concept_id AS visit_group_concept_id,
+            sm.calendar_year AS calendar_year,
+            sm.gender_concept_id AS gender_concept_id,
+            sm.age_decile AS age_decile,
+            sm.unit_concept_id AS unit_concept_id,
+            sm.value_as_number AS value_as_number,
+            CASE WHEN sm.concept_id IN (@conceptIdsToExtract) THEN sm.concept_id
+                 ELSE sm.maps_to_concept_id END AS target_concept_id
+        FROM @resultsDatabaseSchema.stratified_measurements sm
+        WHERE sm.concept_id IN (@conceptIdsToExtract)
+           OR sm.maps_to_concept_id IN (@conceptIdsToExtract)
+    ),
+    bucketed AS (
+        SELECT tm.*,
+               NTILE(@maxEventsPerConcept) OVER (
+                   PARTITION BY tm.target_concept_id, tm.unit_concept_id
+                   ORDER BY tm.value_as_number
+               ) AS value_bucket
+        FROM target_measurements tm
+    ),
+    ranked AS (
+        SELECT b.*,
+               ROW_NUMBER() OVER (
+                   PARTITION BY b.target_concept_id, b.unit_concept_id, b.value_bucket
+                   ORDER BY b.value_as_number
+               ) AS rn
+        FROM bucketed b
+    )
+    SELECT concept_id, maps_to_concept_id, visit_group_concept_id, calendar_year,
+           gender_concept_id, age_decile, unit_concept_id, value_as_number
+    FROM ranked
+    WHERE rn = 1
+  "
+  stratifiedMeasurements <- DatabaseConnector::renderTranslateQuerySql(
+    connection = sourceConnection,
+    sql = sql,
+    resultsDatabaseSchema = sourceResultsDatabaseSchema,
+    conceptIdsToExtract = paste(conceptIdsToExtract, collapse = ","),
+    maxEventsPerConcept = maxEventsPerConcept
+  ) |>
+    tibble::as_tibble()
+
+  targetConnection |> DatabaseConnector::insertTable(
+    tableName = "stratified_measurements",
+    data = stratifiedMeasurements,
     dropTableIfExists = TRUE,
     createTable = TRUE,
     tempTable = FALSE,
