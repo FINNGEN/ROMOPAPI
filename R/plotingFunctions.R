@@ -586,6 +586,57 @@ createPrevalencePlotFromPersonCounts <- function(prevalencePersonCounts, concept
     )
 }
 
+#' Create a clustered dot chart of per-year incidence
+#'
+#' @description
+#' Renders \code{\link{getPersonCountsIncidence}}'s output as a clustered dot chart:
+#' one point per tagged concept set per calendar year, at that year's incidence
+#' (`person_counts / observed_persons_counts * 100`), coloured by tagged concept set.
+#' Same layout as \code{\link{createPrevalencePlotFromPersonCounts}}; `person_counts` here
+#' counts each person once, in the year of their first-ever record of that set.
+#'
+#' @param incidencePersonCounts The tibble from \code{\link{getPersonCountsIncidence}}
+#'   (columns `tagged_concept_id`, `calendar_year`, `person_counts`, `observed_persons_counts`)
+#' @param concepts Optional tibble with `concept_id`/`concept_name` (e.g.
+#'   \code{\link{getConceptRelationships}}'s `concepts`) used to label the sets. NULL (default)
+#'   labels by the raw tagged token.
+#'
+#' @return A plotly object
+#' @importFrom dplyr mutate left_join select coalesce
+#' @importFrom stringr str_extract
+#' @importFrom plotly plot_ly layout
+#' @export
+#'
+createIncidencePlotFromPersonCounts <- function(incidencePersonCounts, concepts = NULL) {
+  data <- incidencePersonCounts |>
+    dplyr::mutate(
+      incidence = person_counts / observed_persons_counts * 100,
+      concept_id = as.integer(stringr::str_extract(tagged_concept_id, "^[0-9]+"))
+    )
+
+  if (!is.null(concepts)) {
+    data <- data |>
+      dplyr::left_join(dplyr::select(concepts, concept_id, concept_name), by = "concept_id") |>
+      dplyr::mutate(set_label = paste0(dplyr::coalesce(concept_name, paste0("Concept ", concept_id)), " (", tagged_concept_id, ")"))
+  } else {
+    data <- data |>
+      dplyr::mutate(set_label = tagged_concept_id)
+  }
+
+  plotly::plot_ly(
+    data,
+    x = ~calendar_year, y = ~incidence, color = ~set_label,
+    type = "scatter", mode = "markers+lines",
+    text = ~ paste0(set_label, "<br>", calendar_year, ": ", person_counts, " / ", observed_persons_counts),
+    hoverinfo = "text"
+  ) |>
+    plotly::layout(
+      xaxis = list(title = "Calendar year"),
+      yaxis = list(title = "Incidence (%)"),
+      legend = list(title = list(text = "Concept"))
+    )
+}
+
 #' Prune levels from results
 #'
 #' @param results A list of results from getConceptRelationships and getCodeCountsStratified

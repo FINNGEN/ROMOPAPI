@@ -184,3 +184,85 @@
 
   CDMdbHandler
 }
+
+# Builds a small synthetic CDMdbHandler dedicated to the Incidence getters: unlike
+# .buildSyntheticPersonCountsHandler() above (where no person has two occurrences of
+# the same token in different years, so incidence and prevalence agree), person 1 here
+# has TWO events under "100SD" -- 2010 and 2012 -- so the exact tests can prove the
+# second (2012) occurrence is excluded (only a person's first-ever year counts). See
+# the "(synthetic)" tests in test-getPersonCountsIncidence.R and
+# test-getPersonCountsIncidenceFilters.R for the hand-computed expected values.
+.buildSyntheticIncidencePersonCountsHandler <- function() {
+  dbPath <- tempfile(fileext = ".sqlite")
+  withr::defer_parent(unlink(dbPath))
+
+  config <- list(
+    database = list(
+      databaseId = "SYN-INC",
+      databaseName = "Synthetic incidence",
+      databaseDescription = "Synthetic incidence person-counts fixture"
+    ),
+    connection = list(connectionDetailsSettings = list(dbms = "sqlite", server = dbPath)),
+    cdm = list(cdmDatabaseSchema = "main", vocabularyDatabaseSchema = "main", resultsDatabaseSchema = "main")
+  )
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(config, loadConnectionChecksLevel = "basicChecks")
+
+  connection <- CDMdbHandler$connectionHandler$getConnection()
+
+  # concept 100 has one descendant (101); concept_ancestor always includes the
+  # ancestor-equals-descendant self row.
+  conceptAncestor <- tibble::tribble(
+    ~ancestor_concept_id, ~descendant_concept_id,
+    100L, 100L,
+    100L, 101L,
+    101L, 101L
+  )
+  connection |> DatabaseConnector::insertTable(
+    tableName = "concept_ancestor",
+    data = conceptAncestor,
+    dropTableIfExists = TRUE,
+    createTable = TRUE,
+    tempTable = FALSE
+  )
+
+  # person 1 carries TWO events matching "100SD" (concept_id in {100,101}) -- one in
+  # 2010, one in 2012 -- so their first-ever year is 2010 and the 2012 row must NOT be
+  # counted as a separate incident event. Person 2 matches via the descendant (101)
+  # with a non-zero visit group (7); person 3 matches the root directly.
+  stratifiedPersons <- tibble::tribble(
+    ~person_id, ~concept_id, ~maps_to_concept_id, ~visit_group_concept_id, ~calendar_year, ~gender_concept_id, ~age_decile,
+    1L, 100L, 100L, 0L, 2010L, 1L, 1L, # person 1's first-ever record of "100SD"
+    1L, 100L, 100L, 0L, 2012L, 1L, 3L, # person 1's SECOND record -- must not count as incident
+    2L, 101L, 101L, 7L, 2011L, 2L, 2L,
+    3L, 100L, 100L, 0L, 2011L, 1L, 2L
+  )
+  connection |> DatabaseConnector::insertTable(
+    tableName = "stratified_persons",
+    data = stratifiedPersons,
+    dropTableIfExists = TRUE,
+    createTable = TRUE,
+    tempTable = FALSE
+  )
+
+  # Population-at-risk denominator, round numbers chosen so the expected
+  # incidence can be computed by hand:
+  #   year 2010 -> (gender1,age1) = 100 observed
+  #   year 2011 -> (gender1,age2)=50 + (gender2,age2)=40 = 90 observed
+  #   year 2012 -> (gender1,age3) = 10 observed
+  observedPersonsCounts <- tibble::tribble(
+    ~calendar_year, ~gender_concept_id, ~age_decile, ~observed_persons_counts,
+    2010L, 1L, 1L, 100L,
+    2011L, 1L, 2L,  50L,
+    2011L, 2L, 2L,  40L,
+    2012L, 1L, 3L,  10L
+  )
+  connection |> DatabaseConnector::insertTable(
+    tableName = "observed_persons_counts_stratified",
+    data = observedPersonsCounts,
+    dropTableIfExists = TRUE,
+    createTable = TRUE,
+    tempTable = FALSE
+  )
+
+  CDMdbHandler
+}

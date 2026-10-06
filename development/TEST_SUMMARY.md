@@ -32,6 +32,12 @@ several tests earn more than one tag.
   `observed_persons_counts_stratified` denominator table with hand-picked round
   numbers) used by the **synthetic** tests in `test-getPersonCountsUpset.R`,
   `test-getPersonCountsFilters.R` and `test-getPersonCountsPrevalence.R`.
+  `.buildSyntheticIncidencePersonCountsHandler()` is a second, dedicated
+  synthetic fixture (one person with TWO occurrences of the same token in
+  different years) used by `test-getPersonCountsIncidence.R` and
+  `test-getPersonCountsIncidenceFilters.R` to prove a person's second
+  occurrence is excluded — kept separate from the fixture above so adding it
+  can't change any already-pinned Upset/Filters/Prevalence expected values.
 
 ---
 
@@ -241,6 +247,67 @@ numerator (down to zero for a group nobody used) while the denominator stays
 identical to the unfiltered value.
 
 ### "getPersonCountsPrevalence returns error if concept id has no descendants" — *(validation)*
+
+---
+
+## `test-getPersonCountsIncidence.R`
+
+### "getPersonCountsIncidence rejects malformed conceptIds tokens" — *(validation)*
+
+### "getPersonCountsIncidence rejects an inverted yearsRange" — *(validation)*
+
+### "getPersonCountsIncidence works for a single descendant-expanded set" — *(behavioral, invariant, fixture)*
+Checks the 4-column shape, no `NA`s, every row tagged with the requested
+token, a strictly-positive denominator, and `person_counts <=
+observed_persons_counts` on every row.
+
+### "getPersonCountsIncidence's per-year total never exceeds getPersonCountsPrevalence's" — *(invariant, fixture)*
+Incidence counts each person at most once ever (their first year); prevalence
+can count them again in later years — so the summed total is `<=` across the
+whole fixture for the same token.
+
+### "getPersonCountsIncidence gives exact counts on a hand-built fixture (synthetic)" — *(synthetic)*
+Against `.buildSyntheticIncidencePersonCountsHandler()` (`helper.R`): a person
+with two occurrences of `"100SD"` in different years is counted only in the
+first; the exact numerator/denominator pair for every year, including the
+excluded second occurrence's year, matches by hand.
+
+### "getPersonCountsIncidence's yearsRange can legitimately zero out a token (synthetic)" — *(synthetic)*
+Restricting `yearsRange` to a year where a person has a (non-first) record
+returns a zero count for that year, not that record — pins down the "first is
+absolute, filters apply after" rule as actual behavior, not just a plan note.
+
+### "getPersonCountsIncidence's sexStratum narrows both numerator and denominator (synthetic)" — *(synthetic)*
+
+### "getPersonCountsIncidence's visitStratum narrows the numerator only (synthetic)" — *(synthetic)*
+Same documented asymmetry as Prevalence, re-verified for the incidence
+numerator.
+
+### "getPersonCountsIncidence returns error if concept id has no descendants" — *(validation)*
+
+---
+
+## `test-getPersonCountsIncidenceFilters.R`
+
+### "getPersonCountsIncidenceFilters rejects malformed conceptIds tokens" — *(validation)*
+
+### "getPersonCountsIncidenceFilters works" — *(behavioral, fixture)*
+
+### "getPersonCountsIncidenceFilters's year total never exceeds getPersonCountsFilters'" — *(invariant, fixture)*
+
+### "getPersonCountsIncidenceFilters gives exact pooled breakdown counts on a hand-built fixture (synthetic)" — *(synthetic)*
+Against `.buildSyntheticIncidencePersonCountsHandler()` (`helper.R`): the
+pooled first-incident-event population for `"100SD"` excludes a person's
+second (non-first) occurrence; every stratum count in all 4 dimensions
+matches by hand.
+
+### "getPersonCountsIncidenceFilters reciprocal filtering matches hand-computed subsets (synthetic)" — *(synthetic)*
+
+### "getPersonCountsIncidenceFilters selected flags mark exactly the passed-in filter values (synthetic)" — *(synthetic)*
+
+### "getPersonCountsIncidenceFilters rejects an inverted yearsRange" — *(validation)*
+
+### "getPersonCountsIncidenceFilters returns error if concept id has no descendants" — *(validation)*
 
 ---
 

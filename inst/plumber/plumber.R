@@ -24,7 +24,7 @@ function(msg = "") {
 #* Get the concept relationships and concept details for a given concept ID
 #* @param conceptId The concept ID to get relationships and details for
 #* @get /getConceptRelationships
-function(res, conceptId=0L) {
+function(res, conceptId=317009L) {
 
   conceptId <- as.integer(conceptId)
 
@@ -47,7 +47,7 @@ function(res, conceptId=0L) {
 #* Get the stratified code counts for a given concept ID
 #* @param conceptId The concept ID to get stratified counts for
 #* @get /getCodeCountsStratified
-function(res, conceptId=0L) {
+function(res, conceptId=317009L) {
 
   conceptId <- as.integer(conceptId)
 
@@ -100,7 +100,7 @@ function(res, conceptId=0L) {
 #* @param ageStratum Comma-separated age_decile values marking the selected age strata
 #* @param visitStratum Comma-separated visit_group_concept_id values marking the selected visit strata
 #* @get /getPersonCountsFilters
-function(res, conceptIds = "", yearsRange = "", sexStratum = "", ageStratum = "", visitStratum = "") {
+function(res, conceptIds = "317009SD", yearsRange = "", sexStratum = "", ageStratum = "", visitStratum = "") {
 
   if (!nzchar(trimws(conceptIds))) {
     res$status <- 400
@@ -138,7 +138,7 @@ function(res, conceptIds = "", yearsRange = "", sexStratum = "", ageStratum = ""
 #* @param ageStratum Comma-separated age_decile values to restrict to
 #* @param visitStratum Comma-separated visit_group_concept_id values to restrict to
 #* @get /getPersonCountsUpset
-function(res, conceptIds = "", yearsRange = "", sexStratum = "", ageStratum = "", visitStratum = "") {
+function(res, conceptIds = "317009SD", yearsRange = "", sexStratum = "", ageStratum = "", visitStratum = "") {
 
   if (!nzchar(trimws(conceptIds))) {
     res$status <- 400
@@ -178,7 +178,7 @@ function(res, conceptIds = "", yearsRange = "", sexStratum = "", ageStratum = ""
 #*   narrows the numerator only; the population-at-risk denominator is not conditioned
 #*   on visit group
 #* @get /getPersonCountsPrevalence
-function(res, conceptIds = "", yearsRange = "", sexStratum = "", ageStratum = "", visitStratum = "") {
+function(res, conceptIds = "317009SD", yearsRange = "", sexStratum = "", ageStratum = "", visitStratum = "") {
 
   if (!nzchar(trimws(conceptIds))) {
     res$status <- 400
@@ -217,7 +217,7 @@ function(res, conceptIds = "", yearsRange = "", sexStratum = "", ageStratum = ""
 #* @param visitStratum Comma-separated visit_group_concept_id values to restrict to
 #* @param nBins Number of in-range bins. Defaults to 100; two outer bins are always added
 #* @get /getMeasurementValueHistogram
-function(res, conceptIds = "", yearsRange = "", sexStratum = "", ageStratum = "",
+function(res, conceptIds = "40652733SD", yearsRange = "", sexStratum = "", ageStratum = "",
          visitStratum = "", nBins = 100L) {
 
   if (!nzchar(trimws(conceptIds))) {
@@ -253,6 +253,89 @@ function(res, conceptIds = "", yearsRange = "", sexStratum = "", ageStratum = ""
   })
 }
 
+#* Get per-year incidence person counts for a list of concept sets
+#* @param conceptIds Comma-separated tagged concept ids, e.g. "317009SD,2000403993MD" —
+#*   each token is <conceptId><S|M><D?>: S/M picks concept_id vs maps_to_concept_id,
+#*   trailing D expands to the concept and all its descendants. Each token gets its own
+#*   row per calendar year. A person is counted once, in the year of their first-ever
+#*   record of that token's id set — not every year they have a record
+#* @param yearsRange Comma-separated "startYear,endYear" to restrict to. Omit for the full range.
+#*   Does not change which year counts as a person's first occurrence — only whether that
+#*   (already-fixed) incident year falls in range
+#* @param sexStratum Comma-separated gender_concept_id values to restrict to
+#* @param ageStratum Comma-separated age_decile values to restrict to
+#* @param visitStratum Comma-separated visit_group_concept_id values to restrict to —
+#*   narrows the numerator only; the population-at-risk denominator is not conditioned
+#*   on visit group
+#* @get /getPersonCountsIncidence
+function(res, conceptIds = "317009SD", yearsRange = "", sexStratum = "", ageStratum = "", visitStratum = "") {
+
+  if (!nzchar(trimws(conceptIds))) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("conceptIds must not be empty")))
+  }
+
+  yearsRange <- .plumberParseYearsRange(yearsRange)
+  if (length(yearsRange) == 1 && is.na(yearsRange)) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("yearsRange must be \"startYear,endYear\"")))
+  }
+
+  tryCatch({
+    getPersonCountsIncidence_memoise(
+      CDMdbHandler = CDMdbHandler,
+      conceptIds = conceptIds,
+      yearsRange = yearsRange,
+      sexStratum = .plumberParseIntCsv(sexStratum),
+      ageStratum = .plumberParseIntCsv(ageStratum),
+      visitStratum = .plumberParseIntCsv(visitStratum)
+    )
+  }, error = function(e) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox(e$message)))
+  })
+}
+
+#* Get person-count breakdowns by sex, age, visit type and year for first-time incident events
+#* @param conceptIds Comma-separated tagged concept ids, e.g. "317009SD,2000403993MD" —
+#*   each token is <conceptId><S|M><D?>: S/M picks concept_id vs maps_to_concept_id,
+#*   trailing D expands to the concept and all its descendants. Pools every set into one
+#*   population of first-ever incident events, same as /getPersonCountsFilters but counting
+#*   each person once (their first occurrence) instead of every occurrence
+#* @param yearsRange Comma-separated "startYear,endYear" marking the selected year strata.
+#*   Omit to select none
+#* @param sexStratum Comma-separated gender_concept_id values marking the selected sex strata
+#* @param ageStratum Comma-separated age_decile values marking the selected age strata
+#* @param visitStratum Comma-separated visit_group_concept_id values marking the selected visit strata
+#* @get /getPersonCountsIncidenceFilters
+function(res, conceptIds = "317009SD", yearsRange = "", sexStratum = "", ageStratum = "", visitStratum = "") {
+
+  if (!nzchar(trimws(conceptIds))) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("conceptIds must not be empty")))
+  }
+
+  yearsRange <- .plumberParseYearsRange(yearsRange)
+  if (length(yearsRange) == 1 && is.na(yearsRange)) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox("yearsRange must be \"startYear,endYear\"")))
+  }
+
+  tryCatch({
+    getPersonCountsIncidenceFilters_memoise(
+      CDMdbHandler = CDMdbHandler,
+      conceptIds = conceptIds,
+      yearsRange = yearsRange,
+      sexStratum = .plumberParseIntCsv(sexStratum),
+      ageStratum = .plumberParseIntCsv(ageStratum),
+      visitStratum = .plumberParseIntCsv(visitStratum)
+    )
+  }, error = function(e) {
+    res$status <- 400
+    return(list(error = jsonlite::unbox(e$message)))
+  })
+}
+
 #* Get the API information
 #* @get /getAPIInfo
 function() {
@@ -273,7 +356,7 @@ function() {
 #* @get /report
 #* @param conceptId The concept ID to include in the report
 #* @serializer html
-function(res, conceptId=0L, showsMappings = FALSE, pruneLevels = 0L, pruneClass = '') {
+function(res, conceptId=317009L, showsMappings = FALSE, pruneLevels = 0L, pruneClass = '') {
 
   conceptId <- as.integer(conceptId)
   showsMappings <- as.logical(showsMappings)

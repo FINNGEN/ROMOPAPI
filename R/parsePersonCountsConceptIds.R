@@ -139,3 +139,51 @@
 
     resolvedTokens
 }
+
+#' Build per-token "incident rows" SQL
+#'
+#' @description
+#' For each resolved token, returns the rows of `stratified_persons` at that
+#' person's absolute first (`MIN`) `calendar_year` for the token's matched
+#' column/id set -- computed ignoring every stratum filter, so the "first"
+#' date is a fixed, strata-independent fact per person. A person can
+#' contribute more than one row (one per `visit_group_concept_id` present in
+#' their incident year), which is what lets a caller narrow by `visitStratum`
+#' afterwards without redefining what "first" means. Shared by
+#' `getPersonCountsIncidence()` and `getPersonCountsIncidenceFilters()`.
+#'
+#' Computed as a `GROUP BY`-aggregated first-year lookup joined back to the
+#' matching rows, not a per-row correlated subquery -- the latter re-scans the
+#' token's matched rows once per matched row and is too slow once a token
+#' resolves to more than a handful of ids (e.g. a `D`-expanded set).
+#'
+#' @param resolvedTokens Output of `.resolveTaggedConceptIdSets()`.
+#'
+#' @return A single character string: one `SELECT` per token, `UNION ALL`-joined
+#'   (no trailing `;`), with columns `tagged_concept_id`, `person_id`,
+#'   `calendar_year`, `gender_concept_id`, `age_decile`, `visit_group_concept_id`.
+#'   Still templated with `@resultsDatabaseSchema`/`@stratifiedPersonsTable` --
+#'   the caller renders/translates it.
+#'
+#' @importFrom purrr pmap_chr
+#'
+.buildIncidentRowsSql <- function(resolvedTokens) {
+    resolvedTokens |>
+        purrr::pmap_chr(function(token, column, resolved_ids, ...) {
+            idsSql <- paste(resolved_ids, collapse = ",")
+            paste0(
+                "SELECT '", token, "' AS tagged_concept_id, sp.person_id AS person_id,
+                        sp.calendar_year AS calendar_year, sp.gender_concept_id AS gender_concept_id,
+                        sp.age_decile AS age_decile, sp.visit_group_concept_id AS visit_group_concept_id
+                 FROM @resultsDatabaseSchema.@stratifiedPersonsTable sp
+                 INNER JOIN (
+                     SELECT person_id, MIN(calendar_year) AS first_year
+                     FROM @resultsDatabaseSchema.@stratifiedPersonsTable
+                     WHERE ", column, " IN (", idsSql, ")
+                     GROUP BY person_id
+                 ) fy ON sp.person_id = fy.person_id AND sp.calendar_year = fy.first_year
+                 WHERE sp.", column, " IN (", idsSql, ")"
+            )
+        }) |>
+        paste(collapse = " UNION ALL ")
+}
