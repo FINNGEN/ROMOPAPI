@@ -106,8 +106,8 @@ that owns the connection and knows where the tables live.
   (`javier-gracia-tabuenca-tuni/DatabaseConnector@bigquery-DBI-2`) that adds
   BigQuery DBI support — intentional, see AGENTS.md → *Dependencies*.
 - **`SqlRender`** renders `@param` placeholders and translates SQL Server → target
-  dialect at runtime. The dialect folder (`inst/sql/sql_server` vs
-  `inst/sql/bigquery`) is chosen from `connection@dbms`.
+  dialect at runtime. All templates live in `inst/sql/sql_server/`; there are no
+  per-dialect copies.
 
 ---
 
@@ -136,7 +136,7 @@ One row per unique combination of stratification keys, for every domain:
   over the OMOP domains (Condition, Procedure, Drug, Measurement, Observation,
   Device, Visit) and appends one domain at a time. The domain→table/field map is
   defined inline in that function.
-- **SQL:** `inst/sql/{sql_server,bigquery}/appendToStratrifiedCodeCountsTable.sql`
+- **SQL:** `inst/sql/sql_server/appendToStratrifiedCodeCountsTable.sql`
   joins each domain table to `person` and `observation_period`, derives the
   strata, and `GROUP BY`s to counts. Events are kept even when the standard
   concept is unmapped (`concept_id = 0`) as long as the source concept is known.
@@ -159,7 +159,7 @@ count — one row per distinct `concept_id × stratum × person_id`:
 
 `createStratifiedPersonsTable()` (`R/createStratifiedPersonsTable.R`) mirrors
 `createStratifiedCodeCountsTable()` — same domain loop, same per-domain SQL
-templates (`inst/sql/{sql_server,bigquery}/appendToStratifiedPersonsTable.sql`),
+templates (`inst/sql/sql_server/appendToStratifiedPersonsTable.sql`),
 just `SELECT DISTINCT` instead of `COUNT`/`GROUP BY`. `COUNT(DISTINCT person_id)`
 over this table is exact on every backend (unlike a sketch, it works the same
 on SQLite and BigQuery) and is what `code_counts` (§2c), `getPersonCountsFilters()`
@@ -188,14 +188,14 @@ histogram's bin breaks depend on which concepts are actually queried (a
 descendant-expanded token pools an arbitrary ancestor's descendants), which is
 only known at request time — so binning cannot be precomputed per concept.
 
-Unlike the other two templates there is no `inst/sql/bigquery/` override; the
-`sql_server` template translates cleanly, and the loader falls back to it.
+Like every other template, it exists only in `inst/sql/sql_server/` and
+`SqlRender` translates it.
 
 ### 2c · `code_counts` — how the stratified tables are rolled up
 
 `code_counts` is derived **from** `stratified_code_counts` and
 `stratified_persons` (it never touches the raw CDM again), inside
-`inst/sql/{sql_server,bigquery}/createCodeCountsTable.sql`:
+`inst/sql/sql_server/createCodeCountsTable.sql`:
 
 1. **Collapse strata → atomic per-concept counts.** Sum `record_counts` (and,
    from the person bridge, take distinct persons) across all strata for each
