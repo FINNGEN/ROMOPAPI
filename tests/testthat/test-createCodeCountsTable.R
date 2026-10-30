@@ -637,7 +637,8 @@ test_that("stratified table keeps source concepts with no standard concept (conc
   cdmDatabaseSchema <- "main"
   resultsDatabaseSchema <- "main"
 
-  # - Minimal OMOP fixtures: one mapped event and one unmapped-source event
+  # - Minimal OMOP fixtures: one mapped event, one unmapped-standard event with a known
+  #   source, and one standard event with no source concept (source = 0)
   DatabaseConnector::insertTable(
     connection,
     tableName = "person",
@@ -658,11 +659,11 @@ test_that("stratified table keeps source concepts with no standard concept (conc
     connection,
     tableName = "condition_occurrence",
     data = tibble::tibble(
-      person_id = c(1L, 1L),
-      condition_concept_id = c(320128L, 0L), # second row is unmapped
-      condition_source_concept_id = c(44831230L, 2000999L), # source known in both
-      condition_start_date = c("2010-05-01", "2011-06-01"),
-      visit_occurrence_id = c(NA_integer_, NA_integer_)
+      person_id = c(1L, 1L, 1L),
+      condition_concept_id = c(320128L, 0L, 320129L), # second row is unmapped
+      condition_source_concept_id = c(44831230L, 2000999L, 0L), # third has no source
+      condition_start_date = c("2010-05-01", "2011-06-01", "2012-07-01"),
+      visit_occurrence_id = c(NA_integer_, NA_integer_, NA_integer_)
     ),
     dropTableIfExists = TRUE, createTable = TRUE, tempTable = FALSE
   )
@@ -670,7 +671,7 @@ test_that("stratified table keeps source concepts with no standard concept (conc
   DatabaseConnector::insertTable(
     connection,
     tableName = "concept",
-    data = tibble::tibble(concept_id = c(320128L, 44831230L, 2000999L, 0L)),
+    data = tibble::tibble(concept_id = c(320128L, 320129L, 44831230L, 2000999L, 0L)),
     dropTableIfExists = TRUE, createTable = TRUE, tempTable = FALSE
   )
   DatabaseConnector::executeSql(
@@ -749,6 +750,11 @@ test_that("stratified table keeps source concepts with no standard concept (conc
     dplyr::filter(concept_id == 320128) |>
     nrow() |>
     expect_equal(1)
+  # the event with no source concept is kept too (this is what used to leak a concept 0)
+  stratified |>
+    dplyr::filter(concept_id == 320129 & maps_to_concept_id == 0) |>
+    nrow() |>
+    expect_equal(1)
 
   # - Build the stratified_persons bridge table exactly as createStratifiedPersonsTable does
   stratifiedPersonsTable <- "stratified_persons_test_nomesco"
@@ -819,8 +825,10 @@ test_that("stratified table keeps source concepts with no standard concept (conc
 
   # source concept is counted
   expect_true(2000999 %in% codeCounts$concept_id)
-  # mapped standard concept is still counted
+  # mapped standard concepts are still counted, including the one without a source concept
   expect_true(320128 %in% codeCounts$concept_id)
-  # unmapped events are not lumped into a phantom concept_id = 0
+  expect_true(320129 %in% codeCounts$concept_id)
+  # neither unmapped events nor events without a source concept (maps_to = 0) are lumped
+  # into a phantom catch-all concept_id = 0
   expect_false(0 %in% codeCounts$concept_id)
 })

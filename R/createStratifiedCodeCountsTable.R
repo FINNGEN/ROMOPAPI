@@ -77,8 +77,7 @@ createStratifiedCodeCountsTable <- function(
     #
 
     # - Create code counts table for each domain
-    sqlDialectFolder <- if (connection@dbms == "bigquery") "bigquery" else "sql_server"
-    sqlPath <- system.file("sql", sqlDialectFolder, "appendToStratrifiedCodeCountsTable.sql", package = "ROMOPAPI")
+    sqlPath <- system.file("sql", "sql_server", "appendToStratrifiedCodeCountsTable.sql", package = "ROMOPAPI")
     baseSql <- SqlRender::readSql(sqlPath)
 
     sql <- "DROP TABLE IF EXISTS @resultsDatabaseSchema.@stratifiedCodeCountsTable;
