@@ -72,8 +72,9 @@ getConceptRelationships <- function(
             dplyr::rename(maps_to_concept_id = concept_id, concept_id = maps_to_concept_id) |>
             dplyr::mutate(levels = "Maps to")
     ) |>
-    # If concept maps to itself, bcs concept in concept and source concept columns, dont take it
-    dplyr::filter(concept_id != maps_to_concept_id)
+    # If concept maps to itself, bcs concept in concept and source concept columns, dont take it.
+    # 0 means "no standard concept" / "no source concept", not a concept to link to.
+    dplyr::filter(concept_id != maps_to_concept_id, concept_id != 0, maps_to_concept_id != 0)
 
     familyTreeWithMappings <- dplyr::bind_rows(
         familyTreeWithInfo,
