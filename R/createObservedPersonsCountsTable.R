@@ -43,10 +43,9 @@ createObservedPersonsCountsTable <- function(
     #
     # FUNCTION
     #
-    sqlDialectFolder <- if (connection@dbms == "bigquery") "bigquery" else "sql_server"
     sqlPath <- system.file(
         "sql",
-        sqlDialectFolder,
+        "sql_server",
         "createObservedPersonsCountsTable.sql",
         package = "ROMOPAPI"
     )

@@ -72,16 +72,7 @@ createStratifiedMeasurementsTable <- function(
     # FUNCTION
     #
 
-    # The sql_server template is canonical and SqlRender translates it cleanly for every
-    # backend here (verified for the window functions, FLOOR and CAST this query uses), so
-    # no bigquery override is shipped. Prefer one if it ever appears, per CLAUDE.md.
-    sqlPath <- ""
-    if (connection@dbms == "bigquery") {
-        sqlPath <- system.file("sql", "bigquery", "appendToStratifiedMeasurementsTable.sql", package = "ROMOPAPI")
-    }
-    if (!nzchar(sqlPath)) {
-        sqlPath <- system.file("sql", "sql_server", "appendToStratifiedMeasurementsTable.sql", package = "ROMOPAPI")
-    }
+    sqlPath <- system.file("sql", "sql_server", "appendToStratifiedMeasurementsTable.sql", package = "ROMOPAPI")
     baseSql <- SqlRender::readSql(sqlPath)
 
     sql <- "DROP TABLE IF EXISTS @resultsDatabaseSchema.@stratifiedMeasurementsTable;

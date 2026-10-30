@@ -67,8 +67,7 @@ createStratifiedPersonsTable <- function(
     #
 
     # - Create stratified persons table for each domain
-    sqlDialectFolder <- if (connection@dbms == "bigquery") "bigquery" else "sql_server"
-    sqlPath <- system.file("sql", sqlDialectFolder, "appendToStratifiedPersonsTable.sql", package = "ROMOPAPI")
+    sqlPath <- system.file("sql", "sql_server", "appendToStratifiedPersonsTable.sql", package = "ROMOPAPI")
     baseSql <- SqlRender::readSql(sqlPath)
 
     sql <- "DROP TABLE IF EXISTS @resultsDatabaseSchema.@stratifiedPersonsTable;
