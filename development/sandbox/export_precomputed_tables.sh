@@ -7,9 +7,10 @@ usage() {
   cat <<EOF
 Usage: $0 [--dry-run] <project.dataset> <gcs_output_path>
 
-Export the three ROMOPAPI precomputed counts tables (stratified_code_counts,
-stratified_persons, code_counts) from BigQuery straight to Google Cloud
-Storage: one folder per table under gcs_output_path, each containing the
+Export the four ROMOPAPI precomputed counts tables (stratified_code_counts,
+stratified_persons, code_counts, observed_persons_counts_stratified) from
+BigQuery straight to Google Cloud Storage: one folder per table under
+gcs_output_path, each containing the
 table data as CSV shard(s) (empty string for NULL cells) and the table
 schema as schema.json. Uses \`bq extract\` (a server-side BigQuery job)
 rather than \`bq query\`, so it stays fast even on large production tables
@@ -63,7 +64,7 @@ esac
 PROJECT="${PROJECT_DATASET%%.*}"
 DATASET="${PROJECT_DATASET#*.}"
 
-TABLES=("stratified_code_counts" "stratified_persons" "code_counts")
+TABLES=("stratified_code_counts" "stratified_persons" "code_counts" "observed_persons_counts_stratified")
 
 if [ "${DRY_RUN}" = true ]; then
   for TABLE in "${TABLES[@]}"; do

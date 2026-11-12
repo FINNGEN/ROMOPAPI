@@ -50,7 +50,9 @@ temp_concept_ancestor AS (
             maps_to_concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile, record_counts
         FROM @resultsDatabaseSchema.@stratifiedCodeCountsTable
         -- do not take if maps_to_concept_id is a standard concept
+        -- nor if there is no source concept (0), which would add a catch-all concept 0 row
         WHERE concept_id != maps_to_concept_id
+          AND maps_to_concept_id != 0
      )
      GROUP BY
          maps_to_concept_id
@@ -73,7 +75,9 @@ atomic_person_bridge AS (
         person_id AS person_id
     FROM @resultsDatabaseSchema.@stratifiedPersonsTable
     -- do not take if maps_to_concept_id is a standard concept
+    -- nor if there is no source concept (0), which would add a catch-all concept 0 row
     WHERE concept_id != maps_to_concept_id
+      AND maps_to_concept_id != 0
 ),
 
 -- distinct persons per concept, own events only

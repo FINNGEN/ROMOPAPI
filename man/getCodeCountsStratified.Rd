@@ -4,7 +4,11 @@
 \alias{getCodeCountsStratified}
 \title{Get per-stratum code counts for a concept tree}
 \usage{
-getCodeCountsStratified(CDMdbHandler, conceptId, codeCountsTable = "code_counts")
+getCodeCountsStratified(
+  CDMdbHandler,
+  conceptId,
+  codeCountsTable = "code_counts"
+)
 }
 \arguments{
 \item{CDMdbHandler}{A CDMdbHandler object that contains database connection details}

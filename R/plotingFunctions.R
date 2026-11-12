@@ -537,6 +537,106 @@ createUpsetPlotFromPersonCounts <- function(upsetPersonCounts, concepts = NULL) 
   plotly::subplot(barPlot, matrixPlot, nrows = 2, shareX = TRUE, heights = c(0.6, 0.4))
 }
 
+#' Create a clustered dot chart of per-year prevalence
+#'
+#' @description
+#' Renders \code{\link{getPersonCountsPrevalence}}'s output as a clustered dot chart:
+#' one point per tagged concept set per calendar year, at that year's prevalence
+#' (`person_counts / observed_persons_counts * 100`), coloured by tagged concept set.
+#'
+#' @param prevalencePersonCounts The tibble from \code{\link{getPersonCountsPrevalence}}
+#'   (columns `tagged_concept_id`, `calendar_year`, `person_counts`, `observed_persons_counts`)
+#' @param concepts Optional tibble with `concept_id`/`concept_name` (e.g.
+#'   \code{\link{getConceptRelationships}}'s `concepts`) used to label the sets. NULL (default)
+#'   labels by the raw tagged token.
+#'
+#' @return A plotly object
+#' @importFrom dplyr mutate left_join select coalesce
+#' @importFrom stringr str_extract
+#' @importFrom plotly plot_ly layout
+#' @export
+#'
+createPrevalencePlotFromPersonCounts <- function(prevalencePersonCounts, concepts = NULL) {
+  data <- prevalencePersonCounts |>
+    dplyr::mutate(
+      prevalence = person_counts / observed_persons_counts * 100,
+      concept_id = as.integer(stringr::str_extract(tagged_concept_id, "^[0-9]+"))
+    )
+
+  if (!is.null(concepts)) {
+    data <- data |>
+      dplyr::left_join(dplyr::select(concepts, concept_id, concept_name), by = "concept_id") |>
+      dplyr::mutate(set_label = paste0(dplyr::coalesce(concept_name, paste0("Concept ", concept_id)), " (", tagged_concept_id, ")"))
+  } else {
+    data <- data |>
+      dplyr::mutate(set_label = tagged_concept_id)
+  }
+
+  plotly::plot_ly(
+    data,
+    x = ~calendar_year, y = ~prevalence, color = ~set_label,
+    type = "scatter", mode = "markers+lines",
+    text = ~ paste0(set_label, "<br>", calendar_year, ": ", person_counts, " / ", observed_persons_counts),
+    hoverinfo = "text"
+  ) |>
+    plotly::layout(
+      xaxis = list(title = "Calendar year"),
+      yaxis = list(title = "Prevalence (%)"),
+      legend = list(title = list(text = "Concept"))
+    )
+}
+
+#' Create a clustered dot chart of per-year incidence
+#'
+#' @description
+#' Renders \code{\link{getPersonCountsIncidence}}'s output as a clustered dot chart:
+#' one point per tagged concept set per calendar year, at that year's incidence
+#' (`person_counts / observed_persons_counts * 100`), coloured by tagged concept set.
+#' Same layout as \code{\link{createPrevalencePlotFromPersonCounts}}; `person_counts` here
+#' counts each person once, in the year of their first-ever record of that set.
+#'
+#' @param incidencePersonCounts The tibble from \code{\link{getPersonCountsIncidence}}
+#'   (columns `tagged_concept_id`, `calendar_year`, `person_counts`, `observed_persons_counts`)
+#' @param concepts Optional tibble with `concept_id`/`concept_name` (e.g.
+#'   \code{\link{getConceptRelationships}}'s `concepts`) used to label the sets. NULL (default)
+#'   labels by the raw tagged token.
+#'
+#' @return A plotly object
+#' @importFrom dplyr mutate left_join select coalesce
+#' @importFrom stringr str_extract
+#' @importFrom plotly plot_ly layout
+#' @export
+#'
+createIncidencePlotFromPersonCounts <- function(incidencePersonCounts, concepts = NULL) {
+  data <- incidencePersonCounts |>
+    dplyr::mutate(
+      incidence = person_counts / observed_persons_counts * 100,
+      concept_id = as.integer(stringr::str_extract(tagged_concept_id, "^[0-9]+"))
+    )
+
+  if (!is.null(concepts)) {
+    data <- data |>
+      dplyr::left_join(dplyr::select(concepts, concept_id, concept_name), by = "concept_id") |>
+      dplyr::mutate(set_label = paste0(dplyr::coalesce(concept_name, paste0("Concept ", concept_id)), " (", tagged_concept_id, ")"))
+  } else {
+    data <- data |>
+      dplyr::mutate(set_label = tagged_concept_id)
+  }
+
+  plotly::plot_ly(
+    data,
+    x = ~calendar_year, y = ~incidence, color = ~set_label,
+    type = "scatter", mode = "markers+lines",
+    text = ~ paste0(set_label, "<br>", calendar_year, ": ", person_counts, " / ", observed_persons_counts),
+    hoverinfo = "text"
+  ) |>
+    plotly::layout(
+      xaxis = list(title = "Calendar year"),
+      yaxis = list(title = "Incidence (%)"),
+      legend = list(title = list(text = "Concept"))
+    )
+}
+
 #' Prune levels from results
 #'
 #' @param results A list of results from getConceptRelationships and getCodeCountsStratified
@@ -586,4 +686,62 @@ pruneLevelsFromResults <- function(results, pruneLevels, pruneClass = NULL) {
   return(list(concept_relationships = concept_relationships, stratified_code_counts = stratified_code_counts, concepts = concepts))
 
 
+}
+#' Create a bar chart of measured values from a measurement histogram
+#'
+#' @description
+#' Renders \code{\link{getMeasurementValueHistogram}}'s output as a stacked bar chart, one
+#' facet per unit (a descendant-expanded concept recorded in several units yields one
+#' histogram per unit, and their scales are not comparable).
+#'
+#' Within a unit the bars are **stacked by `tagged_conceptid`**: a bin's full height is every
+#' event in that bin, split into one coloured segment per requested concept set. The getter
+#' pools the bin breaks across all sets sharing a unit precisely so this stacking is
+#' meaningful -- every set of one unit carries the same bucket labels.
+#'
+#' Buckets are kept in the order the getter returned them — ascending value, with the
+#' underflow `(-Inf, x]` and overflow `(x, +Inf]` bins first and last — rather than sorted
+#' as text, which would scatter negative and multi-digit labels.
+#'
+#' @param measurementHistogram The tibble from \code{\link{getMeasurementValueHistogram}}
+#'   (columns `tagged_conceptid`, `measured_value_bucket`, `unit`, `n_events`).
+#'
+#' @return A plotly object, or NULL when the histogram is empty
+#'
+#' @importFrom dplyr mutate coalesce arrange distinct pull
+#' @importFrom ggplot2 ggplot aes geom_col theme_minimal theme element_text labs facet_wrap vars
+#' @importFrom plotly ggplotly
+#' @export
+#'
+createMeasurementHistogramPlot <- function(measurementHistogram) {
+  if (is.null(measurementHistogram) || nrow(measurementHistogram) == 0) {
+    return(NULL)
+  }
+
+  # the getter already returns buckets in ascending value order; lock that in so ggplot
+  # does not re-sort the labels alphabetically (which scatters negatives and -Inf/+Inf)
+  bucketLevels <- measurementHistogram |>
+    dplyr::distinct(measured_value_bucket) |>
+    dplyr::pull(measured_value_bucket)
+
+  data <- measurementHistogram |>
+    dplyr::mutate(
+      unit = dplyr::coalesce(unit, "(no unit)"),
+      measured_value_bucket = factor(measured_value_bucket, levels = bucketLevels)
+    )
+
+  plot <- ggplot2::ggplot(
+    data,
+    ggplot2::aes(x = measured_value_bucket, y = n_events, fill = tagged_conceptid)
+  ) +
+    ggplot2::geom_col() +
+    ggplot2::facet_wrap(ggplot2::vars(unit), scales = "free", ncol = 1) +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 90, hjust = 1, size = 6),
+      legend.title = ggplot2::element_blank()
+    ) +
+    ggplot2::labs(x = "Measured value", y = "Events", title = "Measured values")
+
+  plotly::ggplotly(plot)
 }

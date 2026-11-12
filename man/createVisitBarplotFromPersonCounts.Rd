@@ -7,11 +7,11 @@
 createVisitBarplotFromPersonCounts(filterPersonCounts, visitTypeNames = NULL)
 }
 \arguments{
-\item{filterPersonCounts}{The `filter_person_counts` tibble from \code{\link{getPersonCountsFilters}}}
+\item{filterPersonCounts}{The \code{filter_person_counts} tibble from \code{\link{getPersonCountsFilters}}}
 
 \item{visitTypeNames}{Optional tibble from \code{\link{getVisitTypeNames}} (columns
-`visit_group_concept_id`, `concept_name`) used to label the groups. NULL (default)
-labels by the raw `visit_group_concept_id`.}
+\code{visit_group_concept_id}, \code{concept_name}) used to label the groups. NULL (default)
+labels by the raw \code{visit_group_concept_id}.}
 }
 \value{
 A plotly object

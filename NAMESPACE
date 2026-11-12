@@ -8,11 +8,16 @@ export(connectionHandlerFromList)
 export(createAgeHistogramFromPersonCounts)
 export(createCodeCountsTableFromResults)
 export(createCodeCountsTables)
+export(createIncidencePlotFromPersonCounts)
+export(createMeasurementHistogramPlot)
 export(createMermaidGraphFromResults)
+export(createObservedPersonsCountsTable)
 export(createPlotFromResults)
+export(createPrevalencePlotFromPersonCounts)
 export(createReport)
 export(createSexPieChartFromPersonCounts)
 export(createStratifiedCodeCountsTable)
+export(createStratifiedMeasurementsTable)
 export(createStratifiedPersonsTable)
 export(createUpsetPlotFromPersonCounts)
 export(createVisitBarplotFromPersonCounts)
@@ -28,8 +33,16 @@ export(getConceptRelationships_memoise)
 export(getConceptTree)
 export(getConceptTree_memoise)
 export(getLogs)
+export(getMeasurementValueHistogram)
+export(getMeasurementValueHistogram_memoise)
 export(getPersonCountsFilters)
 export(getPersonCountsFilters_memoise)
+export(getPersonCountsIncidence)
+export(getPersonCountsIncidenceFilters)
+export(getPersonCountsIncidenceFilters_memoise)
+export(getPersonCountsIncidence_memoise)
+export(getPersonCountsPrevalence)
+export(getPersonCountsPrevalence_memoise)
 export(getPersonCountsUpset)
 export(getPersonCountsUpset_memoise)
 export(getVisitTypeNames)
@@ -61,6 +74,7 @@ importFrom(SqlRender,
 importFrom(checkmate,
   assertCharacter,
   assertClass,
+  assertCount,
   assertDataFrame,
   assertIntegerish,
   assertList,
@@ -91,6 +105,7 @@ importFrom(dplyr,
   n,
   pull,
   rename,
+  row_number,
   rowwise,
   select,
   semi_join,
@@ -100,6 +115,7 @@ importFrom(dplyr,
 importFrom(ggplot2,
   aes,
   element_text,
+  facet_wrap,
   geom_area,
   geom_col,
   geom_line,
@@ -107,7 +123,8 @@ importFrom(ggplot2,
   labs,
   scale_fill_manual,
   theme,
-  theme_minimal
+  theme_minimal,
+  vars
 )
 importFrom(memoise,memoise)
 importFrom(plotly,
@@ -148,7 +165,9 @@ importFrom(tibble,
   tribble
 )
 importFrom(tidyr,
+  expand_grid,
   nest,
+  replace_na,
   unnest
 )
 importFrom(utils,download.file)

@@ -110,14 +110,8 @@ getPersonCountsUpset <- function(
     return(upsetPersonCounts)
 }
 
-# Builds " AND @column IN (v1,v2,...)", or "" when values is NULL/empty.
-# values are always integer ids validated by checkmate upstream — safe to splice.
-.inFilterSql <- function(column, values) {
-    if (is.null(values) || length(values) == 0) {
-        return("")
-    }
-    paste0(" AND ", column, " IN (", paste(as.integer(values), collapse = ","), ")")
-}
+# .inFilterSql()/.betweenFilterSql() live in R/sqlFilterHelpers.R (shared with
+# getPersonCountsFilters() and getMeasurementValueHistogram()).
 
 #' Memoised version of getPersonCountsUpset
 #'

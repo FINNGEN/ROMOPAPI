@@ -62,7 +62,9 @@ getCodeCountsStratified <- function(
         tibble::as_tibble()
 
     # Standard-concept aggregation across maps_to_concept_id.
+    # concept_id = 0 rows (unmapped standard concept) only belong to their source concept below.
     codeCountsStandard <- codeCounts |>
+        dplyr::filter(concept_id != 0) |>
         dplyr::select(-maps_to_concept_id) |>
         dplyr::group_by(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile) |>
         dplyr::summarise(
@@ -75,7 +77,9 @@ getCodeCountsStratified <- function(
     codeCountsPerId <- dplyr::bind_rows(
         codeCountsStandard,
         # source concepts, remove duplicates
+        # maps_to_concept_id = 0 means the event has no source concept, so it is no source row
         codeCounts |>
+            dplyr::filter(maps_to_concept_id != 0) |>
             dplyr::select(-concept_id) |>
             dplyr::rename(concept_id = maps_to_concept_id) |>
             dplyr::distinct(concept_id, visit_group_concept_id, calendar_year, gender_concept_id, age_decile, record_counts)

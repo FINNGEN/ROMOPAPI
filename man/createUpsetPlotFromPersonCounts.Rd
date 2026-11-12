@@ -7,11 +7,11 @@
 createUpsetPlotFromPersonCounts(upsetPersonCounts, concepts = NULL)
 }
 \arguments{
-\item{upsetPersonCounts}{The `upset_person_counts` tibble from \code{\link{getPersonCountsUpset}}
-(columns `group`, `person_counts`)}
+\item{upsetPersonCounts}{The \code{upset_person_counts} tibble from \code{\link{getPersonCountsUpset}}
+(columns \code{group}, \code{person_counts})}
 
-\item{concepts}{Optional tibble with `concept_id`/`concept_name` (e.g.
-\code{\link{getConceptRelationships}}'s `concepts`) used to label the sets. NULL (default)
+\item{concepts}{Optional tibble with \code{concept_id}/\code{concept_name} (e.g.
+\code{\link{getConceptRelationships}}'s \code{concepts}) used to label the sets. NULL (default)
 labels by the raw concept ID.}
 }
 \value{
@@ -19,7 +19,7 @@ A plotly object
 }
 \description{
 Renders the exact exclusive-region person counts from
-\code{\link{getPersonCountsUpset}}'s `upset_person_counts` as a bar chart of region sizes
+\code{\link{getPersonCountsUpset}}'s \code{upset_person_counts} as a bar chart of region sizes
 (top) stacked on a set-membership matrix (bottom), sharing the region ordering on the
 x-axis — the standard UpSet plot layout.
 }

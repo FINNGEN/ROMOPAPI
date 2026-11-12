@@ -284,33 +284,94 @@ test_that("createStratifiedCodeCountsTable works with visit_source_group_concept
     (\(x) expect_false(all(x %in% visitSourceGroupConceptIds)))()
 })
 
-# test_that("createObservationCountsTable works", {
-#   CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
-#   withr::defer({
-#     CDMdbHandler <- NULL
-#     gc()
-#   })
+test_that("createObservedPersonsCountsTable works", {
+  # counts-creation test: needs a raw OMOP CDM
+  skip_if_not(testingDatabase %in% creationDatabases)
 
-#   connection <- CDMdbHandler$connectionHandler$getConnection()
-#   cdmDatabaseSchema <- CDMdbHandler$cdmDatabaseSchema
-#   resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(
+    test_cohortTableHandlerConfig,
+    loadConnectionChecksLevel = "basicChecks"
+  )
+  withr::defer({
+    CDMdbHandler <- NULL
+    gc()
+  })
 
-#   sqlPath <- system.file("sql", "sql_server", "createObservationCountsTable.sql", package = "ROMOPAPI")
-#   sql <- SqlRender::readSql(sqlPath)
-#   sql <- SqlRender::render(sql,
-#     cdmDatabaseSchema = cdmDatabaseSchema,
-#     resultsDatabaseSchema = resultsDatabaseSchema
-#   )
-#   sql <- SqlRender::translate(sql, targetDialect = connection@dbms)
+  resultsDatabaseSchema <- CDMdbHandler$resultsDatabaseSchema
+  stratifiedCodeCountsTable <- "stratified_code_counts_test1"
+  observedPersonsCountsTable <- "observed_persons_counts_test1"
+  withr::defer({
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ", resultsDatabaseSchema, ".", stratifiedCodeCountsTable
+    ))
+    CDMdbHandler$connectionHandler$executeSql(paste0(
+      "DROP TABLE ", resultsDatabaseSchema, ".", observedPersonsCountsTable
+    ))
+  })
 
-#   DatabaseConnector::executeSql(connection, sql)
+  # observedPersonsCountsTable reads its year range from stratifiedCodeCountsTable
+  createStratifiedCodeCountsTable(
+    CDMdbHandler,
+    stratifiedCodeCountsTable = stratifiedCodeCountsTable
+  )
+  createObservedPersonsCountsTable(
+    CDMdbHandler,
+    observedPersonsCountsTable = observedPersonsCountsTable,
+    stratifiedCodeCountsTable = stratifiedCodeCountsTable
+  )
 
-#   observation_counts <- CDMdbHandler$connectionHandler$tbl(paste0(resultsDatabaseSchema, ".observation_counts"))
-#   observation_counts |>
-#     dplyr::count() |>
-#     dplyr::pull(n) |>
-#     expect_gt(0)
-# })
+  observedPersonsCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    resultsDatabaseSchema, ".", observedPersonsCountsTable
+  )))
+
+  observedPersonsCounts |>
+    head() |>
+    dplyr::collect() |>
+    colnames() |>
+    expect_equal(c(
+      "calendar_year",
+      "gender_concept_id",
+      "age_decile",
+      "observed_persons_counts"
+    ))
+
+  observedPersonsCounts |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_gt(0)
+
+  # every stratum has at least one observed person
+  observedPersonsCounts |>
+    dplyr::filter(observed_persons_counts < 1) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  observedPersonsCounts |>
+    dplyr::filter(is.na(calendar_year)) |>
+    dplyr::count() |>
+    dplyr::pull(n) |>
+    expect_equal(0)
+
+  # the set of years covered matches exactly the years in stratified_code_counts
+  stratifiedCodeCounts <- CDMdbHandler$connectionHandler$tbl(I(paste0(
+    resultsDatabaseSchema, ".", stratifiedCodeCountsTable
+  )))
+
+  observedYears <- observedPersonsCounts |>
+    dplyr::distinct(calendar_year) |>
+    dplyr::collect() |>
+    dplyr::pull(calendar_year) |>
+    sort()
+
+  stratifiedYears <- stratifiedCodeCounts |>
+    dplyr::distinct(calendar_year) |>
+    dplyr::collect() |>
+    dplyr::pull(calendar_year) |>
+    sort()
+
+  observedYears |> expect_equal(stratifiedYears)
+})
 
 test_that("createCodeCountsTables works", {
   # counts-creation test: needs a raw OMOP CDM
@@ -576,7 +637,8 @@ test_that("stratified table keeps source concepts with no standard concept (conc
   cdmDatabaseSchema <- "main"
   resultsDatabaseSchema <- "main"
 
-  # - Minimal OMOP fixtures: one mapped event and one unmapped-source event
+  # - Minimal OMOP fixtures: one mapped event, one unmapped-standard event with a known
+  #   source, and one standard event with no source concept (source = 0)
   DatabaseConnector::insertTable(
     connection,
     tableName = "person",
@@ -597,11 +659,11 @@ test_that("stratified table keeps source concepts with no standard concept (conc
     connection,
     tableName = "condition_occurrence",
     data = tibble::tibble(
-      person_id = c(1L, 1L),
-      condition_concept_id = c(320128L, 0L), # second row is unmapped
-      condition_source_concept_id = c(44831230L, 2000999L), # source known in both
-      condition_start_date = c("2010-05-01", "2011-06-01"),
-      visit_occurrence_id = c(NA_integer_, NA_integer_)
+      person_id = c(1L, 1L, 1L),
+      condition_concept_id = c(320128L, 0L, 320129L), # second row is unmapped
+      condition_source_concept_id = c(44831230L, 2000999L, 0L), # third has no source
+      condition_start_date = c("2010-05-01", "2011-06-01", "2012-07-01"),
+      visit_occurrence_id = c(NA_integer_, NA_integer_, NA_integer_)
     ),
     dropTableIfExists = TRUE, createTable = TRUE, tempTable = FALSE
   )
@@ -609,7 +671,7 @@ test_that("stratified table keeps source concepts with no standard concept (conc
   DatabaseConnector::insertTable(
     connection,
     tableName = "concept",
-    data = tibble::tibble(concept_id = c(320128L, 44831230L, 2000999L, 0L)),
+    data = tibble::tibble(concept_id = c(320128L, 320129L, 44831230L, 2000999L, 0L)),
     dropTableIfExists = TRUE, createTable = TRUE, tempTable = FALSE
   )
   DatabaseConnector::executeSql(
@@ -688,6 +750,11 @@ test_that("stratified table keeps source concepts with no standard concept (conc
     dplyr::filter(concept_id == 320128) |>
     nrow() |>
     expect_equal(1)
+  # the event with no source concept is kept too (this is what used to leak a concept 0)
+  stratified |>
+    dplyr::filter(concept_id == 320129 & maps_to_concept_id == 0) |>
+    nrow() |>
+    expect_equal(1)
 
   # - Build the stratified_persons bridge table exactly as createStratifiedPersonsTable does
   stratifiedPersonsTable <- "stratified_persons_test_nomesco"
@@ -758,8 +825,10 @@ test_that("stratified table keeps source concepts with no standard concept (conc
 
   # source concept is counted
   expect_true(2000999 %in% codeCounts$concept_id)
-  # mapped standard concept is still counted
+  # mapped standard concepts are still counted, including the one without a source concept
   expect_true(320128 %in% codeCounts$concept_id)
-  # unmapped events are not lumped into a phantom concept_id = 0
+  expect_true(320129 %in% codeCounts$concept_id)
+  # neither unmapped events nor events without a source concept (maps_to = 0) are lumped
+  # into a phantom catch-all concept_id = 0
   expect_false(0 %in% codeCounts$concept_id)
 })

@@ -142,14 +142,8 @@ getPersonCountsFilters <- function(
     return(filterPersonCounts)
 }
 
-# Builds " AND @column BETWEEN v1 AND v2", or "" when range is NULL/empty.
-# range is always a length-2 integer vector validated by checkmate upstream — safe to splice.
-.betweenFilterSql <- function(column, range) {
-    if (is.null(range) || length(range) == 0) {
-        return("")
-    }
-    paste0(" AND ", column, " BETWEEN ", as.integer(range[1]), " AND ", as.integer(range[2]))
-}
+# .inFilterSql()/.betweenFilterSql() live in R/sqlFilterHelpers.R (shared with
+# getPersonCountsUpset() and getMeasurementValueHistogram()).
 
 #' Memoised version of getPersonCountsFilters
 #'

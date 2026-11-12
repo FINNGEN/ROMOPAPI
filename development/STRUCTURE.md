@@ -22,6 +22,7 @@ flowchart LR
     subgraph build [1 · BUILD  — precompute]
         S[stratified_code_counts]
         P[stratified_persons]
+        O[observed_persons_counts_stratified]
         C[code_counts]
         S --> C
         P --> C
@@ -37,6 +38,7 @@ flowchart LR
     VOCAB -->|createCodeCountsTables| build
     build -->|read at request time| G
     P -->|exact set overlaps<br/>at request time| G
+    O -->|prevalence denominator<br/>at request time| G
     VOCAB -->|concept names, hierarchy,<br/>metadata at request time| G
     E -->|JSON / HTML report| Client[Client]
 ```
@@ -104,16 +106,17 @@ that owns the connection and knows where the tables live.
   (`javier-gracia-tabuenca-tuni/DatabaseConnector@bigquery-DBI-2`) that adds
   BigQuery DBI support — intentional, see AGENTS.md → *Dependencies*.
 - **`SqlRender`** renders `@param` placeholders and translates SQL Server → target
-  dialect at runtime. The dialect folder (`inst/sql/sql_server` vs
-  `inst/sql/bigquery`) is chosen from `connection@dbms`.
+  dialect at runtime. All templates live in `inst/sql/sql_server/`; there are no
+  per-dialect copies.
 
 ---
 
 ## 2 · Precompute: the counts tables
 
-The build phase produces **three** tables in the results schema, in order. The
-first two are fine-grained (one stratified by event, one by person); the third
-rolls both up along the concept hierarchy. Entry point: `createCodeCountsTables()`
+The build phase produces **four** tables in the results schema, in order. The
+first three are fine-grained (one stratified by event, one by person, one the
+population-at-risk denominator); the fourth rolls the first two up along the
+concept hierarchy. Entry point: `createCodeCountsTables()`
 (`R/createCodeCountsTables.R`), called by `runApiServer(buildCountsTable = TRUE)`.
 
 ### 2a · `stratified_code_counts`
@@ -133,7 +136,7 @@ One row per unique combination of stratification keys, for every domain:
   over the OMOP domains (Condition, Procedure, Drug, Measurement, Observation,
   Device, Visit) and appends one domain at a time. The domain→table/field map is
   defined inline in that function.
-- **SQL:** `inst/sql/{sql_server,bigquery}/appendToStratrifiedCodeCountsTable.sql`
+- **SQL:** `inst/sql/sql_server/appendToStratrifiedCodeCountsTable.sql`
   joins each domain table to `person` and `observation_period`, derives the
   strata, and `GROUP BY`s to counts. Events are kept even when the standard
   concept is unmapped (`concept_id = 0`) as long as the source concept is known.
@@ -156,7 +159,7 @@ count — one row per distinct `concept_id × stratum × person_id`:
 
 `createStratifiedPersonsTable()` (`R/createStratifiedPersonsTable.R`) mirrors
 `createStratifiedCodeCountsTable()` — same domain loop, same per-domain SQL
-templates (`inst/sql/{sql_server,bigquery}/appendToStratifiedPersonsTable.sql`),
+templates (`inst/sql/sql_server/appendToStratifiedPersonsTable.sql`),
 just `SELECT DISTINCT` instead of `COUNT`/`GROUP BY`. `COUNT(DISTINCT person_id)`
 over this table is exact on every backend (unlike a sketch, it works the same
 on SQLite and BigQuery) and is what `code_counts` (§2c), `getPersonCountsFilters()`
@@ -166,11 +169,33 @@ and `getPersonCountsUpset()` (§3) build on. See `.scratchpad/no_HLL_or_sketches
 intersect at all (HLL) or need to sample nearly the whole set to resolve the
 tiny bars an overlap plot cares about.
 
+### 2b-bis · `stratified_measurements` — event-level measured values
+
+Histograms of lab values need the value itself, which neither table above keeps.
+`createStratifiedMeasurementsTable()` (`R/createStratifiedMeasurementsTable.R`)
+writes one row **per measurement event that has a numeric `value_as_number`** —
+deliberately *not* de-duplicated, since a histogram counts events:
+
+| Column | Meaning |
+|--------|---------|
+| `concept_id`, `maps_to_concept_id`, `visit_group_concept_id`, `calendar_year`, `gender_concept_id`, `age_decile` | same grain/derivation as the two tables above |
+| `unit_concept_id` | unit the value was recorded in (`0` when absent) |
+| `value_as_number` | the measured value |
+
+Same domain-loop shape as its two siblings (`inst/sql/sql_server/appendToStratifiedMeasurementsTable.sql`),
+but Measurement-only. The value is stored **raw rather than pre-binned**: the
+histogram's bin breaks depend on which concepts are actually queried (a
+descendant-expanded token pools an arbitrary ancestor's descendants), which is
+only known at request time — so binning cannot be precomputed per concept.
+
+Like every other template, it exists only in `inst/sql/sql_server/` and
+`SqlRender` translates it.
+
 ### 2c · `code_counts` — how the stratified tables are rolled up
 
 `code_counts` is derived **from** `stratified_code_counts` and
 `stratified_persons` (it never touches the raw CDM again), inside
-`inst/sql/{sql_server,bigquery}/createCodeCountsTable.sql`:
+`inst/sql/sql_server/createCodeCountsTable.sql`:
 
 1. **Collapse strata → atomic per-concept counts.** Sum `record_counts` (and,
    from the person bridge, take distinct persons) across all strata for each
@@ -203,6 +228,35 @@ for the per-concept, per-stratum detail `/getCodeCountsStratified` and
 `/report` need, and `stratified_persons` backs the exact stratum breakdowns and
 set-overlap regions `/getPersonCountsFilters` and `/getPersonCountsUpset` need.
 
+### 2d · `observed_persons_counts_stratified` — the prevalence denominator
+
+A per-year prevalence needs a denominator — how many persons were even under
+observation that year — and that denominator must stay **exact** under
+filtering the same way the numerator does. Within one calendar year a person
+has exactly one `gender_concept_id` and exactly one `age_decile`, so
+`calendar_year × gender_concept_id × age_decile` is a **partition**: summing
+`observed_persons_counts` over any subset of sex/age/year cells is exact.
+`visit_group_concept_id` is **not** a partition — the same person can have both
+an inpatient and an outpatient visit in the same year — so this table carries
+no visit dimension at all; a visit-conditioned denominator would need a
+person-level table instead (orders of magnitude larger) to stay exact.
+
+| Column | Meaning |
+|--------|---------|
+| `calendar_year` | the year |
+| `gender_concept_id`, `age_decile` | demographic strata |
+| `observed_persons_counts` | distinct persons under observation in that stratum |
+
+`createObservedPersonsCountsTable()` (`R/createObservedPersonsCountsTable.R`)
+builds it from `person` joined to `observation_period`
+(`inst/sql/sql_server/createObservedPersonsCountsTable.sql`), **after**
+`stratified_code_counts` — the set of years it covers is read from that table
+(`SELECT DISTINCT calendar_year`), not independently computed, so the
+denominator never extends past the years the API can ever show. It is read by
+`getPersonCountsPrevalence()` (§3) as the denominator for per-year prevalence;
+`sexStratum`/`ageStratum`/`yearsRange` narrow it exactly, `visitStratum` does
+not (it narrows the numerator only).
+
 ---
 
 ## 3 · Data-extraction functions (getters)
@@ -221,6 +275,10 @@ from the cache key. The API calls the memoised versions.
 | `getCodeCountsStratified()` (`R/getCodeCountsStratified.R`) | `getConceptTree_memoise` (the tree) and `stratified_code_counts` (per-stratum counts for the concept, its descendants and mapped codes) | tibble |
 | `getPersonCountsFilters()` (`R/getPersonCountsFilters.R`) | `stratified_persons` (the exact person bridge), via `.parsePersonCountsConceptIds()`/`.resolveTaggedConceptIdSets()` (`R/parsePersonCountsConceptIds.R`) — sex/age/visit/year breakdowns for the pooled population of an explicit list of tagged concept sets | tibble |
 | `getPersonCountsUpset()` (`R/getPersonCountsUpset.R`) | `stratified_persons`, via the same tagged-concept-id helpers — exact set-overlap (UpSet) regions across an explicit list of tagged concept sets, over an optional `yearsRange` and the requested strata; per-concept `person_counts`/`descendant_person_counts` are read from `code_counts` via `getConceptRelationships()`'s `concepts` tibble instead of being duplicated here | tibble |
+| `getMeasurementValueHistogram()` (`R/getMeasurementValueHistogram.R`) | `stratified_measurements` ⨝ `concept` (unit codes), via the same tagged-concept-id helpers — a robust (median ± 7·MAD) histogram of measured values per tagged set and unit | tibble |
+| `getPersonCountsPrevalence()` (`R/getPersonCountsPrevalence.R`) | `stratified_persons` (numerator) and `observed_persons_counts_stratified` (denominator), via the same tagged-concept-id helpers — per-year distinct-person counts for each tagged concept set, alongside the matching population-at-risk; `visitStratum` narrows the numerator only | tibble |
+| `getPersonCountsIncidence()` (`R/getPersonCountsIncidence.R`) | Same tables as `getPersonCountsPrevalence()`, but the numerator is restricted to each person's absolute first-ever record of the token's id set (`.buildIncidentRowsSql()`, `R/parsePersonCountsConceptIds.R`) — per-year distinct **first-occurrence** person counts, alongside the same population-at-risk denominator | tibble |
+| `getPersonCountsIncidenceFilters()` (`R/getPersonCountsIncidenceFilters.R`) | Same as `getPersonCountsFilters()`, but pooling each set's first-occurrence rows (`.buildIncidentRowsSql()`) instead of every raw occurrence — sex/age/visit/year breakdown of the pooled first-incident-event population | tibble |
 | `getVisitTypeNames()` (`R/getVisitTypeNames.R`) | `stratified_code_counts` (distinct `visit_group_concept_id`) ⨝ `concept` (their names/codes) | tibble |
 | `getAPIInfo()` (`R/getAPIInfo.R`) | `cdm_source` (CDM name, vocabulary version) + package version | list |
 | `getLogs()` / `sendFeedback()` (`R/getLogs.R`, `R/sendFeedback.R`) | in-process log file / feedback capture — no DB | — |
@@ -343,6 +401,101 @@ sketch-reconstructed (see §2b):
 | `group` | the tagged tokens of the exclusive region, joined by `"-"` (e.g. `"317009SD"` or `"317009S-317009SD"`) |
 | `person_counts` | distinct persons in exactly that region (no more, no fewer of the target sets) |
 
+#### `getMeasurementValueHistogram()` → one tibble
+
+A histogram of `value_as_number`, for `Measurement`-domain concepts only (other
+domains are rejected). Takes the same tagged `conceptIds` + strata inputs as
+`getPersonCountsUpset()`, plus `nBins` (default 100).
+
+| Column | Meaning |
+|--------|---------|
+| `tagged_conceptid` | the entry of `conceptIds` this row's events belong to (e.g. `"40652733SD"`) |
+| `measured_value_bucket` | right-closed `(x1, x2]` bucket label |
+| `unit` | `concept_code` of the unit; `NA` when none was recorded |
+| `n_events` | events in that bucket, for that entry |
+
+Bins are computed **per unit**, pooled across every entry of `conceptIds` that
+shares that unit:
+
+- **Same unit → one histogram.** The entries come back on identical buckets, one
+  series each, so a client can stack them as coloured segments of the same bar
+  (a bin's full height is the total, split per `tagged_conceptid`).
+- **Different units → separate histograms**, each with its own bucket scale,
+  since values in different units are not comparable.
+
+A row exists per `(tagged_conceptid, unit, bin)`. Note the breaks pool the events
+of every entry sharing a unit, so overlapping entries (the same event matched by
+two entries) weight that event more than once in the median/MAD — exact for the
+usual disjoint case.
+
+The range is robust — `median ± 7·MAD`, not min/max — so one extreme outlier
+cannot collapse every real value into a single bin; out-of-range values land in
+an underflow bin (`(-Inf, x]`) and an overflow bin (`(x, +Inf]`), so every event
+is still counted. A zero MAD (all values identical) widens the range by a small
+fixed step. All `nBins + 2` bins are returned per partition, zero-filled.
+
+Crucially the breaks come from the **unfiltered** events of each partition while
+the counts come from the **filtered** ones, so the buckets stay fixed as a client
+changes `yearsRange`/`sexStratum`/`ageStratum`/`visitStratum`.
+
+Median and MAD are computed in SQL via `ROW_NUMBER()`/`COUNT() OVER` + `AVG` of
+the middle row(s) rather than `PERCENTILE_CONT` (absent in SQLite, spelled
+differently in BigQuery), so no values ever leave the database.
+
+#### `getPersonCountsPrevalence()` → one tibble
+
+Per tagged concept set per calendar year: the exact distinct-person numerator
+alongside the population-at-risk denominator (§2d), restricted to `yearsRange`
+and the requested strata. `sexStratum`/`ageStratum`/`yearsRange` narrow both
+numerator and denominator exactly; `visitStratum` narrows the numerator only.
+Returns raw counts, not a rate — `person_counts / observed_persons_counts *
+100` is the client's (and the report plot's) job. Rows whose year has no
+denominator are dropped, since no prevalence can be formed there.
+
+| Column | Meaning |
+|--------|---------|
+| `tagged_concept_id` | the tagged token from `conceptIds` (e.g. `"317009SD"`) |
+| `calendar_year` | the year |
+| `person_counts` | distinct persons matching that token's id set and the requested strata, in that year |
+| `observed_persons_counts` | distinct persons under observation in that year, matching `sexStratum`/`ageStratum`/`yearsRange` only |
+
+#### `getPersonCountsIncidence()` → one tibble
+
+Per tagged concept set per calendar year: the exact distinct-person numerator,
+counting a person only **once** — in the year of their first-ever record of
+that token's id set (the concept itself or any requested descendant) —
+alongside the same population-at-risk denominator `getPersonCountsPrevalence()`
+uses. A person's first-ever record is computed **ignoring every filter**;
+`sexStratum`/`ageStratum`/`visitStratum`/`yearsRange` only decide whether that
+already-fixed incident event qualifies for the count, they never change which
+year counts as "first" (see `.buildIncidentRowsSql()`,
+`R/parsePersonCountsConceptIds.R`). One consequence: narrowing `yearsRange` can
+legitimately return an all-zero row for a token whose true first-ever year
+falls outside the range — unlike `getPersonCountsPrevalence()`, where every
+year in range can show a nonzero count.
+
+| Column | Meaning |
+|--------|---------|
+| `tagged_concept_id` | the tagged token from `conceptIds` (e.g. `"317009SD"`) |
+| `calendar_year` | the year |
+| `person_counts` | distinct persons whose first-ever record of that token's id set falls in this year and matches the requested strata |
+| `observed_persons_counts` | distinct persons under observation in that year, matching `sexStratum`/`ageStratum`/`yearsRange` only |
+
+#### `getPersonCountsIncidenceFilters()` → one tibble
+
+Same shape and semantics as `getPersonCountsFilters()`, but pooling each set's
+**first-occurrence** rows instead of every raw occurrence — each of the four
+dimensions is computed with the *other three* dimensions' filters applied, but
+not its own, and a person's first-ever record is fixed ignoring every filter
+(same rule as `getPersonCountsIncidence()` above).
+
+| Column | Meaning |
+|--------|---------|
+| `filter` | which dimension: `"sex"`, `"age"`, `"visit"`, or `"year"` |
+| `stratum` | the `gender_concept_id` / `age_decile` / `visit_group_concept_id` / `calendar_year` value |
+| `person_counts` | distinct persons incident (first-ever record) in that stratum, with the other three dimensions' filters applied |
+| `selected` | `TRUE` if this stratum value was part of that dimension's own filter, else `FALSE` |
+
 #### `getVisitTypeNames()` → one tibble
 
 One row per FinnGen visit-source group present in the counts (empty when grouping
@@ -386,13 +539,25 @@ descendants. `inst/reports/mermaid.min.js` is served locally so reports need no
 CDN.
 
 A **Person Counts** section pulls `getPersonCountsFilters_memoise`,
-`getPersonCountsUpset_memoise` and `getVisitTypeNames_memoise` separately and
-renders: a pie chart of persons by sex
-(`createSexPieChartFromPersonCounts`), a bar chart by age decile
-(`createAgeHistogramFromPersonCounts`), a bar chart by visit-source group
-(`createVisitBarplotFromPersonCounts`), and an UpSet plot of the exact
-set-overlap regions (`createUpsetPlotFromPersonCounts`) — all in
-`R/plotingFunctions.R`.
+`getPersonCountsUpset_memoise`, `getPersonCountsPrevalence_memoise`,
+`getPersonCountsIncidence_memoise` and `getVisitTypeNames_memoise` separately
+and renders: a pie chart of persons by sex (`createSexPieChartFromPersonCounts`),
+a bar chart by age decile (`createAgeHistogramFromPersonCounts`), a bar chart by
+visit-source group (`createVisitBarplotFromPersonCounts`), an UpSet plot of the
+exact set-overlap regions (`createUpsetPlotFromPersonCounts`), a clustered dot
+chart of per-year prevalence, one series per tagged concept set
+(`createPrevalencePlotFromPersonCounts`), and the same chart for per-year
+incidence (`createIncidencePlotFromPersonCounts`) — all in `R/plotingFunctions.R`.
+
+A **Measured Values** section follows it, but only for `Measurement`-domain
+concepts: it pulls `getMeasurementValueHistogram_memoise` with the same
+`<conceptId>SD` token the person-counts section uses, and renders
+`createMeasurementHistogramPlot()` — one facet per unit, bars stacked by
+`tagged_conceptid`. The Rmd
+decides up front whether the concept is a Measurement (from
+`getConceptRelationships()`'s `concepts` tibble) and skips the section entirely
+otherwise, since the getter deliberately errors on other domains. It is also
+skipped when a Measurement concept simply has no numeric values recorded.
 
 ---
 
@@ -415,6 +580,10 @@ memoised getter:
 | `GET /getCodeCountsStratified?conceptId=` | `getCodeCountsStratified_memoise` |
 | `GET /getPersonCountsFilters?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=` | `getPersonCountsFilters_memoise` |
 | `GET /getPersonCountsUpset?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=` | `getPersonCountsUpset_memoise` |
+| `GET /getMeasurementValueHistogram?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=&nBins=` | `getMeasurementValueHistogram_memoise` |
+| `GET /getPersonCountsPrevalence?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=` | `getPersonCountsPrevalence_memoise` |
+| `GET /getPersonCountsIncidence?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=` | `getPersonCountsIncidence_memoise` |
+| `GET /getPersonCountsIncidenceFilters?conceptIds=&yearsRange=&sexStratum=&ageStratum=&visitStratum=` | `getPersonCountsIncidenceFilters_memoise` |
 | `GET /getListOfConcepts` | `getAllConceptsInfo_memoise` |
 | `GET /getVisitTypeNames` | `getVisitTypeNames_memoise` |
 | `GET /getAPIInfo` | `getAPIInfo` |
