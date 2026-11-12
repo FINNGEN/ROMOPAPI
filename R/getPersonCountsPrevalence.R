@@ -41,7 +41,7 @@
 #' @importFrom checkmate assertClass assertString assertIntegerish
 #' @importFrom DatabaseConnector renderTranslateQuerySql
 #' @importFrom tibble as_tibble
-#' @importFrom dplyr mutate left_join coalesce select arrange filter
+#' @importFrom dplyr mutate left_join coalesce select arrange filter row_number
 #' @importFrom tidyr expand_grid
 #' @importFrom purrr pmap_chr
 #'
@@ -90,14 +90,21 @@ getPersonCountsPrevalence <- function(
         .inFilterSql("visit_group_concept_id", visitStratum)
     )
 
+    # Each branch is wrapped in its own subquery: SqlRender's BigQuery translation
+    # rewrites GROUP BY to column ordinals and, across a bare UNION ALL, replaces
+    # the selected calendar_year with the literal 2 in every branch after the
+    # first. The alias is the row index, as the token is not a safe identifier.
     tokenQueries <- resolvedTokens |>
-        purrr::pmap_chr(function(token, column, resolved_ids, ...) {
+        dplyr::mutate(branch_index = dplyr::row_number()) |>
+        purrr::pmap_chr(function(token, column, resolved_ids, branch_index, ...) {
             paste0(
-                "SELECT '", token, "' AS tagged_concept_id, calendar_year,
-                        COUNT(DISTINCT person_id) AS person_counts
-                 FROM @resultsDatabaseSchema.@stratifiedPersonsTable
-                 WHERE ", column, " IN (", paste(resolved_ids, collapse = ","), ")", numeratorStrataFilterSql, "
-                 GROUP BY calendar_year"
+                "SELECT * FROM (
+                    SELECT '", token, "' AS tagged_concept_id, calendar_year,
+                           COUNT(DISTINCT person_id) AS person_counts
+                    FROM @resultsDatabaseSchema.@stratifiedPersonsTable
+                    WHERE ", column, " IN (", paste(resolved_ids, collapse = ","), ")", numeratorStrataFilterSql, "
+                    GROUP BY calendar_year
+                 ) token_", branch_index
             )
         })
 
