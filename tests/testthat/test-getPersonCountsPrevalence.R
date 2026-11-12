@@ -151,6 +151,40 @@ test_that("getPersonCountsPrevalence's per-year numerator matches getPersonCount
     expect_equal(0)
 })
 
+test_that("getPersonCountsPrevalence gives every token the same counts as when queried alone", {
+  # regression: on BigQuery, SqlRender's GROUP BY ordinal rewrite across a bare
+  # UNION ALL replaced calendar_year with the literal 2 in every branch after
+  # the first, so only the first token got non-zero counts
+  skip_if_not(testingDatabase %in% postCountsDatabases)
+
+  CDMdbHandler <- HadesExtras_createCDMdbHandlerFromList(test_cohortTableHandlerConfig, loadConnectionChecksLevel = "basicChecks")
+  withr::defer({
+    CDMdbHandler <- NULL
+    gc()
+  })
+
+  memoise::forget(getPersonCountsPrevalence_memoise)
+
+  tokens <- c("317009SD", "4191479SD")
+
+  combined <- getPersonCountsPrevalence(CDMdbHandler, conceptIds = paste(tokens, collapse = ","))
+  alone <- tokens |>
+    purrr::map(\(token) getPersonCountsPrevalence(CDMdbHandler, conceptIds = token)) |>
+    dplyr::bind_rows()
+
+  # both tokens must actually have data, or the comparison proves nothing
+  alone |>
+    dplyr::group_by(tagged_concept_id) |>
+    dplyr::summarise(total = sum(person_counts)) |>
+    dplyr::pull(total) |>
+    (\(x) length(x) == length(tokens) && all(x > 0))() |>
+    expect_true()
+
+  combined |>
+    dplyr::arrange(tagged_concept_id, calendar_year) |>
+    expect_equal(alone |> dplyr::arrange(tagged_concept_id, calendar_year))
+})
+
 test_that("getPersonCountsPrevalence gives exact counts on a hand-built fixture (synthetic)", {
   # Checks the actual numerator/denominator ARITHMETIC against
   # .buildSyntheticPersonCountsHandler() (tests/testthat/helper.R):
